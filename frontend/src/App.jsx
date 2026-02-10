@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Mic, Volume2, RotateCcw, ShieldCheck, Power } from 'lucide-react';
 import './App.css';
 
-const API_URL = "http://localhost:8000/api";
+const API_URL = `http://${window.location.hostname}:8000/api`;
 
 function App() {
   const [status, setStatus] = useState({ status: "loading", subject_id: "..." });
@@ -59,7 +59,16 @@ function App() {
           <input
             type="checkbox"
             checked={isHandsFree}
-            onChange={() => setIsHandsFree(!isHandsFree)}
+            onChange={async () => {
+              const newMode = !isHandsFree;
+              setIsHandsFree(newMode);
+              try {
+                await axios.post(`${API_URL}/action`, {
+                  type: "set_mode",
+                  mode: newMode ? "hands_free" : "manual"
+                });
+              } catch (e) { console.error(e); }
+            }}
           />
           <span className="slider round"></span>
         </label>
@@ -81,20 +90,39 @@ function App() {
 
       {/* Bottom Controls / Mic */}
       <div className="bottom-controls">
-        <div className="mic-circle pulse">
+        <div
+          className={`mic-circle ${status.status === 'listening' ? 'pulse' : ''}`}
+          onClick={async () => {
+            if (!isHandsFree) {
+              try {
+                await axios.post(`${API_URL}/action`, { type: "start_listening" });
+              } catch (e) { console.error(e); }
+            }
+          }}
+          style={{ cursor: isHandsFree ? 'default' : 'pointer', opacity: isHandsFree ? 0.7 : 1.0 }}
+        >
           <Mic size={40} color="white" />
         </div>
         <div className="assistant-status">
-          <h3>Assistant is speaking...</h3>
-          <p>We will start listening automatically after the assistant finishes speaking.</p>
+          <h3>Session Active</h3>
+          <p>{isHandsFree ? "Hands-Free Mode Active" : "Push Mic to Talk"}</p>
         </div>
         <div className="control-bar">
           <div className="control-item">
-            <div className="listening-badge">
-              <span className="wave">|||</span> Listening...
-            </div>
+            {status.status === 'listening' && (
+              <div className="listening-badge">
+                <span className="wave">|||</span> Listening...
+              </div>
+            )}
           </div>
-          <div className="control-item stop-btn">
+          <div
+            className="control-item stop-btn"
+            onClick={async () => {
+              try {
+                await axios.post(`${API_URL}/action`, { type: "stop" });
+              } catch (e) { console.error(e); }
+            }}
+          >
             <Power size={20} /> Stop
           </div>
         </div>

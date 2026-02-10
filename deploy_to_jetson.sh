@@ -40,21 +40,21 @@ ssh $JETSON_HOST << EOF
     cd $PROJECT_DIR
     
     # Install System Deps
-    if ! dpkg -s portaudio19-dev >/dev/null 2>&1; then
-        echo "Installing portaudio19-dev (sudo required)..."
-        echo "carolina2026" | sudo -S apt-get install -y portaudio19-dev app
-    fi
+    echo "Installing dependencies (sudo required)..."
+    echo "carolina2026" | sudo -S apt-get install -y portaudio19-dev python3-venv
+
     
     # Python Venv
-    if [ ! -d ".venv" ]; then
+    if [ ! -f ".venv/bin/activate" ]; then
         echo "Creating Python venv..."
+        rm -rf .venv
         python3 -m venv .venv
     fi
     source .venv/bin/activate
     
     # Install Python Requirements
     echo "Installing Python dependencies..."
-    pip install -r requirements.txt
+    pip install -r LLM_therapist_prototype/requirements.txt
     pip install faster-whisper webrtcvad pyaudio soundfile uvicorn fastapi python-multipart
     
     # Sanity Check
@@ -69,5 +69,6 @@ echo "To run the system:"
 echo "1. SSH into Jetson: ssh $JETSON_HOST"
 echo "2. Go to project: cd $PROJECT_DIR"
 echo "3. Activate venv: source .venv/bin/activate"
-echo "4. Run Backend: python LLM_therapist_Application.py"
+echo "4. Go to source: cd LLM_therapist_prototype"
+echo "5. Run Backend: python LLM_therapist_Application.py"
 echo "5. (Optional) Run Frontend in another terminal: cd frontend && npm install && npm run dev -- --host"

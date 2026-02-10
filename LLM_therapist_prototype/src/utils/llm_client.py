@@ -24,26 +24,30 @@ def llm_complete(system_content: str, user_content: str) -> str:
     logger.info("Sending request to LLM")
     logger.debug({"model": OPENAI_MODEL, "user": user_content})
     try:
-        resp = client.responses.create(
-            model=OPENAI_MODEL,
-            reasoning={"effort": "low"},
-            instructions=system_content,
-            input=user_content,
-        )
-        logger.info("Received response from LLM (client.responses)")
-        return resp.output_text
-    except AttributeError:
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": user_content},
-            ],
-            max_tokens=OPENAI_MAX_TOKENS,
-            temperature=OPENAI_TEMPERATURE,
-        )
-        logger.info("Received response from LLM (client.chat.completions)")
-        return resp.choices[0].message.content
+        try:
+            resp = client.responses.create(
+                model=OPENAI_MODEL,
+                reasoning={"effort": "low"},
+                instructions=system_content,
+                input=user_content,
+            )
+            logger.info("Received response from LLM (client.responses)")
+            return resp.output_text
+        except AttributeError:
+            resp = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": user_content},
+                ],
+                max_tokens=OPENAI_MAX_TOKENS,
+                temperature=OPENAI_TEMPERATURE,
+            )
+            logger.info("Received response from LLM (client.chat.completions)")
+            return resp.choices[0].message.content
+    except Exception as e:
+        logger.error(f"LLM Call Failed: {e}")
+        return "I am currently unable to access my language model, but I am listening."
 
 
 __all__ = ["llm_complete"]

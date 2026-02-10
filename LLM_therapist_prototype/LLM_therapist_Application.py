@@ -41,8 +41,12 @@ from src.utils.config_loader import SUBJECT_ID
 
 @app.get("/api/status")
 def get_status():
+    current_status = "ready"
+    if hasattr(app.state, 'speech_loop'):
+        current_status = app.state.speech_loop.state
+
     return {
-        "status": "ready", 
+        "status": current_status, 
         "subject_id": SUBJECT_ID,
         "session_id": io_record.SESSION_ID
     }
@@ -57,7 +61,30 @@ def get_turns():
 
 @app.post("/api/action")
 def post_action(action: dict):
-    # Handle hands-free toggle or other actions
+    # Handle actions
+    action_type = action.get("type")
+    
+    if action_type == "stop":
+        # Stop current audio / reset session logic if needed
+        # For now, just logging. Detailed stop logic would require interrupting Action/Player.
+        logger.info("Received STOP command")
+        if hasattr(app.state, 'speech_loop'):
+             app.state.speech_loop.stop_audio()
+        return {"status": "stopped"}
+        
+    elif action_type == "start_listening":
+        logger.info("Received START_LISTENING command")
+        if hasattr(app.state, 'speech_loop'):
+             app.state.speech_loop.manual_input_event.set()
+        return {"status": "listening_triggered"}
+        
+    elif action_type == "set_mode":
+        mode = action.get("mode") # "hands_free" or "manual"
+        logger.info(f"Setting mode to {mode}")
+        if hasattr(app.state, 'speech_loop'):
+            app.state.speech_loop.is_hands_free = (mode == "hands_free")
+        return {"status": "mode_set", "mode": mode}
+
     return {"status": "ok", "action": action}
 
 # Run API in thread
@@ -77,6 +104,12 @@ class SpeechInteractionLoop:
         self.tts = TTSGenerator()
         self.player = AudioPlayer()
         self.running = True
+        
+        # Controls
+        self.manual_input_event = threading.Event()
+        self.stop_playback_event = threading.Event()
+        self.is_hands_free = True
+        self.state = "idle"  # idle, playing, listening, processing
 
     def run(self):
         logger.info("Starting Speech Interaction Loop.")
@@ -109,17 +142,34 @@ class SpeechInteractionLoop:
         logger.info(f"Agent says: {text}")
         
         # 1. TTS
+        self.state = "processing"
         wav_file = "response_temp.wav"
         if self.tts.generate(text, wav_file):
-            # 2. Play Audio
-            self.player.play(wav_file)
+            # 2. Play Audio (Interruptible)
+            self.state = "playing"
+            self.stop_playback_event.clear()
+            self.player.play(wav_file, stop_event=self.stop_playback_event)
         
+        # Check if stopped during playback
+        if self.stop_playback_event.is_set():
+            logger.info("Turn interrupted. Skipping listening.")
+            self.state = "idle"
+            return
+
         # 3. Listen for User Response
+        self.state = "processing" # Waiting/Transition
         time.sleep(0.5) # Wait a bit before listening (Frontend tweak)
         logger.info("Listening for user response (Max 15s wait)...")
         
-        # Logic: Optional Wake Word check could go here if we were in a "Standby" mode.
-        # But since we are in an active session, we just record.
+        # Logic: Hands-Free vs Manual
+        if not self.is_hands_free:
+            self.state = "idle" # Waiting for trigger
+            logger.info("Manual Mode: Waiting for trigger...")
+            self.manual_input_event.wait()
+            self.manual_input_event.clear()
+            logger.info("Trigger received. Listening...")
+        
+        self.state = "listening"
         audio_frames = self.recorder.record_until_silence(max_duration=15.0)
         
         if not audio_frames:
@@ -127,6 +177,7 @@ class SpeechInteractionLoop:
             user_text = "" # Send empty to indicate silence/no-response
         else:
             # 4. Save and STT
+            self.state = "processing"
             user_wav = "user_input_temp.wav"
             self.recorder.save_wav(audio_frames, user_wav)
             user_text = self.stt.transcribe(user_wav)
@@ -136,6 +187,15 @@ class SpeechInteractionLoop:
         # 5. Send to Agent (Back to Cognition)
         # Note: io_record will also log this to record.csv (Frontend Requirement)
         INPUT_QUEUE.put(user_text)
+        self.state = "idle"
+
+    def stop_audio(self):
+        """External hook to stop audio."""
+        logger.info("Stopping audio playback...")
+        self.stop_playback_event.set()
+        # Also interrupt manual wait if stuck there
+        if not self.is_hands_free:
+             self.manual_input_event.set()
 
     def cleanup(self):
         self.running = False
@@ -164,6 +224,9 @@ def main():
     # Start the Speech I/O thread
     t = threading.Thread(target=speech_loop.run, daemon=True)
     t.start()
+    
+    # Register loop for API access
+    app.state.speech_loop = speech_loop
 
     # Start the main RL workflow (this will drive the therapy session)
     try:
