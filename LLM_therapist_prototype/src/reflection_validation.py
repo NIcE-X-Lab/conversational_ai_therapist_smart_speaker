@@ -143,7 +143,11 @@ def rv_reasoner(topic: str, original_question: str, original_response: str, foll
     """
     logger.info("Running reflection validation reasoner.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Response": {original_response!r}, "Follow Up Response": {follow_up_response!r}}}'
-    return _chat_complete(RV_FOLLOW_UP_SYSTEM_REASONER_PROMPT, payload)
+    raw_resp = _chat_complete(RV_FOLLOW_UP_SYSTEM_REASONER_PROMPT, payload)
+    # Parse DECISION
+    if "DECISION:" in raw_resp:
+        return raw_resp.split("DECISION:")[1].strip()
+    return raw_resp
 
 def rv_guide(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
     """
@@ -152,7 +156,11 @@ def rv_guide(topic: str, original_question: str, original_response: str, follow_
     """
     logger.info("Running reflection validation guide.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Response": {original_response!r}, "Follow-up Response": {follow_up_response!r}}}'
-    return _chat_complete(RV_FOLLOW_UP_GUIDE_SYSTEM_PROMPT, payload)
+    raw_resp = _chat_complete(RV_FOLLOW_UP_GUIDE_SYSTEM_PROMPT, payload)
+    # Parse Guide
+    if "Guide:" in raw_resp:
+        return raw_resp.split("Guide:")[1].strip()
+    return raw_resp
 
 def rv_validation(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
     """
@@ -161,4 +169,8 @@ def rv_validation(topic: str, original_question: str, original_response: str, fo
     """
     logger.info("Running reflection validation support/validation.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Response": {original_response!r}, "Follow-up Response": {follow_up_response!r}}}'
-    return _chat_complete(RV_FOLLOW_UP_VALIDATION_SYSTEM_PROMPT, payload)
+    raw_resp = _chat_complete(RV_FOLLOW_UP_VALIDATION_SYSTEM_PROMPT, payload)
+    # Parse VALIDATION
+    if "VALIDATION:" in raw_resp:
+        return raw_resp.split("VALIDATION:")[1].strip()
+    return raw_resp

@@ -64,7 +64,10 @@ def retry_guide(topic: str, original_question: str, original_answer: str) -> str
     """
     logger.info("Generating retry guide for re-ask.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Answer": {original_answer!r}}}'
-    return _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload)
+    raw_resp = _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload)
+    if "GUIDE:" in raw_resp:
+        return raw_resp.split("GUIDE:")[1].strip()
+    return raw_resp
 
 def classify_segments(user_segments: List[str], original_question: str, dimension_label: str) -> List[Tuple[str, int]]:
     """
@@ -266,6 +269,10 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
             log_question(question_text_ask)
             # Get user input for the question
             _ , user_input = get_answer()
+            if user_input and "SESSION_END" in user_input:
+                logger.info("Session End signal received in ask_question.")
+                return 0.0, 1, ""
+
             # Classify the user response into DLA result segments
             dimension_label = question_lib[str(S)][str(question_A)]["label"]
             DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]
@@ -282,8 +289,13 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                 original_answer_text = " ".join(user_input) if user_input else ""
                 guide_text = retry_guide(topic, question_text, original_answer_text)
                 # Show the guide to the user and collect a new response
+                # Show the guide to the user and collect a new response
                 log_question(guide_text)
                 _ , user_input = get_answer()
+                if user_input and "SESSION_END" in user_input:
+                    logger.info("Session End signal received in retry.")
+                    return 0.0, 1, ""
+
                 # Classify the new user response
                 dimension_label = question_lib[str(S)][str(question_A)]["label"]
                 DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]

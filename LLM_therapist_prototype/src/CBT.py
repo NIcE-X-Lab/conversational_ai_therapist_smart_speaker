@@ -362,6 +362,9 @@ def run_cbt(question_lib):
     q0_clean = " \n".join(lines)
     log_question(q0_clean)
     resp = get_resp_log()
+    if isinstance(resp, str) and "SESSION_END" in resp:
+        logger.info("Session End signal received in CBT stage 0.")
+        return
     if isinstance(resp, str) and resp.strip().lower().find("stop") != -1:
         logger.info("User requested stop at CBT stage 0.")
         return
@@ -390,6 +393,9 @@ def run_cbt(question_lib):
             f"Example: 1. Options: {opts}"
         )
         resp = get_resp_log()
+        if isinstance(resp, str) and "SESSION_END" in resp:
+            logger.info("Session End signal received in CBT stage 0 retry.")
+            return
         if isinstance(resp, str) and resp.strip().lower().find("stop") != -1:
             logger.info("User requested stop at CBT stage 0 retry.")
             return
@@ -442,6 +448,9 @@ def run_cbt(question_lib):
     set_question_prefix(recap)
     log_question("Can you try to identify any unhelpful thoughts you have that contribute to this situation?")
     unhelpful = get_resp_log()
+    if isinstance(unhelpful, str) and "SESSION_END" in unhelpful:
+        logger.info("Session End signal received in CBT stage 1.")
+        return
     if isinstance(unhelpful, str) and unhelpful.strip().lower().find("stop") != -1:
         logger.info("User requested stop at CBT stage 1.")
         return
@@ -455,6 +464,9 @@ def run_cbt(question_lib):
         log_question(guide1)
         log_question("Please provide your UNHELPFUL_THOUGHTS again, in one sentence.")
         unhelpful = get_resp_log()
+        if isinstance(unhelpful, str) and "SESSION_END" in unhelpful:
+            logger.info("Session End signal received in CBT stage 1 retry.")
+            return
         if isinstance(unhelpful, str) and unhelpful.strip().lower().find("stop") != -1:
             logger.info("User requested stop during CBT stage 1 retry.")
             return
@@ -475,6 +487,9 @@ def run_cbt(question_lib):
     # Stage 2: challenge the unhelpful thoughts
     log_question("Now, how could you challenge those unhelpful thoughts? Please write a brief challenge.")
     challenge = get_resp_log()
+    if isinstance(challenge, str) and "SESSION_END" in challenge:
+        logger.info("Session End signal received in CBT stage 2.")
+        return
     if isinstance(challenge, str) and challenge.strip().lower().find("stop") != -1:
         logger.info("User requested stop at CBT stage 2.")
         return
@@ -487,6 +502,9 @@ def run_cbt(question_lib):
         log_question(guide2)
         log_question("Please try to CHALLENGE the unhelpful thoughts again, in one sentence.")
         challenge = get_resp_log()
+        if isinstance(challenge, str) and "SESSION_END" in challenge:
+            logger.info("Session End signal received in CBT stage 2 retry.")
+            return
         if isinstance(challenge, str) and challenge.strip().lower().find("stop") != -1:
             logger.info("User requested stop during CBT stage 2 retry.")
             return
@@ -509,6 +527,9 @@ def run_cbt(question_lib):
     set_question_prefix(recap3.strip())
     log_question("Finally, can you reframe the unhelpful thought into a more balanced, constructive one?")
     reframe = get_resp_log()
+    if isinstance(reframe, str) and "SESSION_END" in reframe:
+        logger.info("Session End signal received in CBT stage 3.")
+        return
     if isinstance(reframe, str) and reframe.strip().lower().find("stop") != -1:
         logger.info("User requested stop at CBT stage 3.")
         return
@@ -521,6 +542,9 @@ def run_cbt(question_lib):
         log_question(guide3)
         log_question("Please REFRAME again in one or two sentences.")
         reframe = get_resp_log()
+        if isinstance(reframe, str) and "SESSION_END" in reframe:
+            logger.info("Session End signal received in CBT stage 3 retry.")
+            return
         if isinstance(reframe, str) and reframe.strip().lower().find("stop") != -1:
             logger.info("User requested stop during CBT stage 3 retry.")
             return

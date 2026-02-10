@@ -85,7 +85,52 @@ def post_action(action: dict):
             app.state.speech_loop.is_hands_free = (mode == "hands_free")
         return {"status": "mode_set", "mode": mode}
 
-    return {"status": "ok", "action": action}
+@app.post("/api/pause")
+def pause_session():
+    if hasattr(app.state, 'speech_loop'):
+        app.state.speech_loop.set_paused(True)
+    return {"status": "paused"}
+
+@app.post("/api/resume")
+def resume_session():
+    if hasattr(app.state, 'speech_loop'):
+        app.state.speech_loop.set_paused(False)
+    return {"status": "resumed"}
+
+@app.post("/api/end_session")
+def end_session():
+    logger.info("Ending session via API.")
+    if hasattr(app.state, 'speech_loop'):
+        app.state.speech_loop.stop_audio()
+    
+    # Signal HandlerRL to stop
+    # Signal HandlerRL to stop
+    io_record.END_SESSION_EVENT.set()
+    io_record.START_SESSION_EVENT.clear() # Block future sessions until login
+    # Unblock any waiting input
+    io_record.INPUT_QUEUE.put("SESSION_END")
+    
+    return {"status": "session_ended"}
+
+@app.post("/api/login")
+def login_user(data: dict):
+    user_type = data.get("user_id", "test_user")
+    logger.info(f"Logging in user: {user_type}")
+    
+    # Reset session with new user
+    if user_type == "new_user":
+        import uuid
+        uid = f"user_{str(uuid.uuid4())[:8]}"
+    else:
+        uid = "test_user"
+        
+    io_record.reset_session(uid)
+
+    # Signal session start
+    io_record.END_SESSION_EVENT.clear()
+    io_record.START_SESSION_EVENT.set() 
+    
+    return {"status": "logged_in", "user_id": uid, "session_id": io_record.SESSION_ID}
 
 # Run API in thread
 def run_api():
@@ -109,12 +154,25 @@ class SpeechInteractionLoop:
         self.manual_input_event = threading.Event()
         self.stop_playback_event = threading.Event()
         self.is_hands_free = True
-        self.state = "idle"  # idle, playing, listening, processing
+        self.paused = False
+        self.state = "idle"  # idle, playing, listening, processing, paused
+
+    def set_paused(self, paused: bool):
+        self.paused = paused
+        if paused:
+            self.state = "paused"
+            self.stop_audio()
+        else:
+            self.state = "idle"
 
     def run(self):
         logger.info("Starting Speech Interaction Loop.")
         while self.running:
             try:
+                if self.paused:
+                    time.sleep(0.5)
+                    continue
+
                 # 1. Check for Agent Output (Question)
                 try:
                     text_to_speak = OUTPUT_QUEUE.get(timeout=0.1)
@@ -158,7 +216,12 @@ class SpeechInteractionLoop:
 
         # 3. Listen for User Response
         self.state = "processing" # Waiting/Transition
-        time.sleep(0.5) # Wait a bit before listening (Frontend tweak)
+        time.sleep(1.5) # Increased wait to avoid echo/self-transcription
+        
+        # Clear Input Queue to remove stale data/echoes
+        with INPUT_QUEUE.mutex:
+            INPUT_QUEUE.queue.clear()
+            
         logger.info("Listening for user response (Max 15s wait)...")
         
         # Logic: Hands-Free vs Manual
@@ -184,6 +247,13 @@ class SpeechInteractionLoop:
         
         logger.info(f"User Transcribed: {user_text}")
         
+        # Voice Command Check
+        lower_text = user_text.lower().strip()
+        if "end session" in lower_text or "stop session" in lower_text:
+            logger.info("Voice Command: End Session detected.")
+            end_session() # Call API function directly
+            return
+
         # 5. Send to Agent (Back to Cognition)
         # Note: io_record will also log this to record.csv (Frontend Requirement)
         INPUT_QUEUE.put(user_text)
@@ -230,7 +300,25 @@ def main():
 
     # Start the main RL workflow (this will drive the therapy session)
     try:
-        HandlerRL().run()
+        while True:
+            # Wait for valid session via Login OR Voice Command
+            if not io_record.START_SESSION_EVENT.is_set():
+                # Listen for "Start Session" command while idle?
+                # This requires SpeechLoop to be listening.
+                # Currently SpeechLoop only listens when triggered by Agent or Manual.
+                # To support "Start Session", we'd need a background listening loop.
+                # For now, we rely on the Login UI button as the primary trigger.
+                time.sleep(1)
+                continue
+                
+            io_record.END_SESSION_EVENT.clear()
+            logger.info(f"Starting HandlerRL for Session {io_record.SESSION_ID}")
+            HandlerRL().run()
+            
+            # If run() returns, session ended
+            logger.info("HandlerRL finished. Waiting for next login.")
+            io_record.START_SESSION_EVENT.clear()
+            
     except KeyboardInterrupt:
         logger.info("Application interrupted.")
     finally:
