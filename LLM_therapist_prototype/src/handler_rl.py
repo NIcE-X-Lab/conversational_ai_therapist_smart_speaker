@@ -18,6 +18,7 @@ from src.utils.config_loader import (
 from src.utils.config_loader import RECORD_CSV
 from src.utils.io_question_lib import load_question_lib, save_question_lib, generate_results
 from src.utils.io_record import init_record, log_question, set_question_prefix
+import src.utils.io_record as io_rec
 from src.utils.rl_qtables import (
     initialize_q_table,
     choose_action,
@@ -115,6 +116,10 @@ class HandlerRL:
         # Mask for available items (first item is always available)
         item_mask = [0] + [1] * (ITEM_N_STATES - 1)
         while not is_terminated:
+            if io_rec.END_SESSION_EVENT.is_set():
+                logger.info("Session Interrupted (End Session Event).")
+                return
+
             # If all items have been asked, exit to CBT directly
             if sum(item_mask) == 0:
                 is_terminated = True
@@ -222,6 +227,85 @@ class HandlerRL:
                 log_question(fallback)
                 time.sleep(0.5)
                 self._unlock_question_if_stuck()
+
+        # Perform Session Analysis (Summaries, Prefs, Safety)
+        try:
+            self._generate_session_analysis()
+        except Exception:
+            pass
+
+    def _generate_session_analysis(self):
+        """
+        Analyze the session history for summary, preferences, and safety flags.
+        Stores them in the DB.
+        """
+        if not io_rec.DB or not io_rec.SESSION_ID:
+            logger.warning("DB or Session ID not available for analysis.")
+            return
+
+        history = io_rec.DB.get_session_history(io_rec.SESSION_ID)
+        if not history:
+            return
+
+        # Format history string
+        hist_text = "\\n".join([f"{h['speaker']}: {h['text']}" for h in history])
+        
+        prompt = (
+            "Analyze the following therapy session history:\\n"
+            f"{hist_text}\\n\\n"
+            "Tasks:\\n"
+            "1. SUMMARY: Provide a brief 2-3 sentence summary of the session's key topics and user state.\\n"
+            "2. PREFERENCES: Extract any specific user preferences or facts mentioned (e.g., likes shopping, dislikes crowds). Format: KEY: VALUE\\n"
+            "3. SAFETY_FLAGS: Identify any potential safety risks (e.g., self-harm, violence). If none, say NONE.\\n"
+            "   Severity scale: 1 (mild) to 5 (critical).\\n\\n"
+            "Response Format:\\n"
+            "SUMMARY: <summary text>\\n"
+            "PREFERENCES:\\n- <key>: <value>\\n"
+            "SAFETY_FLAGS:\\n- <type>: <text>: <severity>\\n"
+        )
+        
+        try:
+            analysis = llm_complete("You are a clinical supervisor analyzing session notes.", prompt)
+            
+            # Parse and Store
+            current_section = None
+            for line in analysis.split('\\n'):
+                line = line.strip()
+                if not line: continue
+                
+                if line.startswith("SUMMARY:"):
+                    summary = line.replace("SUMMARY:", "").strip()
+                    if summary:
+                        io_rec.DB.add_summary(io_rec.SESSION_ID, summary)
+                        logger.info(f"Stored summary: {summary}")
+                    current_section = "SUMMARY"
+                elif line.startswith("PREFERENCES:"):
+                    current_section = "PREFERENCES"
+                elif line.startswith("SAFETY_FLAGS:"):
+                    current_section = "SAFETY_FLAGS"
+                elif line.startswith("-") and current_section == "PREFERENCES":
+                    # Parse preference "Key: Value"
+                    parts = line.replace("-", "").strip().split(":", 1)
+                    if len(parts) == 2:
+                        k, v = parts[0].strip(), parts[1].strip()
+                        user_id = io_rec.DB.get_user_id(SUBJECT_ID)
+                        io_rec.DB.set_preference(user_id, k, v)
+                        logger.info(f"Stored preference: {k}={v}")
+                elif line.startswith("-") and current_section == "SAFETY_FLAGS":
+                    # Parse safety flag "Type: Text: Severity"
+                    parts = line.replace("-", "").strip().split(":")
+                    if len(parts) >= 3:
+                        ftype = parts[0].strip()
+                        try:
+                            severity = int(parts[-1].strip())
+                            raw = ":".join(parts[1:-1]).strip()
+                            io_rec.DB.log_safety_flag(io_rec.SESSION_ID, ftype, raw, severity)
+                            logger.warning(f"Logged SAFETY FLAG: {ftype} ({severity})")
+                        except ValueError:
+                            pass
+
+        except Exception as e:
+            logger.error(f"Session analysis failed: {e}")
 
     def _detect_cbt_summary(self) -> tuple:
         """Return (cbt_used, summary_str) by scanning question_lib notes for CBT markers."""

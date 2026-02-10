@@ -180,3 +180,34 @@ class DBManager:
                   (session_id, turn_index, flag_type, raw_text, severity))
         conn.commit()
         conn.close()
+
+    def get_user_context_string(self, user_id, limit=3):
+        """
+        Retrieve a formatted string of user context: preferences and recent summaries.
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        # Get Preferences
+        c.execute("SELECT key, value FROM user_preferences WHERE user_id=?", (user_id,))
+        prefs = c.fetchall()
+        prefs_str = "\n".join([f"- {k}: {v}" for k, v in prefs])
+        
+        # Get Recent Summaries (need join)
+        # Summaries table has session_id, need to join with sessions table to filter by user_id
+        c.execute("""SELECT summaries.summary_text, summaries.created_at FROM summaries 
+                     JOIN sessions ON summaries.session_id = sessions.id
+                     WHERE sessions.user_id=? 
+                     ORDER BY sessions.start_time DESC LIMIT ?""", (user_id, limit))
+        sums = c.fetchall()
+        sums_str = "\n".join([f"- {s[1]}: {s[0]}" for s in sums])
+        
+        conn.close()
+        
+        context = ""
+        if prefs_str:
+            context += f"\n[User Preferences]\n{prefs_str}\n"
+        if sums_str:
+            context += f"\n[Recent Session Summaries]\n{sums_str}\n"
+            
+        return context

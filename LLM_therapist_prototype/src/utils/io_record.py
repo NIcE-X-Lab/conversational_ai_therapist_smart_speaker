@@ -2,6 +2,7 @@ import os
 import queue
 import logging
 import time
+import threading
 import pandas as pd
 from typing import List, Tuple
 
@@ -17,12 +18,20 @@ OUTPUT_QUEUE = queue.Queue()
 # Interface puts responses here, Agent gets them
 INPUT_QUEUE = queue.Queue()
 
+END_SESSION_EVENT = threading.Event()
+START_SESSION_EVENT = threading.Event()
+
+
 # Database instance
 DB = None
 SESSION_ID = None
 CURRENT_TURN_INDEX = 0
 
 _PENDING_QUESTION_PREFIX = ""
+USER_CONTEXT = ""
+
+def get_user_context():
+    return USER_CONTEXT
 
 def set_question_prefix(text: str):
     """
@@ -49,9 +58,13 @@ def _atomic_write_csv(data: dict):
     except Exception as e:
         logger.error(f"Failed to sync to CSV: {e}")
 
-def init_record():
+def init_record(user_id_override: str = None):
     """Initialize queues, database session, and CSV."""
-    global DB, SESSION_ID, CURRENT_TURN_INDEX
+    global DB, SESSION_ID, CURRENT_TURN_INDEX, SUBJECT_ID
+    
+    if user_id_override:
+        logger.info(f"Overriding SUBJECT_ID with {user_id_override}")
+        SUBJECT_ID = user_id_override
     
     # Clear queues
     with OUTPUT_QUEUE.mutex:
@@ -64,6 +77,15 @@ def init_record():
         DB = DBManager(DB_PATH)
         user_id = DB.get_user_id(SUBJECT_ID)
         SESSION_ID = DB.create_session(user_id)
+        # Load User Context (Summaries & Preferences)
+        try:
+            global USER_CONTEXT
+            USER_CONTEXT = DB.get_user_context_string(user_id)
+            if USER_CONTEXT:
+                logger.info("Loaded User Context for session.")
+        except Exception as e:
+            logger.error(f"Failed to load user context: {e}")
+
         CURRENT_TURN_INDEX = 0
         logger.info(f"Initialized record. Session ID: {SESSION_ID}")
     except Exception as e:
@@ -71,6 +93,11 @@ def init_record():
         
     # Initialize CSV
     _atomic_write_csv({"Question": "", "Question_Lock": 0, "Resp": "", "Resp_Lock": 1})
+
+def reset_session(new_user_id: str = None):
+    """Reset the session, optionally switching users."""
+    init_record(new_user_id)
+
 
 
 def log_question(text: str):

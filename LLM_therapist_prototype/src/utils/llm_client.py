@@ -21,6 +21,14 @@ def llm_complete(system_content: str, user_content: str) -> str:
     Output:
       - plain text content returned by the model
     """
+    try:
+        from src.utils.io_record import get_user_context
+        user_ctx = get_user_context()
+        if user_ctx:
+            system_content = f"{system_content}\n\n{user_ctx}"
+    except ImportError:
+        pass
+
     logger.info("Sending request to LLM")
     logger.debug({"model": OPENAI_MODEL, "user": user_content})
     try:
