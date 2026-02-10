@@ -27,14 +27,14 @@ rl:
  
 openai:
   base_url: "http://localhost:11434/v1" # Example local Ollama URL
-  model: "llama3" # Example local model
+  model: "gemma3:4b" # Example local model
   temperature: 0.7
   max_tokens: 400
 
 audio:
   sample_rate: 16000
   channels: 1
-  chunk_size: 1024
+  chunk_size: 480
   vad_aggressiveness: 3 # 0-3
 
 stt:
