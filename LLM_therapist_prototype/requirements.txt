@@ -1,0 +1,25 @@
+# Core Dependencies
+pyaudio
+webrtcvad
+soundfile
+numpy
+pandas
+pyyaml
+coloredlogs
+requests
+
+# Cognition / LLM
+openai
+
+# Speech / Models
+faster-whisper
+piper-tts # ensuring piper is available, or at least the python bindings if used
+
+# API / Backend
+fastapi
+uvicorn
+python-multipart
+
+# Testing
+pytest
+httpx
