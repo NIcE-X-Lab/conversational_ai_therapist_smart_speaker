@@ -1,132 +1,141 @@
 # Smart-Speaker Micro-Intervention System (Local Jetson Deployment)
 
-## Overview
-This project implements a fully local smart-speaker system on the NVIDIA Jetson platform. The system is designed to screen everyday functioning and deliver Motivational Interviewing (MI) and Cognitive Behavioral Therapy (CBT) micro-interventions. It operates entirely offline to ensure privacy and low latency, utilizing local models for speech processing and cognition.
+## 🌟 Overview
+This project implements a fully local, privacy-preserving smart-speaker system designed to deliver **Motivational Interviewing (MI)** and **Cognitive Behavioral Therapy (CBT)** micro-interventions. 
 
-## Architecture
+Built for the NVIDIA Jetson platform, the system operates entirely offline to ensure maximum privacy and low latency. It bridges a robust Python-based speech-cognition loop with a modern React-based frontend dashboard for real-time monitoring and control.
 
-The system follows a modular three-layer architecture:
+---
+
+## 🏗️ Architecture
+
+The system follows a modular three-layer architecture with an integrated **Governance Layer** and **FastAPI Bridge**.
 
 ### 1. Perception Layer ("The Ears")
--   **Audio Capture**: Captures raw audio from the microphone using `pyaudio`.
--   **VAD (Voice Activity Detection)**: Uses `webrtcvad` to detect speech and filter silence.
-    -   **Timeout**: Automatically stops recording after 15 seconds of silence (configurable).
-    -   **Wake Word**: Implicitly supports "start speaking to activate" (session-based).
--   **STT (Speech-to-Text)**: Local transcription using `faster-whisper`.
-    -   **Model**: Defaults to `base.en` (configurable in `config.yaml`).
+*   **Audio Capture**: High-fidelity capture using `pyaudio`.
+*   **VAD (Voice Activity Detection)**: Uses `webrtcvad` for silence filtering and turn-taking.
+*   **STT (Speech-to-Text)**: Local transcription using `faster-whisper` (Defaults to `base.en`).
 
 ### 2. Cognition Layer ("The Brain")
--   **Orchestration**: `HandlerRL` manages the therapeutic logic, selecting questions and interventions based on Reinforcement Learning (Contextual Bandits).
--   **LLM (Large Language Model)**: Generates natural language responses. Supports local LLMs (e.g., Llama 3 via Ollama) or OpenAI-compatible APIs.
--   **Database**: SQLite (`data/therapist.db`) stores all session data, including:
-    -   `users`: User profiles.
-    -   `sessions`: Interaction sessions.
-    -   `turns`: Individual conversation turns (User input, Agent output, Metadata).
--   **IPC (Inter-Process Communication)**: Uses thread-safe Queues for low-latency communication between the Speech Loop and the Logic Core.
-    -   **Legacy Sync**: Also writes transcripts to `data/record.csv` for compatibility with external frontend tools.
+*   **Orchestration**: `HandlerRL` manages therapeutic logic using Reinforcement Learning (Contextual Bandits) to select optimal interventions.
+*   **AI Governance Layer**: A reflection-validation loop (`reflection_validation.py`) that:
+    *   Evaluates if user responses are on-topic.
+    *   Guides users back to the therapeutic focus if they drift.
+    *   Provides empathic validation for shared experiences.
+*   **Memory & Persistence**: SQLite (`data/therapist.db`) manages:
+    *   **User Profiles & Preferences**: Long-term memory of user needs.
+    *   **Session Summaries**: Compressed history of past interactions.
+    *   **Safety Flags**: Detecting and logging high-severity concerns.
+*   **FastAPI Bridge**: Synchronizes the internal speech loop with the external frontend via REST API.
 
 ### 3. Action Layer ("The Voice")
--   **TTS (Text-to-Speech)**: Local speech synthesis using `piper`.
-    -   **Voice**: Configurable (default: `en_US-amy-medium`).
--   **Playback**: Low-latency audio playback using `pyaudio`.
+*   **TTS (Text-to-Speech)**: Local speech synthesis using `piper` (Default: `en_US-amy-medium`).
+*   **Audio Playback**: Low-latency synthesis and playback via `pyaudio`.
 
-## Project Structure
+---
+
+## 📂 Project Structure
+
+```text
+.
+├── LLM_therapist_prototype/    # Backend & Logic Core
+│   ├── src/
+│   │   ├── perception/         # Audio, VAD, STT modules
+│   │   ├── cognition/          # RL Logic & CBT frameworks
+│   │   ├── action/             # TTS and Audio Playback
+│   │   ├── database/           # SQLite DB Manager & Schema
+│   │   └── utils/              # Config, Logging, IPC Queues
+│   ├── data/                   # Persistent SQLite DB and File logs
+│   ├── LLM_therapist_Application.py  # Main Entry Point (Backend + API)
+│   └── config.yaml             # System Configuration
+├── frontend/                   # React + Vite Monitoring Dashboard
+├── deploy_to_jetson.sh         # Automated Jetson deployment script
+├── requirements.txt            # Python Dependencies
+└── readme.md                   # You are here!
 ```
-LLM_therapist_prototype/
-├── data/                   # Database and CSV logs
-├── src/
-│   ├── perception/         # Audio, VAD, STT modules
-│   │   ├── audio.py
-│   │   └── stt.py
-│   ├── cognition/          # (Logic resides in handler_rl.py)
-│   ├── action/             # TTS, Player modules
-│   │   ├── tts.py
-│   │   └── player.py
-│   ├── database/           # SQLite manager
-│   │   └── db_manager.py
-│   └── utils/              # Config, Logging, IPC
-├── LLM_therapist_Application.py  # Main Entry Point
-├── config.yaml             # Configuration
-└── environment.yml         # Dependencies
-```
 
-## Setup and Installation
+---
 
-### Prerequisites
--   NVIDIA Jetson (Orin Nano/NX/AGX) or Linux PC.
--   Python 3.8+.
--   Audio Hardware: Microphone and Speaker.
+## 🛠️ Setup and Installation
 
-### Dependencies
-Install system dependencies (for PyAudio):
+### 1. Prerequisites
+*   **Hardware**: NVIDIA Jetson (Orin Nano/NX/AGX) or a Linux PC with a Microphone/Speaker.
+*   **Software**: Python 3.8+, Node.js (for manual frontend setup).
+
+### 2. Local Setup (Linux PC)
 ```bash
-sudo apt-get install portaudio19-dev
+# Install system dependencies
+sudo apt-get install portaudio19-dev python3-venv
+
+# Set up Python environment
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r LLM_therapist_prototype/requirements.txt
+
+# Install Frontend dependencies
+cd frontend && npm install && cd ..
 ```
 
-Install Python dependencies:
+### 3. Automated Jetson Deployment
+The `deploy_to_jetson.sh` script automates the process of syncing code, installing dependencies, and running a sanity check on a remote Jetson device.
 ```bash
-pip install -r requirements.txt
-# OR
-conda env update -f environment.yml
+# Make the script executable
+chmod +x deploy_to_jetson.sh
+
+# Run the deployment (update JETSON_IP in the script first)
+./deploy_to_jetson.sh
 ```
 
-### Models
-1.  **Whisper**: The `faster-whisper` model will be downloaded automatically on first run.
-2.  **Piper**: Ensure the `piper` executable is in your PATH or configured in `config.yaml`.
-    -   Download voices (onnx + json) to `models/piper/`.
+---
 
-## Usage
+## 🚀 Usage
 
-### 1. Configuration
-Edit `config.yaml` to set your preferences:
-```yaml
-audio:
-  sample_rate: 16000
-  vad_aggressiveness: 3
+### ⚙️ Configuration
+Edit `LLM_therapist_prototype/config.yaml` to configure:
+*   VAD sensitivity and audio sample rates.
+*   STT model sizes (e.g., `tiny.en`, `base.en`).
+*   TTS voice paths and executable locations.
 
-stt:
-  model_path: "base.en"
-
-tts:
-  executable_path: "/path/to/piper"
-```
-
-### 2. Running the System
-To start the full smart speaker application (Backend + API):
+### ▶️ Running the System
+#### 1. Start the Backend
 ```bash
+cd LLM_therapist_prototype
 python LLM_therapist_Application.py
 ```
--   The backend also starts a FastAPI server at `http://localhost:8000/api`.
+*The backend exposes a FastAPI server at `http://localhost:8000`.*
 
-### 3. Running the Frontend UI
-To launch the web interface (desktop/mobile view):
-1.  Navigate to the frontend directory:
-    ```bash
-    cd frontend
-    ```
-2.  Install dependencies (first time only):
-    ```bash
-    npm install
-    ```
-3.  Start the development server:
-    ```bash
-    npm run dev
-    ```
-4.  Open your browser to the URL shown (e.g., `http://localhost:5173`).
-
-The UI will automatically connect to the running Python backend and display the conversation in real-time.
-
-## Verification
-Run the integration tests to verify the pipeline:
+#### 2. Start the Frontend Dashboard
+In a separate terminal:
 ```bash
-python -m unittest tests/test_refinement.py
+cd frontend
+npm run dev -- --host
+```
+*Access the UI at `http://<machine-ip>:5173`. The dashboard allows for session login, pausing, and real-time transcript viewing.*
+
+---
+
+## 🎮 Controls & Interaction
+
+| Action | Method | Description |
+| :--- | :--- | :--- |
+| **Login** | UI | Select "New User" or "Test User" to start a session. |
+| **Pause/Resume** | UI | Temporarily halt the speech loop. |
+| **End Session** | UI / Voice | Say "End Session" or click the End button. |
+| **Hands-Free** | UI Toggle | Toggle between auto-VAD and manual trigger mode. |
+
+---
+
+## ✅ Verification
+Run the integrated sanity check to verify the audio pipeline and database connection:
+```bash
+python sanity_check.py
 ```
 
-## Abbreviations Glossary
--   **VAD**: Voice Activity Detection
--   **STT/ASR**: Speech-to-Text / Automatic Speech Recognition
--   **TTS**: Text-to-Speech
--   **LLM**: Large Language Model
--   **RL**: Reinforcement Learning
--   **CBT**: Cognitive Behavioral Therapy
--   **MI**: Motivational Interviewing
+---
+
+## 📚 Key Technologies
+*   **Speech**: Faster-Whisper, Piper, WebRTC-VAD.
+*   **Cognition**: Python, Contextual Bandits, OpenAI-compatible local APIs.
+*   **Web**: React, Vite, FastAPI, Uvicorn.
+*   **Database**: SQLite3.
+
