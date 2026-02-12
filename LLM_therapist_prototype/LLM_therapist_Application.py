@@ -131,8 +131,26 @@ def login_user(data: dict):
     io_record.START_SESSION_EVENT.set() 
     
     return {"status": "logged_in", "user_id": uid, "session_id": io_record.SESSION_ID}
+    return {"status": "logged_in", "user_id": uid, "session_id": io_record.SESSION_ID}
 
-# Run API in thread
+@app.post("/api/input")
+def receive_input(data: dict):
+    """Bridge for Speech Service to push user text."""
+    text = data.get("text")
+    if text:
+        logger.info(f"API Input received: {text}")
+        io_record.INPUT_QUEUE.put(text)
+    return {"status": "received"}
+
+@app.get("/api/output")
+def get_output():
+    """Bridge for Speech Service to poll agent text."""
+    try:
+        text = str(OUTPUT_QUEUE.get_nowait())
+        logger.info(f"API Output served: {text}")
+        return {"text": text}
+    except queue.Empty:
+        return {"text": None}
 def run_api():
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
@@ -285,19 +303,9 @@ def main():
     api_thread.start()
     logger.info("API Server started on port 8000")
 
-    # Initialize Speech Loop
-    # Note: If running on a system without audio hardware (e.g. CI/CD), 
-    # we might want a fallback to Console.
-    # For now, we assume hardware is present as per requirements.
-    speech_loop = SpeechInteractionLoop()
-
-    # Start the Speech I/O thread
-    t = threading.Thread(target=speech_loop.run, daemon=True)
-    t.start()
+    # Remove SpeechInteractionLoop from Main Logic
+    # It is now a separate service.
     
-    # Register loop for API access
-    app.state.speech_loop = speech_loop
-
     # Start the main RL workflow (this will drive the therapy session)
     try:
         while True:
@@ -322,7 +330,9 @@ def main():
     except KeyboardInterrupt:
         logger.info("Application interrupted.")
     finally:
-        speech_loop.cleanup()
+
+        # cleanup if needed
+        pass
         # Give cleanup time
         time.sleep(0.5)
 

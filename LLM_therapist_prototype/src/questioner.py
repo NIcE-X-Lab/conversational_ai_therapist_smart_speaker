@@ -17,7 +17,7 @@ from src.utils.log_util import get_logger
 from src.utils.io_record import get_answer, get_resp_log, log_question, set_question_prefix
 logger = get_logger("Questioner")
 
-from src.reflection_validation import rv_reasoner, rv_guide, rv_validation
+from src.reflection_validation import rv_consolidated
 
 # System prompt for generating a retry guide when re-asking the same question.
 RETRY_GUIDE_SYSTEM_PROMPT = '''You are a concise and supportive therapist-assistant.
@@ -192,45 +192,51 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         log_question(followup_to_RV)
         user_response = get_resp_log()
 
-        # ReflectionValidation three steps（topic = the dimension label of the current question）
+        # ReflectionValidation Consoldiated
         topic = question_lib[str(S)][str(question_A)]["label"]
         original_resp = user_input[0] if user_input else ""
 
-        logger.info(f"Running ReflectionValidation reasoner for topic '{topic}'.")
-        rv_decision_raw = rv_reasoner(topic, original_question_asked, original_resp, user_response)
-        # Simple parsing: extract '0/1', 0 means related, 1 means not related
-        rv_decision_token = "0" if "0" in rv_decision_raw else "1"
-        logger.info(f"ReflectionValidation decision: {rv_decision_token}")
+        logger.info(f"Running Consolidated RV for topic '{topic}'.")
+        # Unified call: returns decision (0/1) and the text (Validation or Guide)
+        rv_decision_token, rv_text = rv_consolidated(topic, original_question_asked, original_resp, user_response)
+        
+        logger.info(f"RV Decision: {rv_decision_token}")
 
-        # If not related (1), give guidance, recollect follow-up
         rv_guide_text = ""
         user_response_0 = ""
-        if rv_decision_token == "1":
-            logger.info("Follow-up not related, generating guidance and recollecting follow-up.")
-            user_response_0 = user_response
-            rv_guide_text = rv_guide(topic, original_question_asked, original_resp, user_response)
-            log_question(rv_guide_text)
-            user_response = get_resp_log()
+        rv_validation_text = ""
 
-        # Empathic validation
-        logger.info("Running ReflectionValidation empathic validation.")
-        rv_validation_text = rv_validation(topic, original_question_asked, original_resp, user_response)
-        # Set validation text to be prepended to the next user-facing question
-        set_question_prefix(rv_validation_text)
-        logger.info("Queued RV validation to prepend before next question output.")
+        if rv_decision_token == "1":
+            # 1 = Unrelated -> The text provided is a GUIDE.
+            # We need to guide the user and collect a new response.
+            logger.info("Follow-up unrelated. Using Guide text and recollecting.")
+            rv_guide_text = rv_text
+            user_response_0 = user_response
+            
+            # Speak the Guide
+            log_question(rv_guide_text)
+            # Collect new response
+            user_response = get_resp_log()
+            
+        else:
+            # 0 = Related -> The text provided is VALIDATION.
+            logger.info("Follow-up related. Using Validation text.")
+            rv_validation_text = rv_text
+            # Set to prepend
+            set_question_prefix(rv_validation_text)
         
-        # Skip generating therapist response to avoid unnecessary LLM calls
+        # Skip generating therapist response
         therapist_resp = ""
         
-        # Record notes (expand RV fields)
+        # Record notes
         logger.info("Recording notes for this question/response.")
         note_resp = [
             "original_question: " + original_question_asked,
             "original_resp: " + (user_input[0] if user_input else ""),
-            "followup_resp: " + user_response_0 if user_response_0 else "followup_resp: " + user_response,
+            "followup_resp: " + (user_response_0 if user_response_0 else user_response),
             "rv_decision: " + rv_decision_token,
-            ("rv_guide: " + rv_guide_text) if rv_guide_text else "rv_guide: ",
-            "followup_resp_1: " + user_response if user_response_0 else "followup_resp_1: "
+            "rv_guide: " + rv_guide_text,
+            "followup_resp_1: " + (user_response if user_response_0 else ""),
             "rv_validation: " + rv_validation_text,
             "therapist_resp: " + therapist_resp
         ]

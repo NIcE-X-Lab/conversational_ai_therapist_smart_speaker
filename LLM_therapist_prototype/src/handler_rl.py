@@ -101,7 +101,8 @@ class HandlerRL:
                 "- 1–2 short sentences.\n- Friendly, non-judgmental tone.\n"
                 "- No extra headers or labels; output the final greeting directly.\n"
             )
-            greeting = llm_complete(rewrite_system_prompt, greeting_raw).strip()
+            greeting = greeting_raw # Skip LLM rewrite for speed
+            # greeting = llm_complete(rewrite_system_prompt, greeting_raw).strip()
             # Use greeting as a prefix so the first substantive question appears immediately
             set_question_prefix(greeting)
             time.sleep(0.5)
