@@ -136,41 +136,62 @@ def _chat_complete(system_content: str, user_content: str):
     """
     return llm_complete(system_content, user_content)
 
-def rv_reasoner(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
-    """
-    Use the reasoner prompt to determine if the follow-up is related to the topic or original response.
-    Returns the decision as a string.
-    """
-    logger.info("Running reflection validation reasoner.")
-    payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Response": {original_response!r}, "Follow Up Response": {follow_up_response!r}}}'
-    raw_resp = _chat_complete(RV_FOLLOW_UP_SYSTEM_REASONER_PROMPT, payload)
-    # Parse DECISION
-    if "DECISION:" in raw_resp:
-        return raw_resp.split("DECISION:")[1].strip()
-    return raw_resp
 
-def rv_guide(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
-    """
-    Use the guide prompt to help the user provide a more relevant follow-up response.
-    Returns the guide as a string.
-    """
-    logger.info("Running reflection validation guide.")
-    payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Response": {original_response!r}, "Follow-up Response": {follow_up_response!r}}}'
-    raw_resp = _chat_complete(RV_FOLLOW_UP_GUIDE_SYSTEM_PROMPT, payload)
-    # Parse Guide
-    if "Guide:" in raw_resp:
-        return raw_resp.split("Guide:")[1].strip()
-    return raw_resp
+# Consolidated Prompt: Combines Reasoner + Validation/Guide
+RV_CONSOLIDATED_SYSTEM_PROMPT = '''You are an AI assistant with strong reasoning abilities and mental health commonsense.
+You are in a conversation with a client.
 
-def rv_validation(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
+Your Task:
+1. Analyze the client's "Follow-up Response" to see if it is related to the "Topic" or "Original Response".
+2. If RELATED (Decision=0): Provide an empathetic VALIDATION.
+3. If UNRELATED (Decision=1): Provide a GUIDE to help them get back on track.
+
+Input Format:
+{"Topic": "...", "Original Response": "...", "Follow-up Response": "..."}
+
+Output Format:
+DECISION: <0 or 1>
+RESPONSE: <Your validation or guide text>
+
+Rules:
+- VALIDATION (for 0): Empathetic, supportive, brief (1-2 sentences). Do NOT ask questions.
+- GUIDE (for 1): Acknowledge their response, then gently steer back to the topic. Do NOT ask questions.
+- Use ASCII characters only.
+
+Example 1 (Related):
+{"Topic": "Sleep", "Original Response": "I'm tired.", "Follow-up Response": "I stayed up late watching TV."}
+DECISION: 0
+RESPONSE: It makes sense that staying up late would leave you feeling drained; establishing a winding-down routine might help you get the rest you need.
+
+Example 2 (Unrelated):
+{"Topic": "Sleep", "Original Response": "I'm tired.", "Follow-up Response": "I like pizza."}
+DECISION: 1
+RESPONSE: It's great that you enjoy pizza, but since we were discussing your sleep, could you tell me more about what's making you tired?
+'''
+
+def rv_consolidated(topic: str, original_question: str, original_response: str, follow_up_response: str) -> tuple[str, str]:
     """
-    Use the validation prompt to provide empathic validation and support to the user.
-    Returns the validation as a string.
+    Combined logic: Returns (decision_token, text_response).
+    decision_token: "0" (related) or "1" (unrelated)
+    text_response: Validation text (if 0) or Guide text (if 1)
     """
-    logger.info("Running reflection validation support/validation.")
+    logger.info("Running consolidated RV (Reasoner + Validation/Guide).")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Response": {original_response!r}, "Follow-up Response": {follow_up_response!r}}}'
-    raw_resp = _chat_complete(RV_FOLLOW_UP_VALIDATION_SYSTEM_PROMPT, payload)
-    # Parse VALIDATION
-    if "VALIDATION:" in raw_resp:
-        return raw_resp.split("VALIDATION:")[1].strip()
-    return raw_resp
+    raw_resp = _chat_complete(RV_CONSOLIDATED_SYSTEM_PROMPT, payload)
+    
+    decision = "0"
+    response_text = ""
+    
+    lines = raw_resp.strip().split('\n')
+    for line in lines:
+        if line.startswith("DECISION:"):
+            decision = line.split("DECISION:")[1].strip()
+        elif line.startswith("RESPONSE:"):
+            response_text = line.split("RESPONSE:")[1].strip()
+            
+    # Fallback/Cleanup
+    if decision not in ["0", "1"]:
+        decision = "0" 
+    
+    return decision, response_text
+

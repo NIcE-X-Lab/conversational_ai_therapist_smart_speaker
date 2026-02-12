@@ -27,25 +27,9 @@ def generate_prompt_synonymous_sentences(user_input):
 
 def generate_synonymous_sentences(question_text):
     """
-    Use OpenAI API to generate a synonymous sentence for the given question_text.
+    (OPTIMIZED) Directly return the question text to avoid LLM latency.
     """
-    user_input = question_text
-    
-    raw = llm_complete(
-        "You generate synonymous sentences for a given text. Return only the rewritten sentence, without any prefixes.",
-        generate_prompt_synonymous_sentences(user_input)
-    )
-    results = raw.strip()
-    lower = results.lower()
-    if "answer:" in lower:
-        idx = lower.rfind("answer:")
-        results = results[idx+7:].strip()
-    elif results.startswith("User:"):
-        parts = [ln for ln in results.splitlines() if ln.strip().lower().startswith("answer:")]
-        if parts:
-            results = parts[-1].split(":", 1)[1].strip()
-    logger.info(f"generate_synonymous_sentences: {results}")
-    return results
+    return question_text
 
 def generate_prompt_therapist(user_input):
     """
@@ -98,14 +82,9 @@ def generate_prompt_change(user_input):
 
 def generate_change(user_input):
     """
-    Use OpenAI API to convert a first-person sentence to a second-person sentence.
+    (OPTIMIZED) Directly return input to avoid LLM latency.
     """
-    resp = llm_complete(
-        "Convert first-person to second-person statements.",
-        generate_prompt_change(user_input)
-    )
-    logger.debug(resp)
-    return resp
+    return user_input
 
 def generate_prompt_change_positive(user_input):
     """
