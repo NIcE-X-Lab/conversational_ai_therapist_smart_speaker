@@ -40,21 +40,31 @@ def set_question_prefix(text: str):
     global _PENDING_QUESTION_PREFIX
     _PENDING_QUESTION_PREFIX = str(text) if text is not None else ""
 
-# CSV Synchronization (Legacy/Frontend Requirement)
-HEADER = ["Question", "Question_Lock", "Resp", "Resp_Lock"]
+# CSV Synchronization (Full Transcript Logging)
+HEADER = ["Timestamp", "Type", "Speaker", "Text"]
 
-def _atomic_write_csv(data: dict):
+def append_to_csv(log_type: str, speaker: str, text: str):
     """
-    Write current state to record.csv for external frontend compatibility.
+    Append a single entry to record.csv to capture the full state of the conversation.
     """
     try:
-        df = pd.DataFrame([data])
         folder = os.path.dirname(RECORD_CSV)
         if folder and not os.path.exists(folder):
             os.makedirs(folder, exist_ok=True)
-        tmp_path = RECORD_CSV + ".tmp"
-        df.to_csv(tmp_path, columns=HEADER, index=False)
-        os.replace(tmp_path, RECORD_CSV)
+            
+        import datetime
+        timestamp = datetime.datetime.now().isoformat()
+        
+        write_header = not os.path.exists(RECORD_CSV)
+        
+        with open(RECORD_CSV, 'a', encoding='utf-8') as f:
+            if write_header:
+                f.write(",".join(HEADER) + "\n")
+            
+            # Escape strings for CSV
+            escaped_text = str(text).replace('"', '""')
+            line = f'"{timestamp}","{log_type}","{speaker}","{escaped_text}"\n'
+            f.write(line)
     except Exception as e:
         logger.error(f"Failed to sync to CSV: {e}")
 
@@ -92,7 +102,7 @@ def init_record(user_id_override: str = None):
         logger.error(f"Failed to initialize DB: {e}")
         
     # Initialize CSV
-    _atomic_write_csv({"Question": "", "Question_Lock": 0, "Resp": "", "Resp_Lock": 1})
+    append_to_csv("internal", "system", f"Session initialized. User: {SUBJECT_ID}, DB ID: {SESSION_ID}")
 
 def reset_session(new_user_id: str = None):
     """Reset the session, optionally switching users."""
@@ -120,10 +130,8 @@ def log_question(text: str):
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "agent", combined)
         CURRENT_TURN_INDEX += 1
     
-    # Sync to CSV (Agent sets Question, Locks it)
-    # We read existing check? No, just overwrite for this simple sync.
-    # In a real dual-writer scenario, we'd need to be careful, but here Agent drives.
-    _atomic_write_csv({"Question": combined, "Question_Lock": 1, "Resp": "", "Resp_Lock": 0})
+    # Sync to CSV 
+    append_to_csv("turn", "agent", combined)
     
     # Clear prefix
     _PENDING_QUESTION_PREFIX = ""
@@ -146,24 +154,9 @@ def get_answer() -> Tuple[List, List[str]]:
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "user", user_input_raw)
         CURRENT_TURN_INDEX += 1
         
-    # Sync to CSV (User Resp arrived)
-    # Ideally we update the existing row.
-    # For now, we assume the previous LogQuestion set the state.
-    # We update Resp and Lock Resp.
-    # We verify if we need to preserve Question? usually yes.
-    # But since we don't have global state of Question here easily unless we track it.
-    # Let's just write the response.
-    # Note: The 'Frontend' usually writes the response.
-    # Here, 'SpeechInteractionLoop' (Frontend) wrote to INPUT_QUEUE.
-    # And we (Handler/Backend) are consuming it.
-    # So WE are responsible for marking it as 'Read' or 'Logged'?
-    # Actually, if the 'Frontend' (Speech Script) wrote to CSV, then it would be there.
-    # But here we are simulating the frontend via Queue.
-    # So we write it to CSV to verify "transcripts back into data/record.csv".
-    
     # We should read the last Question from CSV? Or just write Resp.
     # Let's try to keep it simple.
-    _atomic_write_csv({"Question": "...", "Question_Lock": 0, "Resp": user_input_raw, "Resp_Lock": 1})
+    append_to_csv("turn", "user", user_input_raw)
         
     # Process segments
     user_input = str(user_input_raw)
@@ -194,7 +187,7 @@ def get_resp_log() -> str:
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "user", user_response)
         CURRENT_TURN_INDEX += 1
     
-    _atomic_write_csv({"Question": "...", "Question_Lock": 0, "Resp": user_response, "Resp_Lock": 1})
+    append_to_csv("turn", "user", user_response)
         
     logger.info(f"Received user response: {user_response}")
     return user_response

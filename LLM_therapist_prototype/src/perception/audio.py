@@ -30,7 +30,17 @@ class AudioRecorder:
                                            rate=self.rate,
                                            input=True,
                                            frames_per_buffer=self.chunk)
-            logger.info("Audio stream started.")
+            
+            # Clear OS buffer (Echo Cancellation/Mic-Mute during recent TTS)
+            # Read and discard ~0.5s of audio to flush any lingering data
+            flush_chunks = int(0.5 * self.rate / self.chunk)
+            for _ in range(flush_chunks):
+                try:
+                    self.stream.read(self.chunk, exception_on_overflow=False)
+                except IOError:
+                    pass
+            
+            logger.info("Audio stream started and OS buffer flushed.")
 
     def stop_stream(self):
         """Stop and close the audio input stream."""
@@ -55,8 +65,8 @@ class AudioRecorder:
 
     def record_until_silence(self, silence_duration=1.5, max_duration=15.0):
         """
-        Record audio until silence is detected for a specific duration or max limit reached.
-        Defaults: silence=1.5s, max=15.0s (Frontend Requirement).
+        Record audio dynamically: wait until speech starts, then record until
+        silence or max limit reached.
         Returns:
             frames: List of audio frames (bytes).
         """
@@ -69,8 +79,21 @@ class AudioRecorder:
         silent_count = 0
         has_speech = False
         
-        logger.info("Listening...")
+        logger.info("Listening (waiting for speech)...")
         
+        # Audio Event Detection: wait for voice activity
+        while not has_speech:
+            try:
+                data = self.stream.read(self.chunk, exception_on_overflow=False)
+                if self.is_speech(data):
+                    has_speech = True
+                    frames.append(data)
+                    logger.info("Speech detected, recording started.")
+            except IOError as e:
+                logger.warning(f"Audio read error during wait: {e}")
+                time.sleep(0.01)
+
+        # Now record up to max_chunks
         for _ in range(max_chunks):
             try:
                 data = self.stream.read(self.chunk, exception_on_overflow=False)
@@ -78,12 +101,10 @@ class AudioRecorder:
                 
                 if self.is_speech(data):
                     silent_count = 0
-                    has_speech = True
                 else:
-                    if has_speech: # Only count silence after speech has started
-                        silent_count += 1
+                    silent_count += 1
                 
-                if has_speech and silent_count > silence_chunks:
+                if silent_count > silence_chunks:
                     logger.info("Silence detected, stopping recording.")
                     break
                     

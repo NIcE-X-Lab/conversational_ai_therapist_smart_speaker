@@ -336,14 +336,5 @@ class HandlerRL:
             return False, ""
 
     def _unlock_question_if_stuck(self) -> None:
-        """If Question_Lock remains set after a system message, clear it to avoid blocking."""
-        try:
-            df = pd.read_csv(RECORD_CSV)
-            if int(df.loc[0, "Question_Lock"]) == 1:
-                df.loc[0, "Question_Lock"] = 0
-                tmp_path = RECORD_CSV + ".tmp"
-                df.to_csv(tmp_path, index=False)
-                os.replace(tmp_path, RECORD_CSV)
-                logger.info("Force-unlocked Question_Lock after system message.")
-        except Exception as e:
-            logger.warning(f"Failed to force-unlock Question_Lock: {e}")
+        """Legacy method for IPC lock. No longer needed with full transcript logging."""
+        pass
