@@ -46,13 +46,12 @@ def choose_action(
     With probability EPSILON, choose the best action; otherwise, explore.
     """
     logger.info(f"Choosing action for state {state}")
-    state_action = q_table.iloc[state, :]
-    # Apply mask to Q-table to disable unavailable actions
+    state_action = q_table.iloc[state, :].copy()
+    # Apply mask to the state_action to disable unavailable actions
     logger.debug("Mask before: [{}]".format(','.join(str(m) for m in mask)))
-    original_q_table = q_table.copy()  # For debugging/more traceable logs
     for i in range(1, number_states):
-        q_table[str(i)] = q_table[str(i)].apply(lambda x: x * mask[i])
-    logger.debug("Q-table after masking (row {}): [{}]".format(state, ','.join(str(v) for v in q_table.iloc[state, :].values)))
+        state_action[str(i)] = state_action[str(i)] * mask[i]
+    logger.debug("Q-values after masking: [{}]".format(','.join(str(v) for v in state_action.values)))
     # Exploration: with probability 1-EPSILON or if all Q-values are zero, pick randomly
     if (np.random.uniform() > EPSILON):
         # Exploration branch: choose at random among available (not masked out) actions

@@ -183,6 +183,52 @@ class SpeechInteractionLoop:
         else:
             self.state = "idle"
 
+    def listen_for_wake_word(self):
+        self.state = "listening_wake_word"
+        logger.info("Waiting for wake word...")
+        audio_frames = self.recorder.record_until_silence(max_duration=10.0)
+        if audio_frames:
+            user_wav = "wake_temp.wav"
+            self.recorder.save_wav(audio_frames, user_wav)
+            user_text = self.stt.transcribe(user_wav).lower().strip()
+            
+            import string
+            user_text = user_text.translate(str.maketrans('', '', string.punctuation)).strip()
+            logger.info(f"Idle heard: {user_text}")
+            
+            wake_words = ["hello caiti", "hello", "start", "end"]
+            
+            for word in wake_words:
+                if word in user_text:
+                    logger.info(f"Wake word '{word}' detected.")
+                    if word == "end":
+                        logger.info("End command detected.")
+                        return
+                    
+                    # Ask "Who is the user?"
+                    logger.info("Prompting for user identity...")
+                    wav_file = "response_temp.wav"
+                    if self.tts.generate("Who is the user?", wav_file):
+                        self.state = "playing"
+                        self.player.play(wav_file)
+                        
+                    # Listen for name
+                    self.state = "listening"
+                    name_frames = self.recorder.record_until_silence(max_duration=10.0)
+                    if name_frames:
+                        name_wav = "name_temp.wav"
+                        self.recorder.save_wav(name_frames, name_wav)
+                        name_text = self.stt.transcribe(name_wav).strip()
+                        if name_text:
+                            logger.info(f"Identity received: {name_text}")
+                            uid = name_text.lower().replace(" ", "_").translate(str.maketrans('', '', string.punctuation))
+                            io_record.reset_session(uid)
+                            io_record.END_SESSION_EVENT.clear()
+                            io_record.START_SESSION_EVENT.set()
+                            logger.info(f"Session started for {uid} via Voice Command.")
+                    return
+        self.state = "idle"
+
     def run(self):
         logger.info("Starting Speech Interaction Loop.")
         while self.running:
@@ -197,6 +243,8 @@ class SpeechInteractionLoop:
                     if text_to_speak:
                         self.process_agent_turn(text_to_speak)
                 except queue.Empty:
+                    if not io_record.START_SESSION_EVENT.is_set():
+                        self.listen_for_wake_word()
                     pass
 
                 # The loop continues to poll/wait. 
@@ -303,19 +351,17 @@ def main():
     api_thread.start()
     logger.info("API Server started on port 8000")
 
-    # Remove SpeechInteractionLoop from Main Logic
-    # It is now a separate service.
+    # Start SpeechInteractionLoop in background thread
+    app.state.speech_loop = SpeechInteractionLoop()
+    speech_thread = threading.Thread(target=app.state.speech_loop.run, daemon=True)
+    speech_thread.start()
+    logger.info("SpeechInteractionLoop started.")
     
     # Start the main RL workflow (this will drive the therapy session)
     try:
         while True:
             # Wait for valid session via Login OR Voice Command
             if not io_record.START_SESSION_EVENT.is_set():
-                # Listen for "Start Session" command while idle?
-                # This requires SpeechLoop to be listening.
-                # Currently SpeechLoop only listens when triggered by Agent or Manual.
-                # To support "Start Session", we'd need a background listening loop.
-                # For now, we rely on the Login UI button as the primary trigger.
                 time.sleep(1)
                 continue
                 

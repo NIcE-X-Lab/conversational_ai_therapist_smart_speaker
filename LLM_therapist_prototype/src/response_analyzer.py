@@ -55,8 +55,7 @@ The definition of each dimension are:
     hobbies: Enjoying personal choices for leisure activities
     creativity: Creativity
     community: Participation in community
-    support: Support from social network
-    social: Relationship with friends and colleagues
+    social: Support from social network and relationships with friends and colleagues
     comfortable: Managing boundaries in close relationship
     protection: Managing sexual safety
     productivity: Productivity at work or school
@@ -75,12 +74,12 @@ The definition of each dimension are:
 
 
 
-There are some dimension maybe confusing, to distinguish them:
-1. eat cares does the user eat regularly and nutirtion cares more about whether the user eat enough good food for nutrition.
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
 2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
 3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
 
-If the user input is general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
 
 The score ranges from 0 to 2, where:
 0 indicates that the user performs well in this dimension;
@@ -127,7 +126,7 @@ Example 3:
 {"Original Question": "How's your mood recently?", "User Response": "I feel so depressed daily."}
 REFLECTIVE_SUMMERIZER: You shared that you feel so depressed daily.
 
-Example 3:
+Example 4:
 {"Original Question": "Have your weight changed significantly recently?", "User Response": "My weight increased a lot recently."}
 REFLECTIVE_SUMMERIZER: You mentioned that your weight increased a lot recently.
 '''
@@ -178,7 +177,7 @@ def classify_dimension_and_score(user_input: str, original_question: str) -> str
     logger.debug(f"User input: {user_input}")
     # Provide both the question and the answer to improve contextual classification
     payload = f"Question: {original_question}\nAnswer: {user_input}"
-    return _chat_complete(INIT_ASKER_SYSTEM_PROMPT_V2, payload)
+    return llm_complete(INIT_ASKER_SYSTEM_PROMPT_V2, payload)
 
 def reflective_summarizer(original_question: str, user_response: str) -> str:
     """
@@ -189,7 +188,7 @@ def reflective_summarizer(original_question: str, user_response: str) -> str:
     logger.info("Generating reflective summary for user response.")
     logger.debug(f"Original question: {original_question}, User response: {user_response}")
     payload = f'{{"Original Question": "{original_question}", "User Response": "{user_response}"}}'
-    return _chat_complete(REFLECTIVE_SUMMERIZER_PROMPT, payload)
+    return llm_complete(REFLECTIVE_SUMMERIZER_PROMPT, payload)
 
 def rephrase_question(original_question: str) -> str:
     """
@@ -200,4 +199,4 @@ def rephrase_question(original_question: str) -> str:
     logger.info("Rephrasing question for therapist style.")
     logger.debug(f"Original question: {original_question}")
     payload = f'{{"Original Question": "{original_question}"}}'
-    return _chat_complete(REPHRASER_PROMPT, payload)
+    return llm_complete(REPHRASER_PROMPT, payload)

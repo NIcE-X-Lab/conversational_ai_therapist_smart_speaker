@@ -3,7 +3,7 @@ set -e
 
 # Configuration
 JETSON_USER="arth"
-JETSON_IP="152.23.251.49"
+JETSON_IP="152.23.12.147"
 JETSON_HOST="$JETSON_USER@$JETSON_IP"
 PROJECT_DIR="~/project"
 LOCAL_DIR="$(pwd)"
