@@ -3,34 +3,58 @@
 ## 🌟 Overview
 This project implements a fully local, privacy-preserving smart-speaker system designed to deliver **Motivational Interviewing (MI)** and **Cognitive Behavioral Therapy (CBT)** micro-interventions. 
 
-Built for the NVIDIA Jetson platform, the system operates entirely offline to ensure maximum privacy and low latency. It bridges a robust Python-based speech-cognition loop with a modern React-based frontend dashboard for real-time monitoring and control.
+Built for the NVIDIA Jetson platform, the system operates entirely offline to ensure maximum privacy and low latency. It functions as a headless audio assistant, relying on a robust Python-based speech-client loop that communicates with a local Dialogue Engine.
 
 ---
 
 ## 🏗️ Architecture
 
-The system follows a modular three-layer architecture with an integrated **Governance Layer** and **FastAPI Bridge**.
+The conversational AI therapist smart speaker is designed to provide localized, low-latency micro-interventions (MI and CBT). It leverages local models (Whisper for STT, Piper for TTS, and Llama 3.1 via Ollama for LLM logic) deployed on an NVIDIA Jetson device.
 
-### 1. Perception Layer ("The Ears")
-*   **Audio Capture**: High-fidelity capture using `pyaudio`.
-*   **VAD (Voice Activity Detection)**: Uses `webrtcvad` for silence filtering and turn-taking.
-*   **STT (Speech-to-Text)**: Local transcription using `faster-whisper` (Defaults to `base.en`).
+Below is a breakdown of the core components and how they interact.
 
-### 2. Cognition Layer ("The Brain")
-*   **Orchestration**: `HandlerRL` manages therapeutic logic using Reinforcement Learning (Contextual Bandits) to select optimal interventions.
-*   **AI Governance Layer**: A reflection-validation loop (`reflection_validation.py`) that:
-    *   Evaluates if user responses are on-topic.
-    *   Guides users back to the therapeutic focus if they drift.
-    *   Provides empathic validation for shared experiences.
-*   **Memory & Persistence**: SQLite (`data/therapist.db`) manages:
-    *   **User Profiles & Preferences**: Long-term memory of user needs.
-    *   **Session Summaries**: Compressed history of past interactions.
-    *   **Safety Flags**: Detecting and logging high-severity concerns.
-*   **FastAPI Bridge**: Synchronizes the internal speech loop with the external frontend via REST API.
+### 1. Application Entry Point (`LLM_therapist_Application.py` & `LLM_therapist_Application_server.py`)
+- **FastAPI Backend (`_server.py`)**: Hosts the web API for incoming interaction logs and manual overrides.
+- **Main App (`LLM_therapist_Application.py`)**: Orchestrates the entire flow. It starts the `SpeechInteractionLoop` in a background thread to continuously listen for wake words and handles the primary Reinforcement Learning (RL) loop (`HandlerRL`).
 
-### 3. Action Layer ("The Voice")
-*   **TTS (Text-to-Speech)**: Local speech synthesis using `piper` (Default: `en_US-amy-medium`).
-*   **Audio Playback**: Low-latency synthesis and playback via `pyaudio`.
+### 2. Audio Pipeline ("Arth" Modules: `src/perception/audio.py` & `src/action/tts.py` & `src/perception/stt.py`)
+- **Input (AudioRecorder)**: Uses `pyaudio` to stream bytes from the local microphone. It integrates `webrtcvad` for Voice Activity Detection (VAD) to dynamically detect speech (Audio Event Detection). When speech starts, it records until a predefined silence timeout is reached. It also aggressively flushes the ALSA buffer during initialization to prevent the mic from capturing the device's own TTS output (Echo Cancellation).
+- **Processing (STT & TTS)**:
+  - **STT**: `faster-whisper` decodes the recorded raw audio into transcripts locally.
+  - **TTS**: `piper-tts` generates synthesized voice responses locally.
+- **SpeechInteractionLoop**: The background worker that bridges the audio hardware to the backend. It continuously listens for wake words ("Hello", "Start", etc.) while idle, initiates a session when triggered, asks for user identity, and then relays questions and answers to the `io_record` queues.
+
+### 3. Policy & Handler ("Eric" Modules: `src/handler_rl.py` & `src/utils/rl_qtables.py`)
+- **HandlerRL**: The primary logic engine driving the screening session. It iterates through different conversational dimensions (topics like mood, sleep, weight) using an RL approach.
+- **Q-Tables**: The agent maintains a state-action Q-table (`pandas.DataFrame`) to decide which dimension to ask about next. Actions (dimensions) are masked out once they are exhaustively discussed.
+- **Evaluation Loop**: For each topic, it asks a question, gets the user's transcript, and uses the `response_analyzer` to classify the user's answer into a score (0: fine, 1: minor issue, 2: severe issue).
+
+### 4. Semantic Processing & Validation (`src/questioner.py` & `src/response_analyzer.py` & `src/reflection_validation.py`)
+- **Response Analyzer**: Wraps the local Llama model (via Ollama) to parse unstructured user input into discrete `(Dimension, Score)` tuples, and generates third-person reflective summaries.
+- **Questioner**: Manages the retry logic if a user's answer is ambiguous (e.g., "I don't know"), asking the question from a different angle.
+- **Reflection & Validation (RV)**: Validates if the user's follow-up response is on-topic. If related, it produces an empathetic validation. If unrelated, it generates a guide to steer the user back.
+
+### 5. Cognitive Behavioral Therapy Module (`src/CBT.py`)
+- Triggered at the end of the session, the CBT module zeroes in on dimensions that received a critical score of 2.
+- It walks the user through a 3-stage protocol:
+  - **Stage 1 (Identify)**: Asking the user to identify unhelpful thoughts related to their statement.
+  - **Stage 2 (Challenge)**: Prompting the user to challenge those negative thoughts.
+  - **Stage 3 (Reframe)**: Guiding the user to reframe their thoughts into balanced, constructive ones.
+- Specialized LLM prompters validate the user's progress at each stage and provide guidance if they get stuck or exhibit cognitive distortions.
+
+### 6. Persistence & IO (`src/database/db_manager.py` & `src/utils/io_record.py`)
+- **SQLite Database**: Persists conversational turns, user preferences, historical summaries, and safety flags across sessions. Provides context to seed the LLM.
+- **CSV Logging**: `io_record.py` handles writing the full conversational transcript (`Timestamp, Type, Speaker, Text`) incrementally to `data/record.csv` for analytics, decoupling the system state from arbitrary IPC locks.
+
+### Summary Workflow
+1. User says "Hello CaiTI".
+2. `SpeechInteractionLoop` detects wake word, asks "Who is the user?", confirms identity, and signals session start.
+3. `HandlerRL` loads user context from DB and uses Q-tables to pick the first dimension.
+4. `LLM` generates a naturally phrased question, which `piper` speaks out loud.
+5. User answers. `whisper` transcribes the audio.
+6. `response_analyzer` scores the answer. If the answer needs clarification, `questioner.py` retries.
+7. Once all dimensions are checked, `CBT.py` initiates an intervention on high-score items.
+8. Entire log is appended to `record.csv` and SQLite.
 
 ---
 
@@ -38,17 +62,17 @@ The system follows a modular three-layer architecture with an integrated **Gover
 
 ```text
 .
-├── LLM_therapist_prototype/    # Backend & Logic Core
-│   ├── src/
-│   │   ├── perception/         # Audio, VAD, STT modules
-│   │   ├── cognition/          # RL Logic & CBT frameworks
-│   │   ├── action/             # TTS and Audio Playback
-│   │   ├── database/           # SQLite DB Manager & Schema
-│   │   └── utils/              # Config, Logging, IPC Queues
-│   ├── data/                   # Persistent SQLite DB and File logs
-│   ├── LLM_therapist_Application.py  # Main Entry Point (Backend + API)
-│   └── config.yaml             # System Configuration
-├── frontend/                   # React + Vite Monitoring Dashboard
+├── src/                        # Backend & Logic Core
+│   ├── perception/             # Audio, VAD, STT modules
+│   ├── cognition/              # RL Logic & CBT frameworks
+│   ├── action/                 # TTS and Audio Playback
+│   ├── database/               # SQLite DB Manager & Schema
+│   └── utils/                  # Config, Logging, IPC Queues
+├── data/                       # Persistent SQLite DB and File logs
+├── services/                   # Microservices (e.g., speech client)
+├── LLM_therapist_Application.py  # Main Entry Point (Backend + API)
+├── start_headless.sh           # Script to launch backend and speech service
+├── config.yaml                 # System Configuration
 ├── deploy_to_jetson.sh         # Automated Jetson deployment script
 ├── requirements.txt            # Python Dependencies
 └── readme.md                   # You are here!
@@ -60,7 +84,7 @@ The system follows a modular three-layer architecture with an integrated **Gover
 
 ### 1. Prerequisites
 *   **Hardware**: NVIDIA Jetson (Orin Nano/NX/AGX) or a Linux PC with a Microphone/Speaker.
-*   **Software**: Python 3.8+, Node.js (for manual frontend setup).
+*   **Software**: Python 3.8+
 
 ### 2. Local Setup (Linux PC)
 ```bash
@@ -70,10 +94,7 @@ sudo apt-get install portaudio19-dev python3-venv
 # Set up Python environment
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r LLM_therapist_prototype/requirements.txt
-
-# Install Frontend dependencies
-cd frontend && npm install && cd ..
+pip install -r requirements.txt
 ```
 
 ### 3. Automated Jetson Deployment
@@ -91,26 +112,18 @@ chmod +x deploy_to_jetson.sh
 ## 🚀 Usage
 
 ### ⚙️ Configuration
-Edit `LLM_therapist_prototype/config.yaml` to configure:
+Edit `config.yaml` to configure:
 *   VAD sensitivity and audio sample rates.
 *   STT model sizes (e.g., `tiny.en`, `base.en`).
 *   TTS voice paths and executable locations.
 
 ### ▶️ Running the System
-#### 1. Start the Backend
 ```bash
-cd LLM_therapist_prototype
-python LLM_therapist_Application.py
+chmod +x start_headless.sh
+./start_headless.sh
 ```
-*The backend exposes a FastAPI server at `http://localhost:8000`.*
-
-#### 2. Start the Frontend Dashboard
-In a separate terminal:
-```bash
-cd frontend
-npm run dev -- --host
-```
-*Access the UI at `http://<machine-ip>:5173`. The dashboard allows for session login, pausing, and real-time transcript viewing.*
+*This starts both the Dialogue Engine (FastAPI backend) and the Speech Service in the background.*
+*Check logs using `tail -f backend_session.log speech_service.log`.*
 
 ---
 
@@ -118,10 +131,8 @@ npm run dev -- --host
 
 | Action | Method | Description |
 | :--- | :--- | :--- |
-| **Login** | UI | Select "New User" or "Test User" to start a session. |
-| **Pause/Resume** | UI | Temporarily halt the speech loop. |
-| **End Session** | UI / Voice | Say "End Session" or click the End button. |
-| **Hands-Free** | UI Toggle | Toggle between auto-VAD and manual trigger mode. |
+| **Start / Interaction** | Voice | Speak wake words to the system (e.g., "Hello CaiTI"). |
+| **End Session** | Voice | Speak concluding remarks to end the interaction. |
 
 ---
 
@@ -136,6 +147,4 @@ python sanity_check.py
 ## 📚 Key Technologies
 *   **Speech**: Faster-Whisper, Piper, WebRTC-VAD.
 *   **Cognition**: Python, Contextual Bandits, OpenAI-compatible local APIs.
-*   **Web**: React, Vite, FastAPI, Uvicorn.
 *   **Database**: SQLite3.
-
