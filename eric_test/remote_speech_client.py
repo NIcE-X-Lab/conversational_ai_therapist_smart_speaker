@@ -6,6 +6,7 @@ import logging
 import queue
 import numpy as np
 import sys
+import subprocess
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.perception.audio import AudioRecorder
@@ -35,11 +36,18 @@ class SpeechClient:
         self.stt = STTGenerator()
         self.tts = TTSGenerator()
         self.player = AudioPlayer()
-        
         self.running = True
         self.paused = False
         self.session_active = False
         self.stop_playback_event = threading.Event()
+        
+        # Stream logs from Jetson Backend
+        logger.info("Initializing remote log stream...")
+        self.log_process = subprocess.Popen(
+            ["ssh", f"{os.environ.get('JETSON_HOST', 'arth@152.23.12.147')}", "tail", "-f", "~/project/backend_session.log"],
+            stdout=sys.stdout,
+            stderr=sys.stderr
+        )
         
     def say(self, text):
         """Synthesize and play text."""
@@ -180,6 +188,8 @@ class SpeechClient:
     def cleanup(self):
         self.recorder.terminate()
         self.player.terminate()
+        if hasattr(self, 'log_process'):
+            self.log_process.terminate()
 
 if __name__ == "__main__":
     client = SpeechClient()
