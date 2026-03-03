@@ -1,12 +1,17 @@
 #!/bin/bash
 set -e
 
-# Configuration
-JETSON_USER="arth"
-JETSON_IP="152.23.12.147"
-JETSON_HOST="$JETSON_USER@$JETSON_IP"
-PROJECT_DIR="~/project"
 LOCAL_DIR="$(pwd)"
+
+# Configuration from .env
+if [ -f "$LOCAL_DIR/.env" ]; then
+    export $(grep -v '^#' "$LOCAL_DIR/.env" | xargs)
+else
+    echo "Error: .env file not found. Please create one with JETSON_USER, JETSON_IP, JETSON_HOST, JETSON_PASSWORD."
+    exit 1
+fi
+
+PROJECT_DIR="~/project"
 
 echo "🚀 Starting Deployment to Jetson Orin Nano ($JETSON_IP)..."
 
@@ -16,7 +21,7 @@ if [ ! -f ~/.ssh/id_ed25519 ]; then
     ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
 fi
 
-echo "Copying SSH ID to Jetson (You may be asked for password 'carolina2026')..."
+echo "Copying SSH ID to Jetson (You may be asked for password if not already set up)..."
 ssh-copy-id -o StrictHostKeyChecking=no $JETSON_HOST || echo "SSH key copy failed or key exists."
 
 # 2. Sync Codebase
@@ -41,7 +46,7 @@ ssh $JETSON_HOST << EOF
     
     # Install System Deps
     echo "Installing dependencies (sudo required)..."
-    echo "carolina2026" | sudo -S apt-get install -y portaudio19-dev python3-venv
+    echo "$JETSON_PASSWORD" | sudo -S apt-get install -y portaudio19-dev python3-venv
 
     
     # Python Venv
@@ -54,7 +59,7 @@ ssh $JETSON_HOST << EOF
     
     # Install Python Requirements
     echo "Installing Python dependencies..."
-    pip install -r LLM_therapist_prototype/requirements.txt
+    pip install -r requirements.txt
     pip install faster-whisper webrtcvad pyaudio soundfile uvicorn fastapi python-multipart
     
     # Sanity Check
@@ -69,6 +74,4 @@ echo "To run the system:"
 echo "1. SSH into Jetson: ssh $JETSON_HOST"
 echo "2. Go to project: cd $PROJECT_DIR"
 echo "3. Activate venv: source .venv/bin/activate"
-echo "4. Go to source: cd LLM_therapist_prototype"
-echo "5. Run Backend: python LLM_therapist_Application.py"
-echo "5. (Optional) Run Frontend in another terminal: cd frontend && npm install && npm run dev -- --host"
+echo "4. Run Headless System: ./start_headless.sh"
