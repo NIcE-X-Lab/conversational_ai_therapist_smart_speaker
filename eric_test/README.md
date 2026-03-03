@@ -37,3 +37,6 @@ Then run the speech client. When prompted, input the IP address of the Jetson.
 python remote_speech_client.py
 ```
 *Your laptop is now streaming STT inputs directly over WiFi to your custom model running on the Jetson, and playing the TTS responses back out through your laptop speakers!*
+
+#### Viewing Logs
+The `remote_speech_client.py` script automatically spawns a background SSH connection to stream the `backend_session.log` from the Jetson directly to your terminal. You will see both your local microphone activity and the Jetson's LLM reasoning in the same console.
