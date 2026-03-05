@@ -90,26 +90,37 @@ class HandlerRL:
 
         # Opening greeting (LLM-rewritten) delivered before the first question for all interfaces
         try:
-            greeting_raw = (
-                "Hello, I'm CaiTI, your intelligence therapist. Thank you for joining me today. "
-                "Let's get started with a couple of questions about your recent daily life."
-            )
-            rewrite_system_prompt = (
-                "You are a warm, concise, and professional therapist-assistant.\n\n"
-                "Task: Given an opening greeting, rewrite it to sound supportive, welcoming, and clear, "
-                "suitable for the very first message of a therapeutic screening conversation.\n\nRules:\n"
-                "- 1–2 short sentences.\n- Friendly, non-judgmental tone.\n"
-                "- No extra headers or labels; output the final greeting directly.\n"
-            )
-            greeting = greeting_raw # Skip LLM rewrite for speed
-            # greeting = llm_complete(rewrite_system_prompt, greeting_raw).strip()
+            greeting_raw = "Hello, I'm CaiTI."
+            user_ctx = io_rec.get_user_context()
+            
+            if user_ctx:
+                rewrite_system_prompt = (
+                    "You are a warm, concise, and professional therapist-assistant.\n\n"
+                    "Task: Generate a welcoming opening greeting for a returning user. Transition into starting a new session.\n"
+                    f"Here is the context from their previous sessions:\n{user_ctx}\n\n"
+                    "Rules:\n"
+                    "- Briefly and naturally acknowledge a detail from their past session summary to show you remember them.\n"
+                    "- Do not list out their preferences mechanically. Just weave it into the 'Welcome back' if relevant.\n"
+                    "- 2–3 short sentences maximum.\n- Friendly, non-judgmental tone.\n"
+                    "- No extra headers or labels; output the final greeting directly.\n"
+                )
+            else:
+                rewrite_system_prompt = (
+                    "You are a warm, concise, and professional therapist-assistant.\n\n"
+                    "Task: Generate a welcoming opening greeting for a user. Transition into starting the first session.\n"
+                    "Rules:\n"
+                    "- 1–2 short sentences.\n- Friendly, non-judgmental tone.\n"
+                    "- No extra headers or labels; output the final greeting directly.\n"
+                )
+                
+            greeting = llm_complete(rewrite_system_prompt, greeting_raw).strip()
             # Use greeting as a prefix so the first substantive question appears immediately
             set_question_prefix(greeting)
             time.sleep(0.5)
         except Exception as e:
             # If LLM call fails, fall back to raw greeting prefix without blocking the flow
             logger.warning(f"Opening greeting rewrite failed: {e}")
-            set_question_prefix(greeting_raw)
+            set_question_prefix("Hello, I'm CaiTI. Let's get started with a couple of questions about your recent daily life.")
             time.sleep(0.5)
         new_q_table = self.item_q_table.copy()
         S = 0  # Start state for item RL
@@ -118,8 +129,9 @@ class HandlerRL:
         item_mask = [0] + [1] * (ITEM_N_STATES - 1)
         while not is_terminated:
             if io_rec.END_SESSION_EVENT.is_set():
-                logger.info("Session Interrupted (End Session Event).")
-                return
+                logger.info("Session Interrupted (End Session Event). Committing Q-Tables early.")
+                is_terminated = True
+                break
 
             # If all items have been asked, exit to CBT directly
             if sum(item_mask) == 0:
@@ -128,6 +140,11 @@ class HandlerRL:
                 break
             # Select an item to ask about using RL policy
             A = choose_action(S, self.item_q_table, item_mask, ITEM_N_STATES, self.item_actions, self.item_action_labels)
+            
+            # Log the RL's internal logical state to the backend database before proceeding
+            q_vals = self.item_q_table.loc[S].to_dict()
+            io_rec.log_reasoning("rl_decision", {"state": S, "action_chosen": A, "available_mask": item_mask, "q_values": q_vals})
+            
             # Mark this item as used
             item_mask[int(A)] = 0
             # Ask questions for the selected item
@@ -177,13 +194,16 @@ class HandlerRL:
             else:
                 logger.info(f"Created new item Q table for subject {SUBJECT_ID} at {qfile}.")
 
-        # Run CBT after the screening loop concludes
-        run_cbt(self.question_lib)
-        logger.info("Completed CBT flow.")
-        # Persist question_lib again to capture CBT notes
-        save_filename = QUESTION_LIB_FILENAME.replace(".json", f"_{int(time.time())}.json")
-        save_question_lib(save_filename, self.question_lib)
-        logger.info(f"Saved question library with CBT notes to {save_filename}.")
+        # Run CBT after the screening loop concludes if not interrupted
+        if not io_rec.END_SESSION_EVENT.is_set():
+            run_cbt(self.question_lib)
+            logger.info("Completed CBT flow.")
+            # Persist question_lib again to capture CBT notes
+            save_filename = QUESTION_LIB_FILENAME.replace(".json", f"_{int(time.time())}.json")
+            save_question_lib(save_filename, self.question_lib)
+            logger.info(f"Saved question library with CBT notes to {save_filename}.")
+        else:
+            logger.info("Session was early terminated. Skipping CBT workflow.")
 
         # Generate final results for this session
         generate_results(self.question_lib, self.new_response)
@@ -232,8 +252,12 @@ class HandlerRL:
         # Perform Session Analysis (Summaries, Prefs, Safety)
         try:
             self._generate_session_analysis()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Post-session analysis failed: {e}")
+            
+        # Ensure deep memory release of the ML frames to prevent user leakage
+        del self.item_q_table
+        logger.info("Garbage collected ML DataFrame for HandlerRL Context wipe.")
 
     def _generate_session_analysis(self):
         """

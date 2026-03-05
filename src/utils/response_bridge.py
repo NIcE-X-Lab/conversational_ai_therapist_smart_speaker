@@ -26,14 +26,6 @@ def _normalize_dim_score(dim: str, score: int):
     logger.debug(f"Dimension and score normalized: ({dim}, {score})")
     return dim, score
 
-    # Ensure score is an integer between 0 and 2 (inclusive)
-    if not isinstance(score, int) or score < 0 or score > 2:
-        logger.warning(f"Score {score} is invalid, must be int in 0-2")
-        return None
-
-    logger.debug(f"Dimension and score normalized: ({dim}, {score})")
-    return dim, score
-
 def _parse_dim_score_from_text(text: str):
     """
     Parse '[dim][sep][score]' from a free-form text line.
@@ -115,24 +107,28 @@ def get_openai_resp(user_input, original_question, dimension_label: str):
     Fallbacks to ('NA', 99) on parse failure.
     """
     # Preprocess: get first 10 lowercased tokens after removing some punctuation for basic pattern catches
-    lower = [t.lower() for t in user_input.replace(".", " ").replace(",", " ").replace("?", " ").split()[:10]]
+    tokens = user_input.replace(".", " ").replace(",", " ").replace("?", " ").split()
+    lower = [t.lower() for t in tokens[:10]]
 
-    # Detect easy and common cases up front, for quick handling:
-    if "stop" in lower:
-        logger.debug(f"Quick token 'Stop' detected; binding to dimension '{dimension_label}'")
-        return dimension_label, "Stop"
-    if "yes" in lower:
-        logger.debug(f"Quick token 'Yes' detected; binding to dimension '{dimension_label}'")
-        return dimension_label, "Yes"
-    if "no" in lower:
-        logger.debug(f"Quick token 'No' detected; binding to dimension '{dimension_label}'")
-        return dimension_label, "No"
-    if "maybe" in lower:
-        logger.debug(f"Quick token 'Maybe' detected; binding to dimension '{dimension_label}'")
-        return dimension_label, "Maybe"
-    if "question" in lower:
-        logger.debug(f"Quick token 'Question' detected; binding to dimension '{dimension_label}'")
-        return dimension_label, "Question"
+    # Detect easy and common cases up front, for quick handling.
+    # We only apply these shortcuts if the user's response was very short (3 words or fewer).
+    # If it's longer, they are likely providing context (e.g., "Yes, but I feel terrible") which the LLM should evaluate.
+    if len(tokens) <= 3:
+        if "stop" in lower:
+            logger.debug(f"Quick token 'Stop' detected in short response; binding to dimension '{dimension_label}'")
+            return dimension_label, "Stop"
+        if "yes" in lower:
+            logger.debug(f"Quick token 'Yes' detected in short response; binding to dimension '{dimension_label}'")
+            return dimension_label, "Yes"
+        if "no" in lower:
+            logger.debug(f"Quick token 'No' detected in short response; binding to dimension '{dimension_label}'")
+            return dimension_label, "No"
+        if "maybe" in lower:
+            logger.debug(f"Quick token 'Maybe' detected in short response; binding to dimension '{dimension_label}'")
+            return dimension_label, "Maybe"
+        if "question" in lower:
+            logger.debug(f"Quick token 'Question' detected in short response; binding to dimension '{dimension_label}'")
+            return dimension_label, "Question"
 
     try:
         # Use the response analyzer to try to classify the input

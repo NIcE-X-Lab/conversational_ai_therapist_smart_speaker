@@ -142,6 +142,42 @@ def receive_input(data: dict):
         io_record.INPUT_QUEUE.put(text)
     return {"status": "received"}
 
+@app.post("/api/intent")
+def classify_intent(data: dict):
+    """Use local LLM to understand if the string is an explicit start/end command."""
+    text = data.get("text", "")
+    if not text:
+        return {"intent": "none"}
+        
+    try:
+        from src.utils.llm_client import llm_complete
+        
+        system_prompt = (
+            "You are a routing AI for a smart speaker therapist. Determine if the user's statement is a command to START or END the session.\n"
+            "Rules:\n"
+            "- Only answer START if the user is explicitly trying to wake you up, say hello to you, or start a new therapy session.\n"
+            "- Only answer END if the user is explicitly commanding you to stop, end the session, wrap up, or say goodbye.\n"
+            "- If the statement is just a normal conversational answer (even if it contains words like 'stop' or 'end'), reply NONE.\n"
+        )
+        user_prompt = (
+            f"User statement: \"{text}\"\n\n"
+            "Reply with exactly one word: START, END, or NONE\n"
+            "Classification:"
+        )
+
+        response = llm_complete(system_prompt, user_prompt).strip().upper()
+        
+        if "START" in response:
+            return {"intent": "start"}
+        elif "END" in response:
+            return {"intent": "end"}
+        else:
+            return {"intent": "none"}
+            
+    except Exception as e:
+        logger.error(f"Intent classification failed: {e}")
+        return {"intent": "none"}
+
 @app.get("/api/output")
 def get_output():
     """Bridge for Speech Service to poll agent text."""
@@ -152,7 +188,7 @@ def get_output():
     except queue.Empty:
         return {"text": None}
 def run_api():
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning", access_log=False)
 
 class SpeechInteractionLoop:
     """
@@ -351,11 +387,16 @@ def main():
     api_thread.start()
     logger.info("API Server started on port 8000")
 
-    # Start SpeechInteractionLoop in background thread
-    app.state.speech_loop = SpeechInteractionLoop()
-    speech_thread = threading.Thread(target=app.state.speech_loop.run, daemon=True)
-    speech_thread.start()
-    logger.info("SpeechInteractionLoop started.")
+    # Start SpeechInteractionLoop in background thread only if it's not disabled for pure backend usage
+    disable_internal_speech = os.environ.get("DISABLE_INTERNAL_SPEECH", "0") == "1"
+    
+    if disable_internal_speech:
+        logger.info("DISABLE_INTERNAL_SPEECH is active. Running as pure Dialogue Engine/Backend only.")
+    else:
+        app.state.speech_loop = SpeechInteractionLoop()
+        speech_thread = threading.Thread(target=app.state.speech_loop.run, daemon=True)
+        speech_thread.start()
+        logger.info("SpeechInteractionLoop started.")
     
     # Start the main RL workflow (this will drive the therapy session)
     try:

@@ -14,7 +14,7 @@ from src.utils.llm_client import llm_complete
 
 # Set up logger for this module
 from src.utils.log_util import get_logger
-from src.utils.io_record import get_answer, get_resp_log, log_question, set_question_prefix
+from src.utils.io_record import get_answer, get_resp_log, log_question, set_question_prefix, log_reasoning
 logger = get_logger("Questioner")
 
 from src.reflection_validation import rv_consolidated
@@ -201,6 +201,7 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         rv_decision_token, rv_text = rv_consolidated(topic, original_question_asked, original_resp, user_response)
         
         logger.info(f"RV Decision: {rv_decision_token}")
+        log_reasoning("validation_flag", {"decision_token": rv_decision_token, "text": rv_text, "topic": topic})
 
         rv_guide_text = ""
         user_response_0 = ""
@@ -282,6 +283,10 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
             # Classify the user response into DLA result segments
             dimension_label = question_lib[str(S)][str(question_A)]["label"]
             DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]
+            
+            # Log Semantic Scores to DB
+            log_reasoning("semantic_scores", {"DLA_result": DLA_result, "dimension_label": dimension_label, "user_input": user_input})
+            
             # Evaluate the result and update state
             valid, DLA_terminate, previous_question, question_lib = evaluate_result(
                 question_lib, DLA_result, S, question_A, user_input, question_text
@@ -305,6 +310,10 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                 # Classify the new user response
                 dimension_label = question_lib[str(S)][str(question_A)]["label"]
                 DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]
+                
+                # Log Semantic Scores to DB
+                log_reasoning("semantic_scores", {"DLA_result": DLA_result, "dimension_label": dimension_label, "user_input": user_input, "is_retry": True})
+                
                 # Re-evaluate the new answer and update state accordingly
                 valid, DLA_terminate, previous_question, question_lib = evaluate_result(
                     question_lib, DLA_result, S, question_A, user_input, question_text
