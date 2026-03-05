@@ -14,6 +14,8 @@ if [ -f ".env" ]; then
     echo "Sourcing .env variables..."
     export $(grep -v '^#' ".env" | xargs)
 fi
+export DISABLE_INTERNAL_SPEECH=1
+export CONSOLE_LOG_LEVEL=DEBUG
 nohup python -u LLM_therapist_Application.py > backend_session.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"

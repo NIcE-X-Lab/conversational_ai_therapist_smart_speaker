@@ -59,11 +59,21 @@ def choose_action(
         logger.info(f"Exploring: choosing randomly among available actions {available_actions}")
         action = np.random.choice(available_actions)
     else:
-        # Exploitation branch: choose the action(s) with the highest Q-value
-        max_value = np.max(state_action)
-        best_actions = state_action[state_action == max_value].index
-        logger.info(f"Exploiting: choosing among best actions {list(best_actions)} with Q-value {max_value}")
-        action = np.random.choice(best_actions)
+        # Exploitation branch: choose the action(s) with the highest Q-value among AVAILABLE actions
+        available_indices = [str(i) for i in range(1, number_states) if mask[i] == 1]
+        
+        if available_indices:
+            # Filter the state_action series to only consider valid unmasked items
+            valid_actions = state_action[available_indices]
+            max_value = np.max(valid_actions)
+            best_actions = valid_actions[valid_actions == max_value].index
+            logger.info(f"Exploiting: choosing among best valid actions {list(best_actions)} with Q-value {max_value}")
+            action = np.random.choice(best_actions)
+        else:
+            # Fallback if no valid actions are technically available
+            logger.warning("No valid actions available in exploitation, defaulting to random choice. Check termination logic.")
+            action = np.random.choice(actions[1:])
+            
     # Log action with human-readable label if provided
     if action_labels is not None:
         label = action_labels.get(str(action), str(action))

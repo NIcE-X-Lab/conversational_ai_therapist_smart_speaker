@@ -110,7 +110,7 @@ def reset_session(new_user_id: str = None):
 
 
 
-def log_question(text: str):
+def log_question(text: str, meta_data: dict = None):
     """
     Log a question from the agent. 
     Prepends pending prefix, puts into Output Queue, saves to DB, and updates CSV.
@@ -127,7 +127,7 @@ def log_question(text: str):
     
     # Save to DB
     if DB and SESSION_ID:
-        DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "agent", combined)
+        DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "agent", combined, meta_data=meta_data)
         CURRENT_TURN_INDEX += 1
     
     # Sync to CSV 
@@ -136,6 +136,18 @@ def log_question(text: str):
     # Clear prefix
     _PENDING_QUESTION_PREFIX = ""
     logger.info(f"Prompted question: {combined}")
+
+def log_reasoning(reasoning_type: str, data: dict):
+    """
+    Log a system reasoning event (e.g., RL states, Semantic scores) to the database.
+    """
+    global CURRENT_TURN_INDEX
+    if DB and SESSION_ID:
+        meta = {"reasoning_type": reasoning_type}
+        meta.update(data)
+        DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "system", f"[{reasoning_type.upper()}]", meta_data=meta)
+        CURRENT_TURN_INDEX += 1
+        logger.info(f"Logged Reasoning ({reasoning_type}) to DB.")
 
 def get_answer() -> Tuple[List, List[str]]:
     """

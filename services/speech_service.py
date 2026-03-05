@@ -81,26 +81,42 @@ class SpeechClient:
                     logger.error(f"Login failed: {e}")
                     self.say("I had trouble logging you in. Please try again.")
 
-    def check_commands(self, text):
-        """Local command handling."""
-        lower = text.lower()
-        if "end session" in lower or "stop session" in lower:
-            self.say("Ending session.")
+    def _wait_for_summary_and_end(self):
+        """Wait for the backend to generate the historical summary, speak it, and end the session."""
+        self.say("Ending session. Give me a moment to generate your summary.")
+        try:
+            requests.post(f"{API_URL}/end_session")
+        except:
+            pass
+        
+        # Block until we receive the summary from the backend queue
+        max_waits = 10
+        while max_waits > 0:
             try:
-                requests.post(f"{API_URL}/end_session")
-            except:
+                res = requests.get(f"{API_URL}/output")
+                if res.status_code == 200:
+                    data = res.json()
+                    agent_text = data.get("text")
+                    if agent_text and agent_text != "None":
+                        self.say(agent_text)
+                        break
+            except Exception:
                 pass
-            self.session_active = False
-            return True
-        elif "pause" in lower:
-            self.paused = True
-            self.say("Paused.")
-            return True
-        elif "resume" in lower or "continue" in lower:
-            self.paused = False
-            self.say("Resuming.")
-            return True
-        return False
+            time.sleep(1)
+            max_waits -= 1
+            
+        self.session_active = False
+
+    def check_intent(self, text):
+        """Use the backend LLM to evaluate complex start/end commands dynamically."""
+        try:
+            res = requests.post(f"{API_URL}/intent", json={"text": text}, timeout=10.0)
+            if res.status_code == 200:
+                data = res.json()
+                return data.get("intent", "none")
+        except Exception as e:
+            logger.error(f"Intent check failed: {e}")
+        return "none"
 
     def run(self):
         # 1. Wait for Server
@@ -112,8 +128,8 @@ class SpeechClient:
             except:
                 time.sleep(2)
         
-        # 2. Voice Login
-        self.handle_voice_login()
+        # 2. Inform user how to wake up the system
+        logger.info("Ready. Awaiting wake word.")
         
         # 3. Main Loop
         while self.running:
@@ -123,14 +139,21 @@ class SpeechClient:
                     continue
                     
                 if not self.session_active:
-                    # If session ended, go back to login? 
-                    # For now, just wait or re-login.
-                    # Let's loop back to login for continuous kiosk mode.
-                    time.sleep(1)
-                    self.handle_voice_login()
+                    # Idle Mode - Waiting for wake word
+                    idle_text = self.listen()
+                    if idle_text:
+                        idle_lower = idle_text.lower()
+                        # Fast Path
+                        if "start session" in idle_lower or "hi caiti" in idle_lower:
+                            self.handle_voice_login()
+                        else:
+                            # Dynamic Intent Checking
+                            intent = self.check_intent(idle_text)
+                            if intent == "start":
+                                self.handle_voice_login()
                     continue
 
-                # A. Poll for Output (Agent Turn)
+                # A. Active Session Mode - Poll for Agent Output
                 try:
                     res = requests.get(f"{API_URL}/output")
                     if res.status_code == 200:
@@ -138,23 +161,48 @@ class SpeechClient:
                         agent_text = data.get("text")
                         if agent_text and agent_text != "None":
                             self.say(agent_text)
-                            # After agent speaks, immediately listen (Turn-taking)
-                            # Unless it was a goodbye?
-                            # We assume standard turn-taking for now.
                             
                             # Small delay to prevent echo
                             time.sleep(0.5)
                             
-                            # Listen
-                            user_text = self.listen()
-                            if user_text:
-                                # Check Commands
-                                if self.check_commands(user_text):
-                                    continue
-                                    
-                                # Push to Backend
-                                requests.post(f"{API_URL}/input", json={"text": user_text})
+                            # Listen with retries for blank responses
+                            retries = 0
+                            while retries < 3 and self.session_active:
+                                user_text = self.listen()
                                 
+                                if user_text:
+                                    lower = user_text.lower()
+                                    if "end session" in lower or "stop session" in lower:
+                                        self._wait_for_summary_and_end()
+                                        break
+                                    elif "pause" in lower:
+                                        self.paused = True
+                                        self.say("Paused.")
+                                        break
+                                    elif "resume" in lower or "continue" in lower:
+                                        self.paused = False
+                                        self.say("Resuming.")
+                                        break
+                                        
+                                    # Intent LLM path
+                                    intent = self.check_intent(user_text)
+                                    if intent == "end":
+                                        self._wait_for_summary_and_end()
+                                        break
+                                    else:
+                                        # Push standard response to Backend
+                                        requests.post(f"{API_URL}/input", json={"text": user_text})
+                                        break
+                                else:
+                                    # Blank response -> Ask again
+                                    retries += 1
+                                    if retries < 3:
+                                        self.say(agent_text)
+                                    else:
+                                        self.say("I am not hearing any response. I will end the session for now.")
+                                        self._wait_for_summary_and_end()
+                                        break
+                                        
                 except Exception as e:
                     logger.error(f"Loop error: {e}")
                     time.sleep(1)
