@@ -7,6 +7,25 @@ fuser -k 8000/tcp || true
 fuser -k 8001/tcp || true
 pkill -f "services/speech_service.py" || true
 
+# Start Ollama LLM Service (if not already running)
+if ! pgrep -x ollama > /dev/null; then
+    echo "Starting Ollama service..."
+    nohup ollama serve > ollama.log 2>&1 &
+    OLLAMA_PID=$!
+    echo "Ollama PID: $OLLAMA_PID"
+    # Wait up to 15s for Ollama to become ready
+    for i in $(seq 1 15); do
+        if curl -s --max-time 1 http://localhost:11434/api/tags > /dev/null 2>&1; then
+            echo "✅ Ollama is ready."
+            break
+        fi
+        echo "Waiting for Ollama... ($i/15)"
+        sleep 1
+    done
+else
+    echo "✅ Ollama already running."
+fi
+
 # Start Backend
 echo "Starting Dialogue Engine (Server)..."
 source .venv/bin/activate
