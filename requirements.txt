@@ -13,7 +13,9 @@ openai
 
 # Speech / Models
 faster-whisper
-piper-tts # ensuring piper is available, or at least the python bindings if used
+piper-tts
+speechbrain
+torchaudio
 
 # API / Backend
 fastapi
