@@ -4,7 +4,7 @@
 
 This project implements a fully local, privacy-preserving smart-speaker system—**CaiTI** (Conversational AI Therapist Interface)—designed to deliver **Motivational Interviewing (MI)** and **Cognitive Behavioral Therapy (CBT)** micro-interventions.
 
-Built specifically for the **NVIDIA Jetson** platform (Orin Nano/NX/AGX), the system operates entirely offline. It functions as a headless audio assistant, leveraging a robust Python-based speech-client loop that communicates with a local Dialogue Engine.
+Built specifically for the **NVIDIA Jetson** platform (Orin Nano/NX/AGX), the system operates entirely offline. It functions as a headless audio assistant, leveraging a robust Python-based speech-client loop that communicates with a local Dialogue Engine powered by a fine-tuned **Llama 3.2 3B** model.
 
 ---
 
@@ -12,44 +12,35 @@ Built specifically for the **NVIDIA Jetson** platform (Orin Nano/NX/AGX), the sy
 
 The CaiTI architecture is built on three non-negotiable pillars:
 
-1. **Clinical Observability**: Standard LLM logs are insufficient for clinical research. This system implements a **"Reasoning Logic"** stream. Every conversational turn records the exact RL Q-values, Semantic Scores, and Validation Flags, allowing researchers to audit *why* the AI chose a specific clinical dimension.
-2. **Edge Privacy**: By using `faster-whisper`, `Piper`, and local `Ollama` models, sensitive patient data never leaves the Jetson device. Ambient states are handled locally, only triggering the expensive LLM layer upon high-probability intent detection.
+1. **Clinical Observability**: Standard LLM logs are insufficient for clinical research. This system implements a **"Reasoning Logic"** stream. Every conversational turn records the exact RL Q-values, Semantic Scores, and Validation Flags, allowing researchers to audit *why* the AI chose a specific clinical dimension. All sessions are logged independently to `sessions/[UserName]/[Timestamp].log`.
+2. **Edge Privacy**: By using `faster-whisper`, `SpeechBrain`, `Piper`, and local `Ollama` models, sensitive patient data never leaves the Jetson device. Ambient states are handled locally, only triggering the expensive LLM layer upon high-probability intent detection.
 3. **Sandboxed State Management**: To prevent "user-leakage," the system utilizes a strict session lifecycle. When a session terminates, the Reinforcement Learning memory (Pandas DataFrames) is explicitly purged, ensuring the next user starts with a clean slate seeded only by their specific historic database context.
 
 ---
 
 ## 🏗️ System Architecture & Logic
 
-The system is a multi-process application designed for high observability and low-latency response.
+The system is a multi-process application designed for high observability, multi-modal perception, and low-latency response.
 
-### 1. The Core State Machine: `AMBIENT_IDLE` vs `ACTIVE_SESSION`
+### 1. Dual-Pipeline Audio Perception ("Arth" Modules)
+The frontend utilizes a highly robust audio recording loop (`AudioRecorder`) initialized via PyAudio and WebRTC-VAD. When user speech is captured, two parallel thread pools execute on the raw `wav` chunk:
+- **Speech-to-Text (STT)**: `faster-whisper` decodes text.
+- **Speech Emotion Recognition (SER)**: `SpeechBrain` (Wav2Vec2) parses vocal tonality to label the emotion.
+- The outcome is packaged dynamically into a single IPC queue payload: `{"transcript": "...", "detected_emotion": "..."}`.
 
-* **Logic**: The system begins in `AMBIENT_IDLE`. The microphone is active, but only a lightweight background STT process monitors for wake words ("Hi CaiTI").
-* **Transition**: Detection of the wake word triggers a move to `ACTIVE_SESSION`. The **`HandlerRL`** initiates, loading user context from SQLite to personalize the interaction.
-* **Cleanup**: At session end, the system performs a "sandboxing" routine—it flushes RL Q-tables, commits logs, and garbage-collects live memory before returning to `AMBIENT_IDLE`.
+### 2. Asynchronous "Latency Shield" & Interstitial Screening
+CaiTI runs entirely locally, meaning Llama inference on Jetson can occasionally exceed acceptable auditory thresholds. To prevent unnatural silence, an asynchronous latency shield covers every LLM completion:
+- A `concurrent.futures` watcher tracks generation latency. 
+- If 3.0s is exceeded, CaiTI outputs an **Interstitial Exercise** (e.g., breath counting, nostril awareness) OR triggers a **GAD-2 Clinical Screening**.
+- **Opt-Out Control**: While generating, `INPUT_QUEUE` listens for variations of "Stop, "Skip", or "I don't want to". If a user opts out over the mic, the system instantly bypasses processing and launches `waiting_music.wav` loop until the model finishes decoding.
 
-### 2. Component Breakdown
+### 3. State Management & Q-Learning Policy
+- **RL Handler**: Decisions run on Reinforcement Learning to explore clinical dimensions (mood, sleep, weight). It injects `USER_CONTEXT` into greetings. The Q-Table maps the optimum dimension trajectory per individual session. 
+- **CBT Module (`src/CBT.py`)**: Triggered when a dimension receives a severe categorization (Score 2). Executes a 3-stage protocol: **Identify** unhelpful thoughts, **Challenge** them, and **Reframe** into balanced thoughts.
 
-* **Dialogue Engine (`LLM_therapist_Application.py`)**: The orchestration brain. It manages the Reinforcement Learning policy and hosts FastAPI endpoints for interaction logs and manual overrides.
-* **Audio Pipeline ("Arth" Modules)**:
-* **Input (`AudioRecorder`)**: Uses `pyaudio` and `webrtcvad` for dynamic Voice Activity Detection (VAD). It aggressively flushes the ALSA buffer to implement **Echo Cancellation** (preventing the mic from capturing its own TTS output).
-* **STT**: `faster-whisper` decodes raw audio into transcripts locally.
-* **TTS**: `piper-tts` generates synthesized voice responses.
-
-
-* **Policy Engine**:
-* **`handler_rl.py`**: Decisions are driven by **Reinforcement Learning** to explore clinical dimensions (mood, sleep, weight). It injects `USER_CONTEXT` into greetings for continuity.
-* **Q-Tables**: Maintains a `pandas.DataFrame` to decide which dimension to ask about next, masking out topics already covered.
-
-
-* **Semantic Processing & Validation**:
-* **Response Analyzer**: Wraps the local Llama model (via Ollama) to parse unstructured input into `(Dimension, Score)` tuples.
-* **Questioner**: Manages retry logic if answers are ambiguous.
-* **Reflection & Validation (RV)**: Validates if follow-ups are on-topic and provides empathetic validation.
-
-
-* **CBT Module (`src/CBT.py`)**: Triggered for dimensions receiving a severe score (Score 2). It executes a 3-stage protocol: **Identify** unhelpful thoughts, **Challenge** them, and **Reframe** into balanced thoughts.
-* **Persistence Layer**: `db_manager.py` persists conversational turns, user preferences, and historical summaries. It acts as the clinical record of the AI's internal reasoning.
+### 4. Logging and Persistence
+- `db_manager.py` dynamically pushes data to a unified SQLite format (`therapist.db`). 
+- Interstitial fallback screenings mapping $\geq 2$ severity proactively flag `[HIGH-PRIORITY-REVIEW]` attributes into the permanent CSV trail for immediate psychotherapist oversight.
 
 ---
 
@@ -58,20 +49,21 @@ The system is a multi-process application designed for high observability and lo
 ```text
 .
 ├── src/                        # Backend & Logic Core
-│   ├── perception/             # Audio, VAD (webrtcvad), STT (Whisper)
+│   ├── perception/             # Audio, VAD, STT (Whisper + SpeechBrain SER)
 │   ├── cognition/              # RL Logic, CBT Protocol, Response Analysis
 │   ├── action/                 # TTS (Piper) and Audio Playback
 │   ├── database/               # SQLite DB Manager & Schema logic
-│   └── utils/                  # Config loader, AI Privacy Logging, IPC Queues
-├── data/                       # Persistent SQLite DB, Q-Tables, and CSV transcripts
+│   └── utils/                  # Async LLM wrappers, IO Queues, Loggers
+├── sessions/                   # Unique CSV logging chronologies per patient
+├── data/                       # Persistent SQLite DB, Q-Tables
 ├── services/                   # Frontend Services (Speech Client)
 ├── LLM_therapist_Application.py  # Main API Server & Session Orchestrator
 ├── start_headless.sh           # Master launch script
 ├── stop_system.sh              # Master termination script
 ├── deploy_and_run.sh           # One-command Deployment + Execution
 ├── config.yaml                 # System sensitivity and model settings
+├── Modelfile                   # System prompt + LLM configs for Ollama
 └── readme.md                   # You are here!
-
 ```
 
 ---
@@ -82,7 +74,7 @@ The system is a multi-process application designed for high observability and lo
 
 * **Hardware**: NVIDIA Jetson (Orin series) or Linux PC with Mic/Speaker.
 * **Software**: Python 3.10+, `portaudio19-dev`.
-* **External**: Ollama (running Llama 3.1 8B).
+* **External**: Ollama (running the fine-tuned `llama3.2-caiti` model).
 
 ### 2. Local Installation
 
@@ -94,17 +86,17 @@ sudo apt-get install portaudio19-dev python3-venv
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-
+pip install speechbrain torchaudio
 ```
 
 ### 3. Configuration
 
-Modify your environment settings in `.env` or `config.yaml`:
+Modify your environment settings in `.env`. By default `start_headless.sh` auto-deploys `llama3.2-caiti` via the included Modelfile:
 
 ```bash
-JETSON_HOST=""
-OLLAMA_HOST=""
-
+JETSON_HOST="arth@152.23.X.X"
+OPENAI_BASE_URL="http://localhost:11434/v1"
+OPENAI_MODEL="llama3.2-caiti"
 ```
 
 ---
@@ -113,10 +105,10 @@ OLLAMA_HOST=""
 
 | Command | Action | Description |
 | --- | --- | --- |
-| `./start_headless.sh` | **Start** | Spawns Backend and Client processes in the background. |
+| `./start_headless.sh` | **Start** | Spawns Backend and Client processes. Auto-builds Llama Modelfile. |
 | `./stop_system.sh` | **Stop** | Kills all CaiTI processes and frees ALSA audio buffers. |
 | `./deploy_and_run.sh` | **Deploy** | Syncs code to Jetson, restarts services, and attaches to live logs. |
-| `tail -f *.log` | **Monitor** | View real-time AI "reasoning" and transcriptions. |
+| `tail -f *.log` | **Monitor** | View real-time AI "reasoning", async latency hits, and transcriptions. |
 
 ---
 
@@ -124,19 +116,21 @@ OLLAMA_HOST=""
 
 1. **Wake**: User says "Hello CaiTI" $\rightarrow$ `SpeechInteractionLoop` detects wake word and identifies user.
 2. **Personalize**: `HandlerRL` loads user context from SQLite and picks the highest-priority dimension from the Q-Table.
-3. **Screen**: AI generates a naturally phrased question; `Piper` speaks it.
-4. **Analyze**: User answers; `Whisper` transcribes; `ResponseAnalyzer` scores the answer (0, 1, or 2).
-5. **Intervene**: If a score of 2 is detected, the **CBT Protocol** initiates (Identify $\rightarrow$ Challenge $\rightarrow$ Reframe).
-6. **Persistence**: Entire turn, including internal RL values and semantic scores, is committed to `record.csv` and SQLite.
-7. **Reset**: Session ends; memory is purged; system returns to `AMBIENT_IDLE`.
+3. **Screen**: AI generates a naturally phrased question; `Piper` speaks it using `--length_scale 0.8` param for therapeutic, calm pacing.
+4. **Analyze**: User answers; `Whisper` transcribes & `SpeechBrain` detects emotion; `ResponseAnalyzer` scores the answer (0, 1, or 2) while interpreting the physiological emotion.
+5. **Latency Shield**: If LLM parsing surpasses 3.0 seconds, ambient interstitial routing fires off CBT grounding exercises or GAD-2 fallback screenings.
+6. **Intervene**: If a score of 2 is detected, the **CBT Protocol** initiates (Identify $\rightarrow$ Challenge $\rightarrow$ Reframe).
+7. **Persistence**: Entire turn is logged to `sessions/USER/TIMESTAMP.log`.
+8. **Reset**: Session ends; memory is purged; system returns to `AMBIENT_IDLE`.
 
 ---
 
 ## 📚 Key Technologies
 
 * **STT**: Faster-Whisper (Local OpenAI implementation)
+* **SER**: SpeechBrain (wav2vec2-IEMOCAP)
 * **TTS**: Piper (High-speed neural TTS)
-* **LLM**: Llama 3.1 8B (via Ollama)
+* **LLM**: Llama 3.2 3B (fine-tuned: `llama3.2-caiti`)
 * **VAD**: WebRTC-VAD (Voice Activity Detection)
 * **Logic**: Reinforcement Learning (Q-Learning) via Pandas
 * **API**: FastAPI & Uvicorn

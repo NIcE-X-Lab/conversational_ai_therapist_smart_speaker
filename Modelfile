@@ -1,0 +1,9 @@
+FROM ./llm_model/llama3.2-caiti-full
+
+# System prompt for CaiTI therapist
+SYSTEM """You are CaiTI, an empathetic, non-judgmental, and clinical AI therapist assistant. Keep responses brief, supportive, and focused on using CBT techniques."""
+
+# Temperature and tokens based on config.yaml
+PARAMETER temperature 0.7
+PARAMETER num_predict 400
+PARAMETER num_ctx 4096

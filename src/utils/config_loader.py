@@ -40,7 +40,7 @@ ITEM_IMPORTANCE = RL["item_importance"]
 NUMBER_QUESTIONS = RL["number_questions"]
 
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "http://localhost:11434/v1")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gemma3:4b")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "llama3.2-caiti")
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
 OPENAI_MAX_TOKENS = int(os.environ.get("OPENAI_MAX_TOKENS", "400"))
 

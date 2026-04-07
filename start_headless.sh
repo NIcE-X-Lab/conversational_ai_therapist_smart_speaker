@@ -17,6 +17,14 @@ if ! pgrep -x ollama > /dev/null; then
     for i in $(seq 1 15); do
         if curl -s --max-time 1 http://localhost:11434/api/tags > /dev/null 2>&1; then
             echo "✅ Ollama is ready."
+            
+            # Ensure fine-tuned model exists
+            if ! ollama list | grep -q "llama3.2-caiti"; then
+                echo "Creating llama3.2-caiti model from Modelfile..."
+                ollama create llama3.2-caiti -f Modelfile
+            else
+                echo "✅ llama3.2-caiti model found."
+            fi
             break
         fi
         echo "Waiting for Ollama... ($i/15)"

@@ -97,10 +97,15 @@ def init_record(user_id_override: str = None):
             logger.error(f"Failed to load user context: {e}")
 
         CURRENT_TURN_INDEX = 0
-        logger.info(f"Initialized record. Session ID: {SESSION_ID}")
     except Exception as e:
         logger.error(f"Failed to initialize DB: {e}")
         
+    # Redefine RECORD_CSV to the new session format
+    global RECORD_CSV
+    import datetime
+    timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    RECORD_CSV = os.path.join(os.path.abspath("."), "sessions", SUBJECT_ID, f"{timestamp_str}.log")
+    
     # Initialize CSV
     append_to_csv("internal", "system", f"Session initialized. User: {SUBJECT_ID}, DB ID: {SESSION_ID}")
 
@@ -170,15 +175,26 @@ def get_answer() -> Tuple[List, List[str]]:
     # Let's try to keep it simple.
     append_to_csv("turn", "user", user_input_raw)
         
-    # Process segments
-    user_input = str(user_input_raw)
-    user_input = user_input.replace(", and", ".").replace("but", ".")
-    user_input = user_input.split(".")
+    # Process as JSON if possible
+    import json
+    emotion_str = "Neutral"
+    try:
+        parsed = json.loads(str(user_input_raw))
+        user_input_text = parsed.get("transcript", "")
+        emotion_str = parsed.get("detected_emotion", "Neutral")
+    except Exception:
+        user_input_text = str(user_input_raw)
+
+    user_input_text = user_input_text.replace(", and", ".").replace("but", ".")
+    raw_segments = user_input_text.split(".")
     
     segments = []
-    for seg in user_input:
+    for i, seg in enumerate(raw_segments):
         seg = seg.strip()
         if seg:
+            # Append emotion auxiliary context to the last valid segment
+            if i == len(raw_segments) - 1 or len([s for s in raw_segments[i+1:] if s.strip()]) == 0:
+                seg = f"{seg} [Detected Emotion: {emotion_str}]"
             segments.append(seg)
             
     DLA_result = [] 
@@ -193,7 +209,16 @@ def get_resp_log() -> str:
     global CURRENT_TURN_INDEX
     
     logger.info("Waiting for user response (raw)...")
-    user_response = INPUT_QUEUE.get()
+    user_response_raw = INPUT_QUEUE.get()
+    
+    import json
+    try:
+        parsed = json.loads(str(user_response_raw))
+        transcript = parsed.get("transcript", "")
+        emotion = parsed.get("detected_emotion", "Neutral")
+        user_response = f"{transcript} [Detected Emotion: {emotion}]"
+    except Exception:
+        user_response = str(user_response_raw)
     
     if DB and SESSION_ID:
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "user", user_response)

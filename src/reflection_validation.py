@@ -2,7 +2,7 @@
 
 import os
 import logging
-from src.utils.llm_client import llm_complete
+from src.utils.llm_client import llm_complete, llm_complete_with_interstitial
 # Set up logger for this module
 from src.utils.log_util import get_logger
 logger = get_logger("ReflectionValidation")
@@ -132,9 +132,9 @@ VALIDATION: It sounds like you're going through a really challenging time. The s
 
 def _chat_complete(system_content: str, user_content: str):
     """
-    Unified LLM entry that delegates to llm_complete.
+    Unified LLM entry that delegates to llm_complete_with_interstitial.
     """
-    return llm_complete(system_content, user_content)
+    return llm_complete_with_interstitial(system_content, user_content)
 
 
 # Consolidated Prompt: Combines Reasoner + Validation/Guide

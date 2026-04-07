@@ -31,6 +31,9 @@ class TTSGenerator:
         cmd = [
             self.executable,
             "--model", self.model_path,
+            "--length_scale", "0.8",
+            "--sentence_silence", "1.5",
+            "--noise_scale", "0.4",
             "--output_file", output_file
         ]
         

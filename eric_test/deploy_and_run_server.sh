@@ -14,7 +14,7 @@ else
 fi
 
 PROJECT_DIR="~/project"
-MODEL_NAME=${OPENAI_MODEL:-"gemma3:4b"}
+MODEL_NAME=${OPENAI_MODEL:-"llama3.2-caiti"}
 
 echo "🚀 Deploying Eric's Model to Jetson ($JETSON_HOST)..."
 

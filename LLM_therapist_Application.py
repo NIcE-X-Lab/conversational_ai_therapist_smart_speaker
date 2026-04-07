@@ -226,7 +226,11 @@ class SpeechInteractionLoop:
         if audio_frames:
             user_wav = "wake_temp.wav"
             self.recorder.save_wav(audio_frames, user_wav)
-            user_text = self.stt.transcribe(user_wav).lower().strip()
+            stt_json = self.stt.transcribe(user_wav)
+            try:
+                user_text = json.loads(stt_json).get("transcript", "").lower().strip()
+            except:
+                user_text = stt_json.lower().strip()
             
             import string
             user_text = user_text.translate(str.maketrans('', '', string.punctuation)).strip()
@@ -254,7 +258,11 @@ class SpeechInteractionLoop:
                     if name_frames:
                         name_wav = "name_temp.wav"
                         self.recorder.save_wav(name_frames, name_wav)
-                        name_text = self.stt.transcribe(name_wav).strip()
+                        stt_json = self.stt.transcribe(name_wav)
+                        try:
+                            name_text = json.loads(stt_json).get("transcript", "").strip()
+                        except:
+                            name_text = stt_json.strip()
                         if name_text:
                             logger.info(f"Identity received: {name_text}")
                             uid = name_text.lower().replace(" ", "_").translate(str.maketrans('', '', string.punctuation))
@@ -301,6 +309,15 @@ class SpeechInteractionLoop:
         """
         logger.info(f"Agent says: {text}")
         
+        if text.startswith("[PLAY_MUSIC]"):
+            music_file = text.split(" ", 1)[1] if " " in text else "waiting_music.wav"
+            logger.info(f"Playing background music: {music_file}")
+            self.state = "playing"
+            self.stop_playback_event.clear()
+            self.player.play(music_file, stop_event=self.stop_playback_event)
+            self.state = "idle"
+            return
+        
         # 1. TTS
         self.state = "processing"
         wav_file = "response_temp.wav"
@@ -339,18 +356,24 @@ class SpeechInteractionLoop:
         
         if not audio_frames:
             logger.warning("No audio recorded (Timeout or Silence).")
-            user_text = "" # Send empty to indicate silence/no-response
+            user_input_payload = "" # Send empty to indicate silence/no-response
+            user_text_for_command = ""
         else:
             # 4. Save and STT
             self.state = "processing"
             user_wav = "user_input_temp.wav"
             self.recorder.save_wav(audio_frames, user_wav)
-            user_text = self.stt.transcribe(user_wav)
+            user_input_payload = self.stt.transcribe(user_wav)
+            try:
+                parsed = json.loads(user_input_payload)
+                user_text_for_command = parsed.get("transcript", "")
+            except:
+                user_text_for_command = user_input_payload
         
-        logger.info(f"User Transcribed: {user_text}")
+        logger.info(f"User Transcribed Payload: {user_input_payload}")
         
         # Voice Command Check
-        lower_text = user_text.lower().strip()
+        lower_text = user_text_for_command.lower().strip()
         if "end session" in lower_text or "stop session" in lower_text:
             logger.info("Voice Command: End Session detected.")
             end_session() # Call API function directly
@@ -358,7 +381,7 @@ class SpeechInteractionLoop:
 
         # 5. Send to Agent (Back to Cognition)
         # Note: io_record will also log this to record.csv (Frontend Requirement)
-        INPUT_QUEUE.put(user_text)
+        INPUT_QUEUE.put(user_input_payload)
         self.state = "idle"
 
     def stop_audio(self):
