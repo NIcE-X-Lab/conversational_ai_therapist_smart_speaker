@@ -16,3 +16,4 @@ src/tools/
 
 tests/
 _archive/
+/llm_model/
