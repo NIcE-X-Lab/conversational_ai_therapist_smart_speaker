@@ -1,3 +1,4 @@
+"""Utility helper providing standard standardized colored logger instances."""
 # This script provides a utility for logging with colored output and file logging.
 # It ensures that a log directory exists, and provides a get_logger function to create a logger with both stream and file handlers.
 # The coloredlogs package is used to enhance the readability of logs in the terminal.

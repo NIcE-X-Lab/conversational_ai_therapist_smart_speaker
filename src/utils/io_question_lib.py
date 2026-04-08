@@ -1,3 +1,4 @@
+"""Utility helper parsing fixed clinical question libraries into memory."""
 import json
 import csv
 import os

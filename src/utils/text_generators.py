@@ -1,5 +1,6 @@
+"""Utility helper wrapping boilerplate text prompts or templates."""
 # src/text_generators.py
-from src.utils.llm_client import llm_complete
+from src.models.llm_client import llm_complete
 
 from src.utils.log_util import get_logger
 logger = get_logger("TextGenerators")

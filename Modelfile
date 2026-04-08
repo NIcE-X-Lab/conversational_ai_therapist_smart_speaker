@@ -1,9 +1,18 @@
-FROM ./llm_model/llama3.2-caiti-full
+FROM gemma:2b
 
-# System prompt for CaiTI therapist
-SYSTEM """You are CaiTI, an empathetic, non-judgmental, and clinical AI therapist assistant. Keep responses brief, supportive, and focused on using CBT techniques."""
+# System prompt optimized for Gemma's instruction-following style
+SYSTEM """
+<start_of_turn>user
+You are CaiTI, a clinical AI therapist assistant. 
+Characteristics: Empathetic, non-judgmental, brief, and supportive.
+Primary Tool: Cognitive Behavioral Therapy (CBT) techniques.
+Constraint: Keep responses under 3 sentences to minimize TTS latency.
+<end_of_turn>
+"""
 
-# Temperature and tokens based on config.yaml
+# Performance parameters for 8GB Jetson
 PARAMETER temperature 0.7
-PARAMETER num_predict 400
-PARAMETER num_ctx 4096
+PARAMETER num_predict 250   # Shorter responses = faster "Time to First Word"
+PARAMETER num_ctx 2048      # Reducing from 4096 saves massive VRAM
+PARAMETER stop "<start_of_turn>"
+PARAMETER stop "<end_of_turn>"

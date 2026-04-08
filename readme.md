@@ -4,7 +4,7 @@
 
 This project implements a fully local, privacy-preserving smart-speaker system—**CaiTI** (Conversational AI Therapist Interface)—designed to deliver **Motivational Interviewing (MI)** and **Cognitive Behavioral Therapy (CBT)** micro-interventions.
 
-Built specifically for the **NVIDIA Jetson** platform (Orin Nano/NX/AGX), the system operates entirely offline. It functions as a headless audio assistant, leveraging a robust Python-based speech-client loop that communicates with a local Dialogue Engine powered by a fine-tuned **Llama 3.2 3B** model.
+Built specifically for the **NVIDIA Jetson** platform (Orin Nano/NX/AGX), the system operates entirely offline. It functions as a headless audio assistant, leveraging a robust Python-based speech-client loop that communicates with a local Dialogue Engine powered by a fine-tuned **Gemma 2B** model.
 
 ---
 
@@ -74,7 +74,7 @@ CaiTI runs entirely locally, meaning Llama inference on Jetson can occasionally 
 
 * **Hardware**: NVIDIA Jetson (Orin series) or Linux PC with Mic/Speaker.
 * **Software**: Python 3.10+, `portaudio19-dev`.
-* **External**: Ollama (running the fine-tuned `llama3.2-caiti` model).
+* **External**: Ollama (running the fine-tuned `gemma:2b-caiti` model).
 
 ### 2. Local Installation
 
@@ -96,7 +96,7 @@ Modify your environment settings in `.env`. By default `start_headless.sh` auto-
 ```bash
 JETSON_HOST="arth@152.23.X.X"
 OPENAI_BASE_URL="http://localhost:11434/v1"
-OPENAI_MODEL="llama3.2-caiti"
+OPENAI_MODEL="gemma:2b-caiti"
 ```
 
 ---
@@ -105,7 +105,7 @@ OPENAI_MODEL="llama3.2-caiti"
 
 | Command | Action | Description |
 | --- | --- | --- |
-| `./start_headless.sh` | **Start** | Spawns Backend and Client processes. Auto-builds Llama Modelfile. |
+| `./start_headless.sh` | **Start** | Spawns Backend and Client processes. Auto-builds Gemma Modelfile. |
 | `./stop_system.sh` | **Stop** | Kills all CaiTI processes and frees ALSA audio buffers. |
 | `./deploy_and_run.sh` | **Deploy** | Syncs code to Jetson, restarts services, and attaches to live logs. |
 | `tail -f *.log` | **Monitor** | View real-time AI "reasoning", async latency hits, and transcriptions. |
@@ -130,7 +130,7 @@ OPENAI_MODEL="llama3.2-caiti"
 * **STT**: Faster-Whisper (Local OpenAI implementation)
 * **SER**: SpeechBrain (wav2vec2-IEMOCAP)
 * **TTS**: Piper (High-speed neural TTS)
-* **LLM**: Llama 3.2 3B (fine-tuned: `llama3.2-caiti`)
+* **LLM**: Gemma 2B (fine-tuned: `gemma:2b-caiti`)
 * **VAD**: WebRTC-VAD (Voice Activity Detection)
 * **Logic**: Reinforcement Learning (Q-Learning) via Pandas
 * **API**: FastAPI & Uvicorn

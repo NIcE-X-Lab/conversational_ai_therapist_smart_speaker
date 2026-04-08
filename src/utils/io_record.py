@@ -1,4 +1,6 @@
+"""Utility helper managing file I/O operations and synchronous memory channels."""
 import os
+import json
 import queue
 import logging
 import time
@@ -7,7 +9,7 @@ import pandas as pd
 from typing import List, Tuple
 
 from src.utils.log_util import get_logger
-from src.database.db_manager import DBManager
+from src.drivers.db_manager import DBManager
 from src.utils.config_loader import DB_PATH, SUBJECT_ID, RECORD_CSV
 
 logger = get_logger("IORecord")
@@ -30,6 +32,9 @@ CURRENT_TURN_INDEX = 0
 _PENDING_QUESTION_PREFIX = ""
 USER_CONTEXT = ""
 
+# JSON session log path (set dynamically in init_record)
+_JSON_LOG_PATH: str = ""
+
 def get_user_context():
     return USER_CONTEXT
 
@@ -42,6 +47,26 @@ def set_question_prefix(text: str):
 
 # CSV Synchronization (Full Transcript Logging)
 HEADER = ["Timestamp", "Type", "Speaker", "Text"]
+
+def log_json_event(event_type: str, data: dict):
+    """
+    Append a timestamped JSON line to the session JSON log file.
+    Format: {"ts": "...", "event": "...", ...data}
+    """
+    global _JSON_LOG_PATH
+    if not _JSON_LOG_PATH:
+        return
+    try:
+        import datetime
+        folder = os.path.dirname(_JSON_LOG_PATH)
+        if folder and not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
+        entry = {"ts": datetime.datetime.now().isoformat(), "event": event_type}
+        entry.update(data)
+        with open(_JSON_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        logger.error(f"Failed to write JSON log: {e}")
 
 def append_to_csv(log_type: str, speaker: str, text: str):
     """
@@ -71,7 +96,14 @@ def append_to_csv(log_type: str, speaker: str, text: str):
 def init_record(user_id_override: str = None):
     """Initialize queues, database session, and CSV."""
     global DB, SESSION_ID, CURRENT_TURN_INDEX, SUBJECT_ID
-    
+
+    # Reset PHQ-4 / GAD-2 screening state for this session
+    try:
+        from src.models.llm_client import _reset_screening
+        _reset_screening()
+    except Exception:
+        pass  # llm_client not yet loaded on first import is okay
+
     if user_id_override:
         logger.info(f"Overriding SUBJECT_ID with {user_id_override}")
         SUBJECT_ID = user_id_override
@@ -100,11 +132,13 @@ def init_record(user_id_override: str = None):
     except Exception as e:
         logger.error(f"Failed to initialize DB: {e}")
         
-    # Redefine RECORD_CSV to the new session format
-    global RECORD_CSV
+    # Redefine RECORD_CSV and _JSON_LOG_PATH to the new session format
+    global RECORD_CSV, _JSON_LOG_PATH
     import datetime
     timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    RECORD_CSV = os.path.join(os.path.abspath("."), "sessions", SUBJECT_ID, f"{timestamp_str}.log")
+    base_session_dir = os.path.join(os.path.abspath("."), "data", "logs", SUBJECT_ID)
+    RECORD_CSV = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.log")
+    _JSON_LOG_PATH = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.json")
     
     # Initialize CSV
     append_to_csv("internal", "system", f"Session initialized. User: {SUBJECT_ID}, DB ID: {SESSION_ID}")
@@ -137,6 +171,7 @@ def log_question(text: str, meta_data: dict = None):
     
     # Sync to CSV 
     append_to_csv("turn", "agent", combined)
+    log_json_event("agent_turn", {"text": combined})
     
     # Clear prefix
     _PENDING_QUESTION_PREFIX = ""
@@ -197,8 +232,8 @@ def get_answer() -> Tuple[List, List[str]]:
                 seg = f"{seg} [Detected Emotion: {emotion_str}]"
             segments.append(seg)
             
-    DLA_result = [] 
-    
+    DLA_result = []
+    log_json_event("user_turn", {"transcript": user_input_text, "emotion": emotion_str, "segments": segments})
     return DLA_result, segments
 
 def get_resp_log() -> str:
@@ -223,10 +258,12 @@ def get_resp_log() -> str:
     if DB and SESSION_ID:
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "user", user_response)
         CURRENT_TURN_INDEX += 1
-    
+
     append_to_csv("turn", "user", user_response)
-        
+    log_json_event("user_turn", {"response": user_response})
+
     logger.info(f"Received user response: {user_response}")
     return user_response
+
 
 

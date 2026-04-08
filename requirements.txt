@@ -21,7 +21,11 @@ torchaudio
 fastapi
 uvicorn
 python-multipart
+python-dotenv
 
 # Testing
 pytest
 httpx
+
+# Hardware (Jetson system package — NOT pip installable, pre-installed on Jetson OS)
+# Jetson.GPIO
