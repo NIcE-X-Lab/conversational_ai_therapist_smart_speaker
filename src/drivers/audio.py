@@ -23,6 +23,18 @@ class AudioRecorder:
         self._audio = pyaudio.PyAudio()
         self.stream = None
         self.vad = webrtcvad.Vad(AUDIO_VAD_AGGRESSIVENESS)
+        self._vad_active_callback = None
+
+    def set_vad_active_callback(self, callback):
+        """Set callback(state: bool) to mirror active VAD capture state."""
+        self._vad_active_callback = callback
+
+    def _set_vad_state(self, state: bool):
+        try:
+            if self._vad_active_callback:
+                self._vad_active_callback(state)
+        except Exception as e:
+            logger.debug(f"VAD callback failed: {e}")
 
     def start_stream(self):
         """Start the audio input stream."""
@@ -89,6 +101,7 @@ class AudioRecorder:
                 data = self.stream.read(self.chunk, exception_on_overflow=False)
                 if self.is_speech(data):
                     has_speech = True
+                    self._set_vad_state(True)
                     frames.append(data)
                     logger.info("Speech detected, recording started.")
             except IOError as e:
@@ -114,6 +127,7 @@ class AudioRecorder:
                 logger.warning(f"Audio read error: {e}")
                 
         self.stop_stream()
+        self._set_vad_state(False)
         
         return frames
 

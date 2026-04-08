@@ -9,6 +9,8 @@ import string
 import pandas as pd
 import uuid
 import requests
+from flask import Flask, request as flask_request, jsonify
+from flask_cors import CORS
 
 # FastAPI
 from fastapi import FastAPI
@@ -23,7 +25,8 @@ from src.utils import io_record
 from src.utils.config_loader import (
     SUBJECT_ID, RECORD_CSV, OPENAI_BASE_URL, LLM_MODEL,
     DB_PATH, STT_MODEL_PATH, TTS_MODEL_PATH,
-    PIN_BTN_START, PIN_BTN_END, PIN_BTN_OPT_OUT, PIN_LISTENING_LED
+    PIN_BTN_START, PIN_BTN_END, PIN_BTN_OPT_OUT, PIN_LISTENING_LED,
+    OLLAMA_KEEP_ALIVE
 )
 
 # Perception and Action modules
@@ -64,6 +67,7 @@ def _startup_checklist():
             f"[{'x' if model_found else '!'}] Ollama Connected ({LLM_MODEL})"
             + ("" if model_found else f" ⚠ model not pulled yet, available: {available}")
         )
+        lines.append(f"[x] Ollama Keep Alive configured ({OLLAMA_KEEP_ALIVE})")
     except Exception as e:
         lines.append(f"[!] Ollama UNREACHABLE: {e}")
 

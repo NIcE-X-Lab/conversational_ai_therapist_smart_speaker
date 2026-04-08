@@ -18,7 +18,7 @@ from src.utils.config_loader import (
 )
 from src.utils.config_loader import RECORD_CSV
 from src.utils.io_question_lib import load_question_lib, save_question_lib, generate_results
-from src.utils.io_record import init_record, log_question, set_question_prefix
+from src.utils.io_record import init_record, log_question, set_question_prefix, dump_session_history_to_terminal
 import src.utils.io_record as io_rec
 from src.utils.rl_qtables import (
     initialize_q_table,
@@ -145,6 +145,7 @@ class HandlerRL:
             # Log the RL's internal logical state to the backend database before proceeding
             q_vals = self.item_q_table.loc[S].to_dict()
             io_rec.log_reasoning("rl_decision", {"state": S, "action_chosen": A, "available_mask": item_mask, "q_values": q_vals})
+            io_rec.set_rl_context({"state": S, "action_chosen": A, "available_mask": item_mask, "q_values": q_vals})
             
             # Mark this item as used
             item_mask[int(A)] = 0
@@ -252,7 +253,9 @@ class HandlerRL:
 
         # Perform Session Analysis (Summaries, Prefs, Safety)
         try:
+            self._generate_clinical_summary()
             self._generate_session_analysis()
+            dump_session_history_to_terminal()
         except Exception as e:
             logger.error(f"Post-session analysis failed: {e}")
             
@@ -332,6 +335,47 @@ class HandlerRL:
 
         except Exception as e:
             logger.error(f"Session analysis failed: {e}")
+
+    def _generate_clinical_summary(self):
+        """
+        Generate a structured, clinician-friendly reflection summary at session end.
+        Includes key emotional trends, average screening profile, and next-session focus.
+        """
+        if not io_rec.DB or not io_rec.SESSION_ID:
+            logger.warning("DB or Session ID not available for clinical summary.")
+            return
+
+        history = io_rec.DB.get_session_history(io_rec.SESSION_ID)
+        if not history:
+            return
+
+        hist_text = "\n".join([f"{h['speaker']}: {h['text']}" for h in history])
+        screening = io_rec.DB.get_screening_scores(io_rec.SESSION_ID) or {}
+        anxiety = screening.get("anxiety")
+        depression = screening.get("depression")
+        total = screening.get("total")
+
+        prompt = (
+            "Create a structured clinical session summary for therapist handoff.\n"
+            "Output exactly in this format with these headers:\n"
+            "KEY_EMOTIONAL_HIGHLIGHTS:\n"
+            "- ...\n"
+            "AVERAGE_SCREENING_SCORES:\n"
+            "- GAD2: ...\n"
+            "- PHQ2: ...\n"
+            "- PHQ4: ...\n"
+            "RECOMMENDED_NEXT_SESSION_FOCUS:\n"
+            "- ...\n"
+            "Keep concise, specific, and clinically neutral.\n\n"
+            f"Screening Snapshot => GAD2:{anxiety}, PHQ2:{depression}, PHQ4:{total}\n\n"
+            f"Session History:\n{hist_text}"
+        )
+
+        summary = llm_complete("You are a clinical documentation assistant.", prompt).strip()
+        if summary:
+            io_rec.DB.add_summary(io_rec.SESSION_ID, summary)
+            log_question(summary)
+            logger.info("Structured clinical summary generated and stored.")
 
     def _detect_cbt_summary(self) -> tuple:
         """Return (cbt_used, summary_str) by scanning question_lib notes for CBT markers."""

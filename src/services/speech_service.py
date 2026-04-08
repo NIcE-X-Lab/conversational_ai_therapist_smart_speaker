@@ -9,6 +9,7 @@ import json
 import threading
 import queue
 import string
+import re
 from src.drivers.audio import AudioRecorder
 from src.models.stt import STTGenerator
 from src.models.tts import TTSGenerator
@@ -34,6 +35,7 @@ class SpeechInteractionService:
         
         # GPIO — singleton, used for LED sync and button polling
         self.gpio = GPIOManager()
+        self.recorder.set_vad_active_callback(self.gpio.set_led)
 
         self.input_queue = input_queue
         self.output_queue = output_queue
@@ -93,9 +95,7 @@ class SpeechInteractionService:
     def listen(self, timeout=15.0):
         """Record and transcribe with LED feedback."""
         self.state = "listening"
-        self._led_on()
         audio_frames = self.recorder.record_until_silence(max_duration=timeout)
-        self._led_off()
         
         if not audio_frames:
             self.state = "idle"
@@ -126,7 +126,8 @@ class SpeechInteractionService:
         
         name = self.listen(timeout=10.0)
         if name:
-            uid = name.lower().replace(" ", "_").translate(str.maketrans('', '', string.punctuation))
+            clean = re.sub(r"[^A-Za-z0-9 _-]", "", name).strip()
+            uid = clean.replace(" ", "_") or "User"
             logger.info(f"Initializing session for user: {uid}")
             io_record.reset_session(uid)
             io_record.END_SESSION_EVENT.clear()
@@ -182,7 +183,7 @@ class SpeechInteractionService:
                         except:
                             text = stt_json.lower().strip()
                         
-                        if any(kw in text for kw in ("hello caiti", "hi caiti", "hey caiti")):
+                        if any(kw in text for kw in ("hello katie", "hello caiti", "hi katie", "hi caiti", "hey katie", "hey caiti")):
                             self.handle_onboarding()
                     continue
 

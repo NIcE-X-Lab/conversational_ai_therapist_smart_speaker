@@ -31,12 +31,45 @@ CURRENT_TURN_INDEX = 0
 
 _PENDING_QUESTION_PREFIX = ""
 USER_CONTEXT = ""
+_LAST_USER_TRANSCRIPT = ""
+_LAST_USER_EMOTION = "Neutral"
+_LAST_RL_STATE = {}
+_LATEST_SCREENING_SCORES = {
+    "anxiety": None,
+    "depression": None,
+    "total": None,
+}
 
 # JSON session log path (set dynamically in init_record)
 _JSON_LOG_PATH: str = ""
 
 def get_user_context():
     return USER_CONTEXT
+
+def set_last_user_signal(transcript: str, emotion: str = "Neutral"):
+    global _LAST_USER_TRANSCRIPT, _LAST_USER_EMOTION
+    _LAST_USER_TRANSCRIPT = str(transcript or "").strip()
+    _LAST_USER_EMOTION = str(emotion or "Neutral").strip()
+
+def set_rl_context(state: dict):
+    global _LAST_RL_STATE
+    _LAST_RL_STATE = state if isinstance(state, dict) else {}
+
+def set_latest_screening_scores(anxiety=None, depression=None, total=None):
+    global _LATEST_SCREENING_SCORES
+    _LATEST_SCREENING_SCORES = {
+        "anxiety": anxiety,
+        "depression": depression,
+        "total": total,
+    }
+
+def get_context_pack() -> dict:
+    return {
+        "user_transcript": _LAST_USER_TRANSCRIPT,
+        "emotion_tag": _LAST_USER_EMOTION,
+        "rl_state": _LAST_RL_STATE,
+        "screening_scores": _LATEST_SCREENING_SCORES,
+    }
 
 def set_question_prefix(text: str):
     """
@@ -96,6 +129,7 @@ def append_to_csv(log_type: str, speaker: str, text: str):
 def init_record(user_id_override: str = None):
     """Initialize queues, database session, and CSV."""
     global DB, SESSION_ID, CURRENT_TURN_INDEX, SUBJECT_ID
+    global _LAST_USER_TRANSCRIPT, _LAST_USER_EMOTION, _LAST_RL_STATE, _LATEST_SCREENING_SCORES
 
     # Reset PHQ-4 / GAD-2 screening state for this session
     try:
@@ -129,6 +163,10 @@ def init_record(user_id_override: str = None):
             logger.error(f"Failed to load user context: {e}")
 
         CURRENT_TURN_INDEX = 0
+        _LAST_USER_TRANSCRIPT = ""
+        _LAST_USER_EMOTION = "Neutral"
+        _LAST_RL_STATE = {}
+        _LATEST_SCREENING_SCORES = {"anxiety": None, "depression": None, "total": None}
     except Exception as e:
         logger.error(f"Failed to initialize DB: {e}")
         
@@ -188,6 +226,8 @@ def log_reasoning(reasoning_type: str, data: dict):
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "system", f"[{reasoning_type.upper()}]", meta_data=meta)
         CURRENT_TURN_INDEX += 1
         logger.info(f"Logged Reasoning ({reasoning_type}) to DB.")
+    if reasoning_type == "rl_decision":
+        set_rl_context(data)
 
 def get_answer() -> Tuple[List, List[str]]:
     """
@@ -219,6 +259,8 @@ def get_answer() -> Tuple[List, List[str]]:
         emotion_str = parsed.get("detected_emotion", "Neutral")
     except Exception:
         user_input_text = str(user_input_raw)
+
+    set_last_user_signal(user_input_text, emotion_str)
 
     user_input_text = user_input_text.replace(", and", ".").replace("but", ".")
     raw_segments = user_input_text.split(".")
@@ -252,8 +294,10 @@ def get_resp_log() -> str:
         transcript = parsed.get("transcript", "")
         emotion = parsed.get("detected_emotion", "Neutral")
         user_response = f"{transcript} [Detected Emotion: {emotion}]"
+        set_last_user_signal(transcript, emotion)
     except Exception:
         user_response = str(user_response_raw)
+        set_last_user_signal(user_response, "Neutral")
     
     if DB and SESSION_ID:
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "user", user_response)
@@ -264,6 +308,20 @@ def get_resp_log() -> str:
 
     logger.info(f"Received user response: {user_response}")
     return user_response
+
+
+def dump_session_history_to_terminal() -> None:
+    """Print full session history to terminal in chronological order."""
+    if not DB or not SESSION_ID:
+        logger.warning("Cannot dump session history: DB or SESSION_ID missing.")
+        return
+    history = DB.get_session_history(SESSION_ID)
+    logger.info("========== SESSION HISTORY BEGIN ==========")
+    for idx, turn in enumerate(history, start=1):
+        speaker = str(turn.get("speaker", "unknown")).upper()
+        text = str(turn.get("text", "")).strip()
+        logger.info(f"[{idx:03d}] {speaker}: {text}")
+    logger.info("=========== SESSION HISTORY END ===========")
 
 
 

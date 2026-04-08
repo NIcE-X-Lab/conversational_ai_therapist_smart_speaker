@@ -1,9 +1,195 @@
 """Service bridging data payloads between perception and orchestration."""
 import re
 import json
+import time
+import random
+import itertools
+import queue as _queue
+from concurrent.futures import Future
 from src.core.response_analyzer import classify_dimension_and_score
+from src.core.therapy_content import (
+    CLINICAL_SCREENING,
+    GAD2_QUESTIONS,
+    MEDITATIONS,
+    WAITING_MUSIC_PATH,
+    score_response,
+    GAD2_THRESHOLD,
+    PHQ4_THRESHOLD,
+)
 from src.utils.log_util import get_logger
 logger = get_logger("ResponseBridge")
+
+
+class IntermissionManager:
+    """
+    Non-blocking interstitial manager used while LLM inference is in-flight.
+    Sequence priority:
+      1) Clinical screening (GAD-2 first, optionally PHQ-2)
+      2) Guided breathing / meditation prompts
+      3) Waiting music fallback
+    """
+
+    def __init__(self):
+        self._screening_index = 0
+        self._anxiety_scores = []
+        self._depression_scores = []
+        self._screening_refused = False
+        self._meditation_cycle = itertools.cycle(MEDITATIONS)
+
+    def reset(self):
+        self._screening_index = 0
+        self._anxiety_scores = []
+        self._depression_scores = []
+        self._screening_refused = False
+
+    def current_scores(self) -> dict:
+        return {
+            "anxiety": sum(self._anxiety_scores) if self._anxiety_scores else None,
+            "depression": sum(self._depression_scores) if self._depression_scores else None,
+            "total": (sum(self._anxiety_scores) + sum(self._depression_scores)) if (self._anxiety_scores or self._depression_scores) else None,
+            "anxiety_items": len(self._anxiety_scores),
+            "depression_items": len(self._depression_scores),
+            "screening_refused": self._screening_refused,
+        }
+
+    def _next_screening_question(self, allow_phq2: bool):
+        if self._screening_refused:
+            return None
+        max_idx = len(CLINICAL_SCREENING) if allow_phq2 else len(GAD2_QUESTIONS)
+        if self._screening_index >= max_idx:
+            return None
+        return CLINICAL_SCREENING[self._screening_index]["text"]
+
+    def _persist_scores(self, db, session_id, log_json_event, append_to_csv):
+        anxiety_total = sum(self._anxiety_scores) if self._anxiety_scores else None
+        depression_total = sum(self._depression_scores) if self._depression_scores else None
+        phq4_total = None
+        if anxiety_total is not None or depression_total is not None:
+            phq4_total = (anxiety_total or 0) + (depression_total or 0)
+
+        try:
+            from src.utils import io_record as _io
+            _io.set_latest_screening_scores(anxiety_total, depression_total, phq4_total)
+        except Exception:
+            pass
+
+        if db and session_id and (anxiety_total is not None or depression_total is not None):
+            try:
+                db.log_screening_scores(
+                    session_id,
+                    anxiety_score=anxiety_total,
+                    depression_score=depression_total,
+                    phq4_total=phq4_total,
+                )
+            except Exception as e:
+                logger.warning(f"Could not persist screening scores: {e}")
+
+        log_json_event("screening_scores_snapshot", {
+            "anxiety_score": anxiety_total,
+            "depression_score": depression_total,
+            "phq4_total": phq4_total,
+        })
+
+        if anxiety_total is not None and anxiety_total >= GAD2_THRESHOLD:
+            flag = f"[CLINICAL-FLAG] GAD2_POSITIVE — anxiety_score={anxiety_total} >= {GAD2_THRESHOLD}"
+            append_to_csv("clinical_flag", "system", flag)
+            log_json_event("GAD2_POSITIVE", {"anxiety_score": anxiety_total})
+
+        if phq4_total is not None and phq4_total >= PHQ4_THRESHOLD:
+            flag = f"[CLINICAL-FLAG] PHQ4_HIGH_RISK — total_score={phq4_total} >= {PHQ4_THRESHOLD}"
+            append_to_csv("clinical_flag", "system", flag)
+            log_json_event("PHQ4_HIGH_RISK", {"phq4_total": phq4_total})
+
+    def _store_screening_response(self, raw_text: str, db, session_id, log_json_event, append_to_csv):
+        score = score_response(raw_text)
+        if score == -1:
+            self._screening_refused = True
+            self._persist_scores(db, session_id, log_json_event, append_to_csv)
+            return True
+
+        q = CLINICAL_SCREENING[self._screening_index]
+        if q["scale"] == "anxiety":
+            self._anxiety_scores.append(score)
+        else:
+            self._depression_scores.append(score)
+
+        self._screening_index += 1
+        self._persist_scores(db, session_id, log_json_event, append_to_csv)
+        return False
+
+    def engage_while_waiting(self, future: Future, trigger_threshold: float = 3.0):
+        """
+        Drives interstitial content until the LLM future is done.
+        Returns immediately once the future is complete.
+        """
+        from src.utils.io_record import log_question, append_to_csv, log_json_event, INPUT_QUEUE
+        from src.utils import io_record as _io
+
+        fillers = [
+            "I'm still thinking, let's practice something together while I reflect...",
+            "It's taking me a moment to reflect. Let me invite you to try this with me...",
+            "While I'm processing that, let's try a quick breathing exercise...",
+            "Let's try this while I work through your response...",
+            "Give me just a moment. While we wait, let's try a little awareness practice together...",
+        ]
+
+        start_time = time.time()
+
+        while not future.done():
+            elapsed = time.time() - start_time
+            if elapsed < trigger_threshold:
+                time.sleep(0.2)
+                continue
+
+            allow_phq2 = elapsed >= (trigger_threshold * 2)
+            question_text = self._next_screening_question(allow_phq2=allow_phq2)
+            if question_text and not self._screening_refused:
+                is_screening = True
+                play_text = f"{random.choice(fillers)} {question_text}"
+                logger.info("Intermission: clinical screening question.")
+            else:
+                is_screening = False
+                play_text = next(self._meditation_cycle)
+                logger.info("Intermission: guided breathing / meditation.")
+
+            log_question(play_text)
+
+            turn_start = time.time()
+            while not future.done():
+                try:
+                    raw_input = INPUT_QUEUE.get(timeout=0.5)
+                    try:
+                        parsed = json.loads(raw_input)
+                        text = parsed.get("transcript", "").lower().strip()
+                    except Exception:
+                        text = str(raw_input).lower().strip()
+
+                    if not text:
+                        continue
+
+                    if any(kw in text for kw in ("don't want", "stop", "skip", "opt out", "no thanks")):
+                        self._screening_refused = True
+                        self._persist_scores(_io.DB, _io.SESSION_ID, log_json_event, append_to_csv)
+                        log_question(f"[PLAY_MUSIC] {WAITING_MUSIC_PATH}")
+                        break
+
+                    if is_screening:
+                        refused = self._store_screening_response(
+                            text, _io.DB, _io.SESSION_ID, log_json_event, append_to_csv
+                        )
+                        if not refused:
+                            log_json_event("screening_response", {
+                                "question_id": CLINICAL_SCREENING[self._screening_index - 1]["id"],
+                                "text": text,
+                                "score": score_response(text),
+                            })
+                        break
+                except _queue.Empty:
+                    if not is_screening and (time.time() - turn_start > 15.0):
+                        # If exercise ended and model still busy, play neutral waiting music.
+                        log_question(f"[PLAY_MUSIC] {WAITING_MUSIC_PATH}")
+                        break
+                    continue
 
 def _normalize_dim_score(dim: str, score: int):
     """
