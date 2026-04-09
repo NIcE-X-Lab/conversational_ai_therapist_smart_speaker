@@ -1,0 +1,8 @@
+Timestamp,Type,Speaker,Text
+"2026-04-08T22:28:36.670248","internal","system","Session initialized. User: 8080, DB ID: 1"
+"2026-04-08T22:28:36.674865","internal","system","Session initialized. User: 8080, DB ID: 2"
+"2026-04-08T22:28:37.197927","turn","agent","Hello, welcome to the test session.
+
+How's your eating? Are you eating regularly?"
+"2026-04-08T22:28:37.201947","turn","user","Yes, I am fine."
+"2026-04-08T22:28:37.210538","turn","agent","Just answer yes or no."

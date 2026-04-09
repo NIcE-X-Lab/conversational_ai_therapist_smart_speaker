@@ -31,11 +31,15 @@ audio:
   sample_rate: 16000
   channels: 1
   chunk_size: 480
-  vad_aggressiveness: 3 # 0-3
+  vad_aggressiveness: 2 # 0-3
 
 stt:
-  model_path: "base.en" # whisper model name or path
+  model_path: "base.en" # faster-whisper model name or local path
   device: "cpu" # or "cuda" on Jetson
+  compute_type: "int8" # lower memory footprint for edge deployment
+  beam_size: 2 # memory-aware decode setting (lower than legacy beam_size=5)
+  best_of: 1 # avoid extra candidate allocations
+  without_timestamps: true
 
 tts:
   model_path: "en_US-amy-medium.onnx" # piper model path

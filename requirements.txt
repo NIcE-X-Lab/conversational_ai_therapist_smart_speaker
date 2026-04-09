@@ -7,19 +7,22 @@ pandas
 pyyaml
 coloredlogs
 requests
+psutil
 
 # Cognition / LLM
 openai
 
-# Speech / Models
-faster-whisper
+# Speech / Models — CRITICAL: pin versions to prevent CUDA dependency drift
+# faster-whisper pulls ctranslate2 which bundles its own CUDA bindings.
+# Do NOT install openai-whisper (it pulls full PyTorch ~2GB, OOM on Jetson).
+faster-whisper>=1.0.0,<2.0.0
 piper-tts
-speechbrain
-torchaudio
 
 # API / Backend
 fastapi
 uvicorn
+flask
+flask-cors
 python-multipart
 python-dotenv
 
@@ -29,3 +32,11 @@ httpx
 
 # Hardware (Jetson system package — NOT pip installable, pre-installed on Jetson OS)
 # Jetson.GPIO
+
+# ── BLOCKLIST (DO NOT INSTALL — these cause OOM on 8GB Jetson) ──────────
+# openai-whisper        — pulls full PyTorch (~2GB VRAM)
+# whisper               — alias for openai-whisper
+# mlc-ai-nightly        — experimental, pulls large CUDA runtime
+# torch                 — only needed if using openai-whisper (we use faster-whisper)
+# torchaudio            — same as above
+# onnxruntime-gpu       — conflicts with ctranslate2's CUDA bindings

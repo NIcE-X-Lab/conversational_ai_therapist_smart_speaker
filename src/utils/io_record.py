@@ -14,6 +14,9 @@ from src.utils.config_loader import DB_PATH, SUBJECT_ID, RECORD_CSV
 
 logger = get_logger("IORecord")
 
+_DEFAULT_RECORD_CSV = RECORD_CSV
+_LAST_AUTO_RECORD_CSV = None
+
 # IPC Queues
 # Agent puts questions here, Interface gets them
 OUTPUT_QUEUE = queue.Queue()
@@ -130,6 +133,7 @@ def init_record(user_id_override: str = None):
     """Initialize queues, database session, and CSV."""
     global DB, SESSION_ID, CURRENT_TURN_INDEX, SUBJECT_ID
     global _LAST_USER_TRANSCRIPT, _LAST_USER_EMOTION, _LAST_RL_STATE, _LATEST_SCREENING_SCORES
+    global _LAST_AUTO_RECORD_CSV
 
     # Reset PHQ-4 / GAD-2 screening state for this session
     try:
@@ -170,12 +174,19 @@ def init_record(user_id_override: str = None):
     except Exception as e:
         logger.error(f"Failed to initialize DB: {e}")
         
-    # Redefine RECORD_CSV and _JSON_LOG_PATH to the new session format
+    # Resolve RECORD_CSV and _JSON_LOG_PATH.
+    # Keep dynamic per-session path by default, but respect explicit overrides
+    # (e.g., tests that set io_record.RECORD_CSV to a fixed file).
     global RECORD_CSV, _JSON_LOG_PATH
     import datetime
     timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     base_session_dir = os.path.join(os.path.abspath("."), "data", "logs", SUBJECT_ID)
-    RECORD_CSV = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.log")
+    record_csv_is_external = RECORD_CSV not in {_DEFAULT_RECORD_CSV, _LAST_AUTO_RECORD_CSV}
+    if record_csv_is_external:
+        logger.info(f"Using externally configured RECORD_CSV path: {RECORD_CSV}")
+    else:
+        RECORD_CSV = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.log")
+        _LAST_AUTO_RECORD_CSV = RECORD_CSV
     _JSON_LOG_PATH = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.json")
     
     # Initialize CSV

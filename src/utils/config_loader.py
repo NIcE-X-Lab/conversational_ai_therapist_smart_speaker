@@ -49,12 +49,39 @@ _ollama_base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OPENAI_BASE_URL = _ollama_base.rstrip("/") + "/v1"
 # LLM configuration (replaces OPENAI_MODEL)
 LLM_MODEL = os.environ.get("LLM_MODEL", "gemma:2b")
+LLM_FALLBACK_MODELS = [
+    m.strip()
+    for m in os.environ.get("LLM_FALLBACK_MODELS", "").split(",")
+    if m.strip()
+]
 
 # If using openai package to query ollama directly, we can define tokens here:
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
 OPENAI_MAX_TOKENS = int(os.environ.get("OPENAI_MAX_TOKENS", "400"))
+LLM_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "90"))
+
+# Ollama per-request safety controls to reduce Jetson memory pressure.
+# num_ctx=256: Aggressive cap to fit the KV cache handshake into fragmented
+# VRAM.  The 3B model's cudaMalloc was requesting ~1918 MiB at num_ctx=512,
+# exceeding available contiguous memory.  256 halves the KV cache further
+# and should bring the request down to ~1200 MiB.  Override with env var
+# once memory headroom is confirmed.
+OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "256"))
+OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", str(OPENAI_MAX_TOKENS)))
+# Default to GPU execution (num_gpu=1).  CPU-only (num_gpu=0) causes 7-minute
+# inference on Jetson Maxwell/Pascal and should only be used as a deliberate
+# override for devices with no GPU.
+OLLAMA_NUM_GPU = int(os.environ.get("OLLAMA_NUM_GPU", "1"))
 
 OLLAMA_KEEP_ALIVE = int(os.environ.get("OLLAMA_KEEP_ALIVE", "0"))
+
+# Zero-History diagnostic toggle: when enabled, conversation context and user
+# history are stripped from LLM prompts.  If the crash still occurs on turn 1,
+# the issue is *Initialization Peak* (Whisper + KV cache).  If it only occurs
+# on turn 5+, the issue is *Context Bloat* (unbounded history injection).
+DISABLE_CONTEXT_HISTORY = os.environ.get(
+    "DISABLE_CONTEXT_HISTORY", "0"
+).strip().lower() in {"1", "true", "yes", "on"}
 
 # Audio
 AUDIO = _CFG.get("audio", {})
@@ -67,9 +94,16 @@ AUDIO_VAD_AGGRESSIVENESS = int(AUDIO.get("vad_aggressiveness", 3))
 STT = _CFG.get("stt", {})
 STT_MODEL_PATH = os.environ.get("STT_MODEL", STT.get("model_path", "base.en"))
 STT_DEVICE = STT.get("device", "cpu")
+STT_COMPUTE_TYPE = os.environ.get("STT_COMPUTE_TYPE", STT.get("compute_type", "int8"))
+STT_BEAM_SIZE = int(os.environ.get("STT_BEAM_SIZE", str(STT.get("beam_size", 2))))
+STT_BEST_OF = int(os.environ.get("STT_BEST_OF", str(STT.get("best_of", 1))))
+STT_WITHOUT_TIMESTAMPS = os.environ.get(
+    "STT_WITHOUT_TIMESTAMPS", str(STT.get("without_timestamps", True))
+).strip().lower() in {"1", "true", "yes", "on"}
 
 # Emotion Recognition (SER)
-SER_MODEL = os.environ.get("SER_MODEL", "speechbrain/emotion-recognition-wav2vec2-IEMOCAP")
+SER_BACKEND = os.environ.get("SER_BACKEND", "light_mfcc_rf").strip().lower()
+SER_DEVICE = os.environ.get("SER_DEVICE", "cpu")
 
 # TTS
 TTS = _CFG.get("tts", {})
@@ -87,5 +121,12 @@ PIN_LISTENING_LED = int(os.environ.get("PIN_LISTENING_LED", "18"))
 PIN_BTN_START = int(os.environ.get("PIN_BTN_START", "11"))
 PIN_BTN_END = int(os.environ.get("PIN_BTN_END", "13"))
 PIN_BTN_OPT_OUT = int(os.environ.get("PIN_BTN_OPT_OUT", "15"))
+PIN_BTN_4 = int(os.environ.get("PIN_BTN_4", "16"))
+PIN_LISTENING_LED_ACTIVE_LOW = os.environ.get("PIN_LISTENING_LED_ACTIVE_LOW", "0").strip().lower() in {"1", "true", "yes", "on"}
+PIN_BUTTONS_ACTIVE_LOW = os.environ.get("PIN_BUTTONS_ACTIVE_LOW", "1").strip().lower() in {"1", "true", "yes", "on"}
+PIN_BTN_START_ACTIVE_LOW = os.environ.get("PIN_BTN_START_ACTIVE_LOW", "0").strip().lower() in {"1", "true", "yes", "on"}
+PIN_BTN_END_ACTIVE_LOW = os.environ.get("PIN_BTN_END_ACTIVE_LOW", "0").strip().lower() in {"1", "true", "yes", "on"}
+PIN_BTN_OPT_OUT_ACTIVE_LOW = os.environ.get("PIN_BTN_OPT_OUT_ACTIVE_LOW", "1").strip().lower() in {"1", "true", "yes", "on"}
+PIN_BTN_4_ACTIVE_LOW = os.environ.get("PIN_BTN_4_ACTIVE_LOW", "1").strip().lower() in {"1", "true", "yes", "on"}
 
 

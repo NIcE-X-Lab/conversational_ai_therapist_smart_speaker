@@ -1,4 +1,5 @@
 """Low-level driver handling microphone streams and Voice Activity Detection."""
+import ctypes
 import pyaudio
 import webrtcvad
 import collections
@@ -14,8 +15,32 @@ from src.utils.config_loader import AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, AUDIO_CHU
 
 logger = get_logger("AudioRecorder")
 
+_ALSA_ERR_HANDLER_REF = None
+
+
+def _suppress_alsa_warnings():
+    """Mute low-level ALSA library stderr spam from device probing."""
+    global _ALSA_ERR_HANDLER_REF
+    if _ALSA_ERR_HANDLER_REF is not None:
+        return
+    try:
+        asound = ctypes.cdll.LoadLibrary("libasound.so")
+        err_cb_type = ctypes.CFUNCTYPE(
+            None, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p
+        )
+
+        def _err_handler(filename, line, function, err, fmt):
+            return
+
+        _ALSA_ERR_HANDLER_REF = err_cb_type(_err_handler)
+        asound.snd_lib_error_set_handler(_ALSA_ERR_HANDLER_REF)
+    except Exception:
+        # If unavailable, proceed normally.
+        pass
+
 class AudioRecorder:
     def __init__(self):
+        _suppress_alsa_warnings()
         self.format = pyaudio.paInt16
         self.channels = AUDIO_CHANNELS
         self.rate = AUDIO_SAMPLE_RATE
@@ -89,24 +114,32 @@ class AudioRecorder:
         frames = []
         silence_chunks = int(silence_duration * self.rate / self.chunk)
         max_chunks = int(max_duration * self.rate / self.chunk)
+        wait_chunks = int(5.0 * self.rate / self.chunk) # Max 5s wait for speech start
         
         silent_count = 0
         has_speech = False
         
         logger.info("Listening (waiting for speech)...")
+        self._set_vad_state(True)
         
         # Audio Event Detection: wait for voice activity
-        while not has_speech:
+        for _ in range(wait_chunks):
             try:
                 data = self.stream.read(self.chunk, exception_on_overflow=False)
                 if self.is_speech(data):
                     has_speech = True
-                    self._set_vad_state(True)
                     frames.append(data)
                     logger.info("Speech detected, recording started.")
+                    break
             except IOError as e:
                 logger.warning(f"Audio read error during wait: {e}")
                 time.sleep(0.01)
+
+        if not has_speech:
+            logger.info("No speech detected, stopping recording window.")
+            self.stop_stream()
+            self._set_vad_state(False)
+            return []
 
         # Now record up to max_chunks
         for _ in range(max_chunks):
@@ -121,6 +154,7 @@ class AudioRecorder:
                 
                 if silent_count > silence_chunks:
                     logger.info("Silence detected, stopping recording.")
+                    self._set_vad_state(False)
                     break
                     
             except IOError as e:
@@ -131,6 +165,16 @@ class AudioRecorder:
         
         return frames
 
+    @staticmethod
+    def compute_rms(frames) -> float:
+        """Compute RMS energy of raw PCM-16 frames (list of bytes).
+        Returns a float in [0.0, 1.0] range (normalised by int16 max)."""
+        if not frames:
+            return 0.0
+        raw = b''.join(frames)
+        samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+        return float(np.sqrt(np.mean(samples ** 2) + 1e-9))
+
     def save_wav(self, frames, filename):
         """Save recorded frames to a WAV file."""
         wf = wave.open(filename, 'wb')
@@ -139,7 +183,8 @@ class AudioRecorder:
         wf.setframerate(self.rate)
         wf.writeframes(b''.join(frames))
         wf.close()
-        logger.info(f"Saved audio to {filename}")
+        rms = self.compute_rms(frames)
+        logger.info(f"Saved audio to {filename} (RMS={rms:.4f})")
 
 if __name__ == "__main__":
     # Test recording

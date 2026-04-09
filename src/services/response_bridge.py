@@ -117,11 +117,49 @@ class IntermissionManager:
         self._persist_scores(db, session_id, log_json_event, append_to_csv)
         return False
 
-    def engage_while_waiting(self, future: Future, trigger_threshold: float = 3.0):
+    # Default intermission trigger: 2.0 seconds of LLM silence before engaging
+    # the user with clinical screening or breathing exercises.
+    _DEFAULT_TRIGGER_THRESHOLD = 2.0
+
+    def engage_while_waiting(
+        self,
+        future: Future,
+        trigger_threshold: float | None = None,
+        led_controller=None,
+    ):
         """
-        Drives interstitial content until the LLM future is done.
-        Returns immediately once the future is complete.
+        Non-blocking intermission engine.  Keeps the user therapeutically
+        engaged while the LLM background thread is still processing.
+
+        Args:
+            future:            The LLM background thread future.
+            trigger_threshold: Seconds to wait before triggering intermission.
+            led_controller:    Optional callable(bool) to control Pin 18 LED.
+                               LED is held LOW (off) for the entire duration of
+                               this method — signalling "processing, not listening".
+
+        State machine:
+          WAITING   — silent fast-path (< trigger_threshold).
+          EXERCISE  — clinical screening or breathing exercise active.
+                      Stays in this state until the LLM thread signals done.
+          MUSIC     — ambient fallback when exercises are exhausted.
+          DONE      — LLM response received; current sentence allowed to finish.
         """
+        if trigger_threshold is None:
+            trigger_threshold = self._DEFAULT_TRIGGER_THRESHOLD
+
+        # ── LED: Pin 18 LOW for entire thinking + intermission phase ───────
+        # Resolve LED controller: prefer explicit arg, fall back to GPIO singleton.
+        if led_controller is None:
+            try:
+                from src.drivers.gpio_manager import GPIOManager
+                led_controller = GPIOManager().set_led
+            except Exception:
+                pass
+        if led_controller is not None:
+            led_controller(False)
+            logger.info("[LED] Pin 18 LOW — device is processing, not listening.")
+
         from src.utils.io_record import log_question, append_to_csv, log_json_event, INPUT_QUEUE
         from src.utils import io_record as _io
 
@@ -133,16 +171,53 @@ class IntermissionManager:
             "Give me just a moment. While we wait, let's try a little awareness practice together...",
         ]
 
+        _HEARTBEAT_INTERVAL = 10.0
         start_time = time.time()
+        last_heartbeat = start_time
 
+        # ── State: WAITING — silent fast-path ──────────────────────────────
         while not future.done():
-            elapsed = time.time() - start_time
-            if elapsed < trigger_threshold:
-                time.sleep(0.2)
-                continue
+            now = time.time()
+            elapsed = now - start_time
 
+            if now - last_heartbeat >= _HEARTBEAT_INTERVAL:
+                last_heartbeat = now
+                logger.info(
+                    f"[Heartbeat] LLM still thinking... "
+                    f"Time elapsed: {elapsed:.0f}s. Waiting silently."
+                )
+
+            if elapsed >= trigger_threshold:
+                logger.info(
+                    f"Trigger threshold ({trigger_threshold}s) reached at {elapsed:.1f}s. "
+                    "Entering EXERCISE state."
+                )
+                break  # transition → EXERCISE state
+
+            time.sleep(0.2)
+
+        if future.done():
+            return  # fast path — LLM answered within threshold
+
+        # ── State: EXERCISE — stay here until LLM signals done ─────────────
+        _llm_ready = False
+
+        while not _llm_ready:
+            now = time.time()
+            elapsed = now - start_time
+
+            # Heartbeat
+            if now - last_heartbeat >= _HEARTBEAT_INTERVAL:
+                last_heartbeat = now
+                logger.info(
+                    f"[Heartbeat] LLM still thinking... "
+                    f"Time elapsed: {elapsed:.0f}s. Intermission active."
+                )
+
+            # Select next interstitial content
             allow_phq2 = elapsed >= (trigger_threshold * 2)
             question_text = self._next_screening_question(allow_phq2=allow_phq2)
+
             if question_text and not self._screening_refused:
                 is_screening = True
                 play_text = f"{random.choice(fillers)} {question_text}"
@@ -154,8 +229,29 @@ class IntermissionManager:
 
             log_question(play_text)
 
+            # ── Collect user response for this exercise turn ───────────────
             turn_start = time.time()
-            while not future.done():
+            _llm_finished_during_turn = False
+
+            while True:
+                # Detect LLM completion — but let current sentence finish
+                if future.done() and not _llm_finished_during_turn:
+                    _llm_finished_during_turn = True
+                    logger.info(
+                        f"[Heartbeat] LLM response ready after "
+                        f"{time.time() - start_time:.1f}s. "
+                        "Allowing current interstitial turn to finish."
+                    )
+
+                # Heartbeat during turn
+                now = time.time()
+                if now - last_heartbeat >= _HEARTBEAT_INTERVAL:
+                    last_heartbeat = now
+                    logger.info(
+                        f"[Heartbeat] LLM still thinking... "
+                        f"Time elapsed: {now - start_time:.0f}s. Intermission active."
+                    )
+
                 try:
                     raw_input = INPUT_QUEUE.get(timeout=0.5)
                     try:
@@ -167,29 +263,55 @@ class IntermissionManager:
                     if not text:
                         continue
 
-                    if any(kw in text for kw in ("don't want", "stop", "skip", "opt out", "no thanks")):
+                    # Opt-out detection
+                    if any(kw in text for kw in (
+                        "don't want", "stop", "skip", "opt out", "no thanks"
+                    )):
                         self._screening_refused = True
-                        self._persist_scores(_io.DB, _io.SESSION_ID, log_json_event, append_to_csv)
-                        log_question(f"[PLAY_MUSIC] {WAITING_MUSIC_PATH}")
+                        self._persist_scores(
+                            _io.DB, _io.SESSION_ID,
+                            log_json_event, append_to_csv,
+                        )
+                        if not _llm_finished_during_turn:
+                            log_question(f"[PLAY_MUSIC] {WAITING_MUSIC_PATH}")
                         break
 
+                    # Score screening response
                     if is_screening:
                         refused = self._store_screening_response(
-                            text, _io.DB, _io.SESSION_ID, log_json_event, append_to_csv
+                            text, _io.DB, _io.SESSION_ID,
+                            log_json_event, append_to_csv,
                         )
                         if not refused:
                             log_json_event("screening_response", {
-                                "question_id": CLINICAL_SCREENING[self._screening_index - 1]["id"],
+                                "question_id": CLINICAL_SCREENING[
+                                    self._screening_index - 1
+                                ]["id"],
                                 "text": text,
                                 "score": score_response(text),
                             })
                         break
+
                 except _queue.Empty:
+                    # Meditation timeout (15s) — queue waiting music and
+                    # loop back for the next exercise.
                     if not is_screening and (time.time() - turn_start > 15.0):
-                        # If exercise ended and model still busy, play neutral waiting music.
-                        log_question(f"[PLAY_MUSIC] {WAITING_MUSIC_PATH}")
+                        if not _llm_finished_during_turn:
+                            log_question(f"[PLAY_MUSIC] {WAITING_MUSIC_PATH}")
+                        break
+                    # If LLM already finished during a non-screening turn,
+                    # no need to wait for user input — break immediately.
+                    if _llm_finished_during_turn and not is_screening:
                         break
                     continue
+
+            # ── Transition check ───────────────────────────────────────────
+            if _llm_finished_during_turn or future.done():
+                _llm_ready = True
+                logger.info(
+                    f"Intermission complete. LLM response ready after "
+                    f"{time.time() - start_time:.1f}s total."
+                )
 
 def _normalize_dim_score(dim: str, score: int):
     """

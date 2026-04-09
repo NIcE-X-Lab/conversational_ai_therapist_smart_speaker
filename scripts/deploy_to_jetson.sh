@@ -46,7 +46,7 @@ ssh $JETSON_HOST << EOF
     
     # Install System Deps
     echo "Installing dependencies (sudo required)..."
-    echo "$JETSON_PASSWORD" | sudo -S apt-get install -y portaudio19-dev python3-venv
+    echo "$JETSON_PASSWORD" | sudo -S apt-get install -y portaudio19-dev python3-venv python3-jetson-gpio
 
     # Python Venv
     if [ ! -f ".venv/bin/activate" ]; then
@@ -59,7 +59,6 @@ ssh $JETSON_HOST << EOF
     # Install Python Requirements
     echo "Installing Python dependencies..."
     pip install -r requirements.txt
-    pip install faster-whisper webrtcvad pyaudio soundfile uvicorn fastapi python-multipart
     
     # Download Piper en_US-amy-medium voice model if not present
     echo "Checking for Piper voice model (en_US-amy-medium)..."
@@ -77,6 +76,11 @@ ssh $JETSON_HOST << EOF
         echo "✅ Piper voice model already present."
     fi
 
+    # Backward-compatibility path expected by older env files
+    mkdir -p "\$REMOTE_PROJECT_DIR/models"
+    ln -sf "\$PIPER_MODEL_DIR/en_US-amy-medium.onnx" "\$REMOTE_PROJECT_DIR/models/en_US-amy-medium.onnx"
+    ln -sf "\$PIPER_MODEL_DIR/en_US-amy-medium.onnx.json" "\$REMOTE_PROJECT_DIR/models/en_US-amy-medium.onnx.json" || true
+
     echo "✅ Verifying Python syntax..."
     python3 -m py_compile main.py && echo "✅ main.py syntax OK."
     
@@ -88,4 +92,4 @@ echo "To run the system:"
 echo "1. SSH into Jetson: ssh $JETSON_HOST"
 echo "2. Go to project: cd ~/$PROJECT_DIR"
 echo "3. Activate venv: source .venv/bin/activate"
-echo "4. Run Headless System: ./scripts/start_headless.sh"
+echo "4. Run Headless System: bash ./scripts/start_headless.sh"

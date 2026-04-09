@@ -18,6 +18,7 @@ if not os.path.exists(LOG_DIR):
     
 _GLOBAL_LOG_FILE = os.environ.get("LOG_FILE")  # 可通过入口统一指定
 _GLOBAL_FILE_HANDLER = None
+_LOG_FORMAT = '%(asctime)s arth-desktop %(name)s[%(process)d] %(levelname)s %(message)s'
 
 def _ensure_global_file_handler():
     '''
@@ -32,7 +33,7 @@ def _ensure_global_file_handler():
             )
         fh = logging.FileHandler(_GLOBAL_LOG_FILE)
         fh.setLevel(logging.DEBUG)
-        fh.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s - %(message)s'))
+        fh.setFormatter(logging.Formatter(_LOG_FORMAT))
         _GLOBAL_FILE_HANDLER = fh
     return _GLOBAL_FILE_HANDLER
 
@@ -63,7 +64,7 @@ def get_logger(name, file=None, file_handler=None):
         if file is not None:
             f_handler = logging.FileHandler(file)
             f_handler.setLevel(logging.DEBUG)
-            f_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s - %(message)s'))
+            f_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
         else:
             f_handler = _ensure_global_file_handler()
 
@@ -71,7 +72,7 @@ def get_logger(name, file=None, file_handler=None):
         logger.addHandler(f_handler)
 
     # coloredlogs 只影响控制台显示，跟随 console_level
-    coloredlogs.install(level=console_level, logger=logger)
+    coloredlogs.install(level=console_level, logger=logger, fmt=_LOG_FORMAT)
 
     return logger
 

@@ -5,7 +5,6 @@ import time
 import threading
 import queue
 import json
-import string
 import pandas as pd
 import uuid
 import requests
@@ -18,9 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from src.core.handler_rl import HandlerRL
-from src.services.speech_service import SpeechInteractionService
-from src.utils.io_record import init_record, OUTPUT_QUEUE, INPUT_QUEUE, HEADER
+from src.utils.io_record import init_record, OUTPUT_QUEUE, INPUT_QUEUE
 from src.utils.log_util import get_logger
+from src.utils.resource_audit import get_resource_audit
 from src.utils import io_record
 from src.utils.config_loader import (
     SUBJECT_ID, RECORD_CSV, OPENAI_BASE_URL, LLM_MODEL,
@@ -29,15 +28,71 @@ from src.utils.config_loader import (
     OLLAMA_KEEP_ALIVE
 )
 
-# Perception and Action modules
-from src.drivers.audio import AudioRecorder
-from src.models.stt import STTGenerator
-from src.models.tts import TTSGenerator
-from src.drivers.player import AudioPlayer
+# ── Memory autopsy helper ───────────────────────────────────────────────
+def _log_process_rss(label: str):
+    """Log this process's RSS and VMS in MB using psutil (best-effort)."""
+    try:
+        import psutil
+        proc = psutil.Process(os.getpid())
+        mem = proc.memory_info()
+        rss_mb = mem.rss / (1024 * 1024)
+        vms_mb = mem.vms / (1024 * 1024)
+        children = proc.children(recursive=True)
+        child_rss = sum(c.memory_info().rss for c in children) / (1024 * 1024)
+        logger.info(
+            f"[RSS AUDIT] {label}: "
+            f"PID={os.getpid()} RSS={rss_mb:.1f}MB VMS={vms_mb:.1f}MB "
+            f"Children({len(children)})={child_rss:.1f}MB "
+            f"Total={rss_mb + child_rss:.1f}MB"
+        )
+    except ImportError:
+        logger.warning("[RSS AUDIT] psutil not installed — skipping RSS audit.")
+    except Exception as e:
+        logger.warning(f"[RSS AUDIT] {label}: failed ({e})")
+
+
+def _ghost_hunt(rss_threshold_mb: float = 50.0):
+    """Identify child processes consuming > rss_threshold_mb and log them.
+
+    This helps detect zombie Ollama runners, leaked model-loading forks,
+    or any non-essential process eating into the Jetson's 8GB budget.
+    """
+    try:
+        import psutil
+        parent = psutil.Process(os.getpid())
+        children = parent.children(recursive=True)
+        ghosts_found = 0
+        for child in children:
+            try:
+                child_rss_mb = child.memory_info().rss / (1024 * 1024)
+                if child_rss_mb > rss_threshold_mb:
+                    ghosts_found += 1
+                    cmdline = " ".join(child.cmdline()) or child.name()
+                    logger.warning(
+                        f"[GHOST HUNT] Heavy child process detected: "
+                        f"PID={child.pid} RSS={child_rss_mb:.1f}MB "
+                        f"CMD='{cmdline[:120]}'"
+                    )
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        if ghosts_found == 0:
+            logger.info(f"[GHOST HUNT] No child processes > {rss_threshold_mb}MB. Clean.")
+        else:
+            logger.warning(
+                f"[GHOST HUNT] Found {ghosts_found} child process(es) "
+                f"> {rss_threshold_mb}MB. Review for memory savings."
+            )
+    except ImportError:
+        logger.warning("[GHOST HUNT] psutil not installed — skipping.")
+    except Exception as e:
+        logger.warning(f"[GHOST HUNT] Failed: {e}")
+
 
 logger = get_logger("MainApp")
+RESOURCE_AUDIT = get_resource_audit()
 
 APP_MODE = os.environ.get("APP_MODE", "local")
+DISABLE_INTERNAL_SPEECH = os.environ.get("DISABLE_INTERNAL_SPEECH", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _startup_checklist():
@@ -72,9 +127,13 @@ def _startup_checklist():
         lines.append(f"[!] Ollama UNREACHABLE: {e}")
 
     # 3. STT / TTS
-    whisper_ok = True   # WhisperModel loaded lazily; just verify path
+    try:
+        import faster_whisper  # noqa: F401
+        whisper_ok = True
+    except Exception:
+        whisper_ok = False
     piper_ok = os.path.isfile(TTS_MODEL_PATH)
-    lines.append(f"[{'x' if whisper_ok else '!'}] Whisper Model configured ({STT_MODEL_PATH})")
+    lines.append(f"[{'x' if whisper_ok else '!'}] Faster-Whisper configured ({STT_MODEL_PATH})")
     lines.append(f"[{'x' if piper_ok else '!'}] Piper Model {'found' if piper_ok else 'NOT FOUND'} ({TTS_MODEL_PATH})")
 
     # 4. Database
@@ -93,6 +152,8 @@ def _startup_checklist():
     for line in lines:
         print(f"  {line}")
     print(f"{sep}\n")
+    RESOURCE_AUDIT.capture_point("startup_checklist_complete")
+    RESOURCE_AUDIT.capture_process_inventory("startup_checklist_inventory")
 
 
 # ==========================================
@@ -110,9 +171,11 @@ app.add_middleware(
 
 @app.get("/api/status")
 def get_status():
-    current_status = "ready"
+    current_status = "api_only_ready" if DISABLE_INTERNAL_SPEECH else "ready"
     if hasattr(app.state, 'speech_loop'):
         current_status = app.state.speech_loop.state
+    elif io_record.START_SESSION_EVENT.is_set():
+        current_status = "session_active"
 
     return {
         "status": current_status, 
@@ -130,36 +193,40 @@ def get_turns():
 @app.post("/api/action")
 def post_action(action: dict):
     action_type = action.get("type")
+
+    if not hasattr(app.state, 'speech_loop'):
+        return {"status": "ignored", "reason": "internal_speech_unavailable"}
     
     if action_type == "stop":
         logger.info("Received STOP command")
-        if hasattr(app.state, 'speech_loop'):
-             app.state.speech_loop.stop_audio()
+        app.state.speech_loop.stop_audio()
         return {"status": "stopped"}
         
     elif action_type == "start_listening":
         logger.info("Received START_LISTENING command")
-        if hasattr(app.state, 'speech_loop'):
-             app.state.speech_loop.manual_input_event.set()
+        app.state.speech_loop.manual_input_event.set()
         return {"status": "listening_triggered"}
         
     elif action_type == "set_mode":
         mode = action.get("mode")
         logger.info(f"Setting mode to {mode}")
-        if hasattr(app.state, 'speech_loop'):
-            app.state.speech_loop.is_hands_free = (mode == "hands_free")
+        app.state.speech_loop.is_hands_free = (mode == "hands_free")
         return {"status": "mode_set", "mode": mode}
+
+    return {"status": "ignored", "reason": f"unknown_action:{action_type}"}
 
 @app.post("/api/pause")
 def pause_session():
-    if hasattr(app.state, 'speech_loop'):
-        app.state.speech_loop.set_paused(True)
+    if not hasattr(app.state, 'speech_loop'):
+        return {"status": "ignored", "reason": "internal_speech_unavailable"}
+    app.state.speech_loop.set_paused(True)
     return {"status": "paused"}
 
 @app.post("/api/resume")
 def resume_session():
-    if hasattr(app.state, 'speech_loop'):
-        app.state.speech_loop.set_paused(False)
+    if not hasattr(app.state, 'speech_loop'):
+        return {"status": "ignored", "reason": "internal_speech_unavailable"}
+    app.state.speech_loop.set_paused(False)
     return {"status": "resumed"}
 
 @app.post("/api/end_session")
@@ -234,21 +301,43 @@ def run_fastapi_server():
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning", access_log=False)
 
 def main_local():
+    RESOURCE_AUDIT.capture_point("main_local_entry")
+    _log_process_rss("Before startup checklist")
     _startup_checklist()
     init_record()
+    RESOURCE_AUDIT.capture_point("record_init_complete")
+    _log_process_rss("After init_record (before audio stack)")
     
     # Start API server in background for remote monitoring/control
     api_thread = threading.Thread(target=run_fastapi_server, daemon=True)
     api_thread.start()
     logger.info("API Server started on port 8000")
+    RESOURCE_AUDIT.capture_point("api_thread_started")
 
-    # Initialize and start the Unified Speech Interaction Service
-    # This service handles both voice wake-word and physical button events
-    speech_service = SpeechInteractionService(INPUT_QUEUE, OUTPUT_QUEUE)
-    speech_thread = threading.Thread(target=speech_service.run, daemon=True)
-    speech_thread.start()
-    logger.info("Unified SpeechInteractionService started.")
-    
+    speech_service = None
+    if DISABLE_INTERNAL_SPEECH:
+        logger.info("DISABLE_INTERNAL_SPEECH is enabled. Running in API-only mode.")
+    else:
+        try:
+            # Lazy import so headless/API-only mode does not require audio stack deps.
+            from src.services.speech_service import SpeechInteractionService
+
+            speech_service = SpeechInteractionService(INPUT_QUEUE, OUTPUT_QUEUE)
+            _log_process_rss("After SpeechService init (Whisper+SER+TTS loaded)")
+            app.state.speech_loop = speech_service
+            speech_thread = threading.Thread(target=speech_service.run, daemon=True)
+            speech_thread.start()
+            logger.info("Unified SpeechInteractionService started.")
+            RESOURCE_AUDIT.capture_point("speech_service_started")
+            _log_process_rss("After SpeechService thread started (baseline)")
+        except Exception as e:
+            logger.error(f"Failed to start SpeechInteractionService; falling back to API-only mode: {e}")
+            RESOURCE_AUDIT.capture_point("speech_service_start_failed", extra={"error": str(e)})
+
+    # ── Ghost hunt: flag any child processes eating >50MB ──
+    _ghost_hunt(rss_threshold_mb=50.0)
+    RESOURCE_AUDIT.capture_process_inventory("post_init_ghost_hunt")
+
     try:
         while True:
             # Main logic loop: wait for the speech service to set START_SESSION_EVENT
@@ -269,7 +358,9 @@ def main_local():
     except KeyboardInterrupt:
         logger.info("Application interrupted.")
     finally:
-        speech_service.stop()
+        if speech_service is not None:
+            speech_service.stop()
+        RESOURCE_AUDIT.emit_resource_map()
 
 
 # ==========================================
@@ -284,19 +375,16 @@ _rl_running = False
 _rl_lock = threading.Lock()
 
 def _ensure_record_file():
-    folder = os.path.dirname(RECORD_CSV)
-    if folder and not os.path.exists(folder):
-        os.makedirs(folder, exist_ok=True)
-    if not os.path.exists(RECORD_CSV):
-        df = pd.DataFrame([["", 0, "", 1]], columns=HEADER)
-        df.to_csv(RECORD_CSV, columns=HEADER, index=False)
+    # Legacy CSV lock transport was replaced by queue-based transport.
+    # Keep this as a no-op for compatibility with existing call sites.
+    return
 
 def _read_record():
     return pd.read_csv(RECORD_CSV)
 
 def _write_record(df):
     tmp_path = RECORD_CSV + ".tmp"
-    df.to_csv(tmp_path, columns=HEADER, index=False)
+    df.to_csv(tmp_path, index=False)
     os.replace(tmp_path, RECORD_CSV)
 
 def _start_rl_if_needed():
@@ -315,23 +403,13 @@ def _start_rl_if_needed():
         _rl_thread.start()
 
 def _get_question_blocking(timeout_sec=60):
-    t0 = time.time()
-    while True:
-        df = _read_record()
-        if int(df.loc[0, "Question_Lock"]) == 1:
-            question = str(df.loc[0, "Question"])
-            df.loc[0, "Question_Lock"] = 0
-            _write_record(df)
-            return question
-        if time.time() - t0 > timeout_sec:
-            return ""
-        time.sleep(0.1)
+    try:
+        return str(OUTPUT_QUEUE.get(timeout=timeout_sec))
+    except queue.Empty:
+        return ""
 
 def _log_resp(text: str):
-    df = _read_record()
-    df.loc[0, "Resp"] = text
-    df.loc[0, "Resp_Lock"] = 0
-    _write_record(df)
+    INPUT_QUEUE.put(text)
 
 @flask_app.route("/gpt", methods=["POST"])
 def gpt():
@@ -355,6 +433,7 @@ def health():
     return jsonify({"status": status})
 
 def main_server():
+    RESOURCE_AUDIT.capture_point("main_server_entry")
     host = os.environ.get("FLASK_HOST", "0.0.0.0")
     port = int(os.environ.get("FLASK_PORT", "8080"))
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
@@ -365,6 +444,7 @@ def main_server():
 # BOOTSTRAP
 # ==========================================
 def main():
+    RESOURCE_AUDIT.capture_point("main_bootstrap")
     if APP_MODE == "local":
         logger.info("Booting in LOCAL mode")
         main_local()

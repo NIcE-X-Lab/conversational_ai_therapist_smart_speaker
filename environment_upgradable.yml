@@ -14,5 +14,14 @@ dependencies:
   - pyyaml>=6.0.0
   - pip:
     - openai>=1.07.3
-    - flask-cors>=3.0.0
-    - word2number>=1.1
+    - flask-cors>=6.0.0
+    - faster-whisper
+    - piper-tts
+    - fastapi
+    - uvicorn
+    - python-multipart
+    - python-dotenv
+    - psutil
+    - pyaudio
+    - webrtcvad
+    - soundfile
