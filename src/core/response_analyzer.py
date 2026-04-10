@@ -178,7 +178,7 @@ def classify_dimension_and_score(user_input: str, original_question: str) -> str
     logger.debug(f"User input: {user_input}")
     # Provide both the question and the answer to improve contextual classification
     payload = f"Question: {original_question}\nAnswer: {user_input}"
-    return llm_complete(INIT_ASKER_SYSTEM_PROMPT_V2, payload)
+    return llm_complete(INIT_ASKER_SYSTEM_PROMPT_V2, payload, inject_context=False)
 
 def reflective_summarizer(original_question: str, user_response: str) -> str:
     """
@@ -189,7 +189,7 @@ def reflective_summarizer(original_question: str, user_response: str) -> str:
     logger.info("Generating reflective summary for user response.")
     logger.debug(f"Original question: {original_question}, User response: {user_response}")
     payload = f'{{"Original Question": "{original_question}", "User Response": "{user_response}"}}'
-    return llm_complete(REFLECTIVE_SUMMERIZER_PROMPT, payload)
+    return llm_complete(REFLECTIVE_SUMMERIZER_PROMPT, payload, inject_context=False)
 
 def rephrase_question(original_question: str) -> str:
     """
@@ -200,4 +200,4 @@ def rephrase_question(original_question: str) -> str:
     logger.info("Rephrasing question for therapist style.")
     logger.debug(f"Original question: {original_question}")
     payload = f'{{"Original Question": "{original_question}"}}'
-    return llm_complete(REPHRASER_PROMPT, payload)
+    return llm_complete(REPHRASER_PROMPT, payload, inject_context=False)

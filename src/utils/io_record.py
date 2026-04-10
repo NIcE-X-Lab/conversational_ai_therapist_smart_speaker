@@ -242,14 +242,23 @@ def log_reasoning(reasoning_type: str, data: dict):
 
 def get_answer() -> Tuple[List, List[str]]:
     """
-    Get answer from the user. 
-    Blocks until input is available in Input Queue.
+    Get answer from the user.
+    Blocks until input is available in Input Queue, but checks END_SESSION_EVENT
+    every 0.5s so the session can be terminated promptly.
     Returns (dummy_DLA_result, segments).
     """
     global CURRENT_TURN_INDEX
-    
+
     logger.info("Waiting for user answer...")
-    user_input_raw = INPUT_QUEUE.get() # Blocking get
+    user_input_raw = None
+    while user_input_raw is None:
+        if END_SESSION_EVENT.is_set():
+            logger.info("END_SESSION_EVENT detected while waiting for user answer.")
+            return [], ["SESSION_END"]
+        try:
+            user_input_raw = INPUT_QUEUE.get(timeout=0.5)
+        except queue.Empty:
+            continue
     logger.info(f"Received user input: {user_input_raw}")
     
     # Save to DB
@@ -292,12 +301,20 @@ def get_answer() -> Tuple[List, List[str]]:
 def get_resp_log() -> str:
     """
     Get raw user response (for RV logic).
-    Blocking.
+    Blocks but checks END_SESSION_EVENT every 0.5s for prompt termination.
     """
     global CURRENT_TURN_INDEX
-    
+
     logger.info("Waiting for user response (raw)...")
-    user_response_raw = INPUT_QUEUE.get()
+    user_response_raw = None
+    while user_response_raw is None:
+        if END_SESSION_EVENT.is_set():
+            logger.info("END_SESSION_EVENT detected while waiting for user response.")
+            return "SESSION_END"
+        try:
+            user_response_raw = INPUT_QUEUE.get(timeout=0.5)
+        except queue.Empty:
+            continue
     
     import json
     try:

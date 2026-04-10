@@ -4,6 +4,7 @@ import json
 import time
 import random
 import itertools
+import threading
 import queue as _queue
 from concurrent.futures import Future
 from src.core.response_analyzer import classify_dimension_and_score
@@ -27,9 +28,14 @@ class IntermissionManager:
       1) Clinical screening (GAD-2 first, optionally PHQ-2)
       2) Guided breathing / meditation prompts
       3) Waiting music fallback
+
+    Thread-safety: a lock protects all mutable screening state so that
+    concurrent calls to current_scores() / reset() / _store_screening_response()
+    never see a torn snapshot.
     """
 
     def __init__(self):
+        self._lock = threading.Lock()
         self._screening_index = 0
         self._anxiety_scores = []
         self._depression_scores = []
@@ -37,20 +43,22 @@ class IntermissionManager:
         self._meditation_cycle = itertools.cycle(MEDITATIONS)
 
     def reset(self):
-        self._screening_index = 0
-        self._anxiety_scores = []
-        self._depression_scores = []
-        self._screening_refused = False
+        with self._lock:
+            self._screening_index = 0
+            self._anxiety_scores = []
+            self._depression_scores = []
+            self._screening_refused = False
 
     def current_scores(self) -> dict:
-        return {
-            "anxiety": sum(self._anxiety_scores) if self._anxiety_scores else None,
-            "depression": sum(self._depression_scores) if self._depression_scores else None,
-            "total": (sum(self._anxiety_scores) + sum(self._depression_scores)) if (self._anxiety_scores or self._depression_scores) else None,
-            "anxiety_items": len(self._anxiety_scores),
-            "depression_items": len(self._depression_scores),
-            "screening_refused": self._screening_refused,
-        }
+        with self._lock:
+            return {
+                "anxiety": sum(self._anxiety_scores) if self._anxiety_scores else None,
+                "depression": sum(self._depression_scores) if self._depression_scores else None,
+                "total": (sum(self._anxiety_scores) + sum(self._depression_scores)) if (self._anxiety_scores or self._depression_scores) else None,
+                "anxiety_items": len(self._anxiety_scores),
+                "depression_items": len(self._depression_scores),
+                "screening_refused": self._screening_refused,
+            }
 
     def _next_screening_question(self, allow_phq2: bool):
         if self._screening_refused:
@@ -102,18 +110,19 @@ class IntermissionManager:
 
     def _store_screening_response(self, raw_text: str, db, session_id, log_json_event, append_to_csv):
         score = score_response(raw_text)
-        if score == -1:
-            self._screening_refused = True
-            self._persist_scores(db, session_id, log_json_event, append_to_csv)
-            return True
+        with self._lock:
+            if score == -1:
+                self._screening_refused = True
+                self._persist_scores(db, session_id, log_json_event, append_to_csv)
+                return True
 
-        q = CLINICAL_SCREENING[self._screening_index]
-        if q["scale"] == "anxiety":
-            self._anxiety_scores.append(score)
-        else:
-            self._depression_scores.append(score)
+            q = CLINICAL_SCREENING[self._screening_index]
+            if q["scale"] == "anxiety":
+                self._anxiety_scores.append(score)
+            else:
+                self._depression_scores.append(score)
 
-        self._screening_index += 1
+            self._screening_index += 1
         self._persist_scores(db, session_id, log_json_event, append_to_csv)
         return False
 
@@ -160,7 +169,7 @@ class IntermissionManager:
             led_controller(False)
             logger.info("[LED] Pin 18 LOW — device is processing, not listening.")
 
-        from src.utils.io_record import log_question, append_to_csv, log_json_event, INPUT_QUEUE
+        from src.utils.io_record import log_question, append_to_csv, log_json_event, INPUT_QUEUE, END_SESSION_EVENT
         from src.utils import io_record as _io
 
         fillers = [
@@ -177,6 +186,10 @@ class IntermissionManager:
 
         # ── State: WAITING — silent fast-path ──────────────────────────────
         while not future.done():
+            if END_SESSION_EVENT.is_set():
+                logger.info("[Intermission] END_SESSION_EVENT detected in WAITING state. Aborting.")
+                return
+
             now = time.time()
             elapsed = now - start_time
 
@@ -203,6 +216,10 @@ class IntermissionManager:
         _llm_ready = False
 
         while not _llm_ready:
+            if END_SESSION_EVENT.is_set():
+                logger.info("[Intermission] END_SESSION_EVENT detected in EXERCISE state. Breaking out.")
+                break
+
             now = time.time()
             elapsed = now - start_time
 
@@ -415,8 +432,12 @@ def get_openai_resp(user_input, original_question, dimension_label: str):
     Otherwise, attempts to return (dimension, score:int) parsed from model output.
     Fallbacks to ('NA', 99) on parse failure.
     """
+    # Strip the [Detected Emotion: ...] metadata tag before keyword analysis
+    # so it doesn't inflate the token count and bypass shortcuts.
+    _clean_input = re.sub(r"\[Detected Emotion:\s*\w+\]", "", user_input).strip()
+
     # Preprocess: get first 10 lowercased tokens after removing some punctuation for basic pattern catches
-    tokens = user_input.replace(".", " ").replace(",", " ").replace("?", " ").split()
+    tokens = _clean_input.replace(".", " ").replace(",", " ").replace("?", " ").split()
     lower = [t.lower() for t in tokens[:10]]
 
     # Detect easy and common cases up front, for quick handling.

@@ -374,11 +374,6 @@ _rl_thread = None
 _rl_running = False
 _rl_lock = threading.Lock()
 
-def _ensure_record_file():
-    # Legacy CSV lock transport was replaced by queue-based transport.
-    # Keep this as a no-op for compatibility with existing call sites.
-    return
-
 def _read_record():
     return pd.read_csv(RECORD_CSV)
 
@@ -418,7 +413,6 @@ def gpt():
     subject_id = str(payload.get("subject_ID", ""))
 
     if user_input.lower().strip() == "start":
-        _ensure_record_file()
         _start_rl_if_needed()
         question = _get_question_blocking()
         return jsonify({"subject_ID": subject_id, "question": question})

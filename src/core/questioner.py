@@ -50,11 +50,11 @@ Example C (neither):
 GUIDE: Let us focus on sleeping time: in the past week, have you generally slept enough hours most nights?
 '''
 
-def _chat_complete(system_content: str, user_content: str):
+def _chat_complete(system_content: str, user_content: str, **kwargs):
     """
     Unified LLM entry that delegates to llm_complete.
     """
-    return llm_complete(system_content, user_content)
+    return llm_complete(system_content, user_content, **kwargs)
 
 def retry_guide(topic: str, original_question: str, original_answer: str) -> str:
     """
@@ -65,7 +65,7 @@ def retry_guide(topic: str, original_question: str, original_answer: str) -> str
     """
     logger.info("Generating retry guide for re-ask.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Answer": {original_answer!r}}}'
-    raw_resp = _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload)
+    raw_resp = _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload, inject_context=False)
     if "GUIDE:" in raw_resp:
         return raw_resp.split("GUIDE:")[1].strip()
     return raw_resp
@@ -136,7 +136,8 @@ def _if_valid_response(
                 followup_to_RV = "It seems that " + text + " " + followup
 
             # Prepare note for follow-up, to be appended by caller after collecting follow-up
-            original_resp = "original_resp: " + (user_segments[i] if i < len(user_segments) else user_segments[0])
+            _seg = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
+            original_resp = "original_resp: " + _seg
             note_resp = [
                 "original_question: " + original_question,
                 original_resp,
@@ -153,7 +154,8 @@ def _if_valid_response(
                 text = generate_change(user_segments[i]).lower() if i < len(user_segments) else ''
                 followup_to_RV = "You mentioned that " + text + " Can you tell me more?"
             # Prepare note
-            original_resp = "original_resp: " + (user_segments[i] if i < len(user_segments) else user_segments[0])
+            _seg = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
+            original_resp = "original_resp: " + _seg
             note_resp = [
                 "original_question: " + original_question,
                 original_resp,
@@ -192,6 +194,9 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         # Log the last AI question and get a user response
         log_question(followup_to_RV)
         user_response = get_resp_log()
+        if user_response == "SESSION_END":
+            logger.info("Session End signal received during follow-up.")
+            return 1, 1, previous_question, question_lib
 
         # ReflectionValidation Consoldiated
         topic = question_lib[str(S)][str(question_A)]["label"]
@@ -219,6 +224,9 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
             log_question(rv_guide_text)
             # Collect new response
             user_response = get_resp_log()
+            if user_response == "SESSION_END":
+                logger.info("Session End signal received during RV guide.")
+                return 1, 1, previous_question, question_lib
             
         else:
             # 0 = Related -> The text provided is VALIDATION.

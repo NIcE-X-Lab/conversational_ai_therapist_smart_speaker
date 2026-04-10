@@ -1,5 +1,6 @@
 """AI model wrapper abstracting Speech-to-Text and lightweight emotion parsing."""
 
+import gc
 import json
 import os
 import sys
@@ -101,6 +102,14 @@ class STTGenerator:
             rss_pre = _rss_mb()
             del self.model
             self.model = None
+            gc.collect()
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    logger.info("torch.cuda.empty_cache() called after STT suspend.")
+            except ImportError:
+                pass
             clear_inference_cache("STT model suspended for LLM VRAM headroom")
             rss_post = _rss_mb()
             logger.info(f"STT model suspended. RSS freed: {rss_pre - rss_post:.1f}MB")
@@ -112,6 +121,7 @@ class STTGenerator:
             rss_pre = _rss_mb()
             del self.emotion_model
             self.emotion_model = None
+            gc.collect()
             clear_inference_cache("SER model suspended for LLM VRAM headroom")
             rss_post = _rss_mb()
             logger.info(f"SER model suspended. RSS freed: {rss_pre - rss_post:.1f}MB")

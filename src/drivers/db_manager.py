@@ -1,4 +1,5 @@
 """Low-level driver managing exact transactions with SQLite persistence."""
+import os
 import sqlite3
 import datetime
 import json
@@ -6,14 +7,23 @@ from src.utils.log_util import get_logger
 
 logger = get_logger("DBManager")
 
+# All connections use a 5-second timeout to prevent indefinite hangs when
+# another process holds the database lock.
+_SQLITE_TIMEOUT = 5.0
+
+
 class DBManager:
     def __init__(self, db_path):
         self.db_path = db_path
+        # Ensure parent directory exists before opening the database.
+        parent = os.path.dirname(db_path)
+        if parent and not os.path.exists(parent):
+            os.makedirs(parent, exist_ok=True)
         self._init_db()
 
     def _init_db(self):
         """Initialize the database with required tables."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
 
         # Users table
@@ -97,7 +107,7 @@ class DBManager:
 
     def get_user_id(self, subject_id):
         """Get user ID by subject_id, creating if not exists."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("SELECT id FROM users WHERE subject_id=?", (subject_id,))
         result = c.fetchone()
@@ -112,7 +122,7 @@ class DBManager:
 
     def create_session(self, user_id):
         """Create a new session for the user."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("INSERT INTO sessions (user_id) VALUES (?)", (user_id,))
         conn.commit()
@@ -122,7 +132,7 @@ class DBManager:
 
     def add_turn(self, session_id, turn_index, speaker, text, meta_data=None):
         """Record a turn in the conversation."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         meta_json = json.dumps(meta_data) if meta_data else None
         c.execute("INSERT INTO turns (session_id, turn_index, speaker, text, meta_data) VALUES (?, ?, ?, ?, ?)",
@@ -132,7 +142,7 @@ class DBManager:
 
     def get_session_history(self, session_id):
         """Retrieve all turns for a session."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("SELECT speaker, text, meta_data FROM turns WHERE session_id=? ORDER BY turn_index", (session_id,))
         rows = c.fetchall()
@@ -150,7 +160,7 @@ class DBManager:
 
     def add_summary(self, session_id, summary_text):
         """Add a summary for a session."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("INSERT INTO summaries (session_id, summary_text) VALUES (?, ?)", (session_id, summary_text))
         conn.commit()
@@ -158,7 +168,7 @@ class DBManager:
 
     def set_preference(self, user_id, key, value):
         """Set a user preference (upsert)."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("""INSERT INTO user_preferences (user_id, key, value) 
                      VALUES (?, ?, ?) 
@@ -169,7 +179,7 @@ class DBManager:
 
     def get_preference(self, user_id, key):
         """Get a user preference."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("SELECT value FROM user_preferences WHERE user_id=? AND key=?", (user_id, key))
         result = c.fetchone()
@@ -178,7 +188,7 @@ class DBManager:
 
     def log_feedback(self, session_id, rating, comments, turn_index=None):
         """Log user feedback."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("INSERT INTO feedback (session_id, turn_index, rating, comments) VALUES (?, ?, ?, ?)",
                   (session_id, turn_index, rating, comments))
@@ -187,7 +197,7 @@ class DBManager:
 
     def log_safety_flag(self, session_id, flag_type, raw_text, severity, turn_index=None):
         """Log a safety flag."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute("INSERT INTO safety_flags (session_id, turn_index, flag_type, raw_text, severity) VALUES (?, ?, ?, ?, ?)",
                   (session_id, turn_index, flag_type, raw_text, severity))
@@ -198,9 +208,9 @@ class DBManager:
         """
         Retrieve a formatted string of user context: preferences and recent summaries.
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
-        
+
         # Get Preferences
         c.execute("SELECT key, value FROM user_preferences WHERE user_id=?", (user_id,))
         prefs = c.fetchall()
@@ -240,7 +250,7 @@ class DBManager:
         gad2_pos  = int((anxiety_score or 0) >= GAD2_THRESHOLD)
         phq4_risk = int((phq4_total   or 0) >= PHQ4_THRESHOLD)
 
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute(
             """INSERT INTO clinical_screening
@@ -258,7 +268,7 @@ class DBManager:
 
     def get_screening_scores(self, session_id: int):
         """Fetch the latest screening scores for a session."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
         c = conn.cursor()
         c.execute(
             """SELECT anxiety_score, depression_score, phq4_total, gad2_positive, phq4_high_risk 

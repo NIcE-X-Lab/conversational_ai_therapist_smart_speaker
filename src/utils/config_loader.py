@@ -20,6 +20,11 @@ def _load_yaml_config() -> Dict[str, Any]:
 
 _CFG = _load_yaml_config()
 
+_REQUIRED_SECTIONS = ("app", "paths", "rl")
+for _sect in _REQUIRED_SECTIONS:
+    if _sect not in _CFG:
+        raise KeyError(f"config.yaml missing required top-level key: '{_sect}'")
+
 APP = _CFG["app"]
 PATHS = _CFG["paths"]
 RL = _CFG["rl"]
@@ -68,10 +73,10 @@ LLM_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS"
 # once memory headroom is confirmed.
 OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "256"))
 OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", str(OPENAI_MAX_TOKENS)))
-# Default to GPU execution (num_gpu=1).  CPU-only (num_gpu=0) causes 7-minute
-# inference on Jetson Maxwell/Pascal and should only be used as a deliberate
+# Default to full GPU offload (num_gpu=99 = all layers).  CPU-only (num_gpu=0)
+# causes 7-minute inference on Jetson and should only be used as a deliberate
 # override for devices with no GPU.
-OLLAMA_NUM_GPU = int(os.environ.get("OLLAMA_NUM_GPU", "1"))
+OLLAMA_NUM_GPU = int(os.environ.get("OLLAMA_NUM_GPU", "99"))
 
 OLLAMA_KEEP_ALIVE = int(os.environ.get("OLLAMA_KEEP_ALIVE", "0"))
 

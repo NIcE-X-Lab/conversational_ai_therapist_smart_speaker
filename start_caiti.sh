@@ -95,10 +95,30 @@ ssh $SSH_OPTS "$JETSON_HOST_VALUE" bash -s << 'SANITIZE_EOF'
   sync
   echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
 
+  # Phase 5: Nuclear kill — clear ALL stale python3 processes
+  echo "  [SANITIZE] Phase 5: pkill -9 python3 (clearing all Python)"
+  sudo pkill -9 python3 2>/dev/null || true
+  sudo pkill -9 python  2>/dev/null || true
+
   sleep 2
-  # Phase 5: Verify clean state — count surviving python processes
+
+  # Phase 6: Detect D-state (Uninterruptible Sleep) processes — only a hard reboot can clear these
+  d_state=$(ps aux 2>/dev/null | awk '$8 ~ /^D/ {print $2, $11}' || true)
+  if [ -n "$d_state" ]; then
+    echo "  [CRITICAL] D-state (Uninterruptible Sleep) processes detected:"
+    echo "$d_state" | while read -r line; do echo "    PID $line"; done
+    echo "  [CRITICAL] These processes CANNOT be killed. A HARD REBOOT of the Jetson is required."
+    echo "  [CRITICAL] Run: sudo reboot"
+  fi
+
+  # Phase 7: Verify clean state — count surviving python processes
   remaining=$(pgrep -c python 2>/dev/null || echo 0)
-  echo "  [SANITIZE] Complete. Remaining python processes: $remaining"
+  if [ "$remaining" -gt 0 ]; then
+    echo "  [WARN] $remaining python processes survived sanitization."
+    echo "  [WARN] They may be D-state or owned by root. Check: ps aux | grep python"
+  else
+    echo "  [SANITIZE] Complete. All python processes cleared."
+  fi
 SANITIZE_EOF
 echo "[OK] Aggressive sanitization complete"
 
@@ -239,9 +259,19 @@ for pkg in $BLOCKLIST_PKGS; do
   fi
 done
 
+# ── Auto-install audit dependencies ───────────────────────────────────────
+for _dep in psutil setproctitle; do
+  if ! python3 -c "import $_dep" 2>/dev/null; then
+    echo "[AUTO-INSTALL] Installing missing dependency: $_dep"
+    pip install --quiet "$_dep" || echo "[WARN] Failed to install $_dep"
+  fi
+done
+
 # ── CUDA / GPU environment ─────────────────────────────────────────────────
 export LD_LIBRARY_PATH="/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export OLLAMA_KEEP_ALIVE=0
+export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
+export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-1}"
 export ALSA_LOG_LEVEL=none
 export PYTHONUNBUFFERED=1
 export CONSOLE_LOG_LEVEL=${CONSOLE_LOG_LEVEL:-INFO}

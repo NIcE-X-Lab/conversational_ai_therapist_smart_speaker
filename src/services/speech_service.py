@@ -239,16 +239,37 @@ class SpeechInteractionService:
             logger.info(f"Initializing session for user: {uid}")
             io_record.reset_session(uid)
             io_record.END_SESSION_EVENT.clear()
+
+            # ── Pre-session VRAM handoff ───────────────────────────────
+            # The RL pipeline will call llm_complete() for the opening
+            # greeting immediately after START_SESSION_EVENT is set.
+            # Suspend STT/SER now so the LLM has enough GPU memory.
+            # The main loop will resume STT after the first output is spoken.
+            logger.info("[VRAM HANDOFF] Pre-session: suspending STT before pipeline starts.")
+            try:
+                self.stt.suspend_all()
+            except Exception as e:
+                logger.warning(f"[VRAM HANDOFF] Pre-session STT suspend failed: {e}")
+
             io_record.START_SESSION_EVENT.set()
             break
 
         self.state = "idle"
 
     def handle_end_session(self):
-        """Triggered by voice or Button 2: End current session."""
+        """Triggered by voice or Button 2: End current session immediately."""
         logger.info("Ending session via hardware/voice command.")
+        # Signal termination first so all blocking queues unblock immediately
         io_record.END_SESSION_EVENT.set()
         io_record.START_SESSION_EVENT.clear()
+        # Stop any ongoing playback before speaking goodbye
+        self.stop_audio()
+        # Drain any pending items from the output queue so they don't replay
+        while not self.output_queue.empty():
+            try:
+                self.output_queue.get_nowait()
+            except queue.Empty:
+                break
         self.input_queue.put("SESSION_END")
         self.say("Ending our session now. Goodbye.")
 
@@ -330,6 +351,11 @@ class SpeechInteractionService:
             return
 
         while not llm_done_event.is_set():
+            # Bail out immediately if session was ended
+            if io_record.END_SESSION_EVENT.is_set():
+                logger.info("[INTERMISSION] Session ended. Stopping intermission.")
+                break
+
             now = time.monotonic()
             elapsed = now - start_time
 
@@ -446,6 +472,13 @@ class SpeechInteractionService:
                     if text_to_speak:
                         self.say(text_to_speak)
 
+                        # Ensure STT is loaded before listening (may have been
+                        # suspended by pre-session handoff or previous turn).
+                        try:
+                            self.stt.resume_all()
+                        except Exception as e:
+                            logger.warning(f"[VRAM HANDOFF] STT resume before listen failed: {e}")
+
                         # Wait for user response
                         if not self.is_hands_free:
                             self.manual_input_event.wait()
@@ -464,7 +497,10 @@ class SpeechInteractionService:
                             # ── Sequential VRAM Handoff ("Safe-Pass") ──────────
                             # 1. Unload BOTH Whisper and SER to maximize free VRAM
                             logger.info(f"[VRAM HANDOFF] Phase 1 — Pre-unload: {get_system_memory_snapshot()}")
-                            self.stt.suspend_all()
+                            try:
+                                self.stt.suspend_all()
+                            except Exception as e:
+                                logger.warning(f"[VRAM HANDOFF] STT suspend failed (non-fatal): {e}")
                             logger.info(f"[VRAM HANDOFF] Phase 1 — Post-unload: {get_system_memory_snapshot()}")
 
                             # 2. Wait 0.5s for OS to reclaim memory pages
@@ -477,7 +513,10 @@ class SpeechInteractionService:
 
                             # 4. Reload Whisper + SER for next listen cycle
                             logger.info(f"[VRAM HANDOFF] Phase 4 — Pre-reload: {get_system_memory_snapshot()}")
-                            self.stt.resume_all()
+                            try:
+                                self.stt.resume_all()
+                            except Exception as e:
+                                logger.warning(f"[VRAM HANDOFF] STT resume failed (non-fatal): {e}")
                             logger.info(f"[VRAM HANDOFF] Phase 4 — Post-reload: {get_system_memory_snapshot()}")
 
                 except queue.Empty:

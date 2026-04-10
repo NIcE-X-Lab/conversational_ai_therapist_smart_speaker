@@ -194,20 +194,32 @@ class GPIOManager:
     # ------------------------------------------------------------------ #
 
     def _on_start(self, channel):
-        if self._is_pressed(channel):
-            self._emit_event(EVENT_START, channel, source="GPIO")
+        try:
+            if self._is_pressed(channel):
+                self._emit_event(EVENT_START, channel, source="GPIO")
+        except Exception as e:
+            logger.error(f"GPIO callback _on_start failed: {e}")
 
     def _on_end(self, channel):
-        if self._is_pressed(channel):
-            self._emit_event(EVENT_END, channel, source="GPIO")
+        try:
+            if self._is_pressed(channel):
+                self._emit_event(EVENT_END, channel, source="GPIO")
+        except Exception as e:
+            logger.error(f"GPIO callback _on_end failed: {e}")
 
     def _on_opt_out(self, channel):
-        if self._is_pressed(channel):
-            self._emit_event(EVENT_OPT_OUT, channel, source="GPIO")
+        try:
+            if self._is_pressed(channel):
+                self._emit_event(EVENT_OPT_OUT, channel, source="GPIO")
+        except Exception as e:
+            logger.error(f"GPIO callback _on_opt_out failed: {e}")
 
     def _on_btn4(self, channel):
-        if self._is_pressed(channel):
-            self._emit_event(EVENT_BTN4, channel, source="GPIO")
+        try:
+            if self._is_pressed(channel):
+                self._emit_event(EVENT_BTN4, channel, source="GPIO")
+        except Exception as e:
+            logger.error(f"GPIO callback _on_btn4 failed: {e}")
 
     # ------------------------------------------------------------------ #
     # LED control                                                          #

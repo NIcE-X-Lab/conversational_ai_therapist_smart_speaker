@@ -1,8 +1,14 @@
-"""AI model wrapper abstracting communications with the primary LLM engine."""
+"""AI model wrapper abstracting communications with the primary LLM engine.
+
+Uses Ollama's native /api/chat endpoint directly instead of the OpenAI-compat
+/v1/chat/completions endpoint, which has a known runner crash on Jetson ARM64
+with Ollama v0.20.x.
+"""
+import atexit
 import os
 import time
 import threading
-from openai import OpenAI
+import requests as _requests
 from src.utils.config_loader import (
     OPENAI_BASE_URL,
     LLM_MODEL,
@@ -26,11 +32,10 @@ from src.utils.resource_audit import get_resource_audit
 logger = get_logger("LLMClient")
 RESOURCE_AUDIT = get_resource_audit()
 
-_api_key = os.environ.get("OPENAI_API_KEY")
-if not _api_key:
-    logger.warning("OPENAI_API_KEY is not set. Using dummy key for local LLM.")
-    _api_key = "dummy"
-client = OpenAI(api_key=_api_key, base_url=OPENAI_BASE_URL)
+# Derive Ollama base URL (strip /v1 suffix used by OpenAI compat layer)
+_OLLAMA_BASE = OPENAI_BASE_URL.replace("/v1", "").rstrip("/")
+_OLLAMA_CHAT_URL = f"{_OLLAMA_BASE}/api/chat"
+
 _INTERMISSION_MANAGER = None
 
 
@@ -42,16 +47,22 @@ def _get_intermission_manager():
     return _INTERMISSION_MANAGER
 
 
-def llm_complete(system_content: str, user_content: str) -> str:
+def llm_complete(system_content: str, user_content: str, *, inject_context: bool = True) -> str:
     """
     Unified LLM caller used across the app.
     Inputs:
       - system_content: system prompt/instructions
       - user_content: user input/payload
+      - inject_context: when True (default), appends user history and
+        session context pack to the system prompt.  Set to False for
+        utility calls (classification, rephrasing) where context bloats
+        the prompt without benefit.
     Output:
       - plain text content returned by the model
     """
-    if DISABLE_CONTEXT_HISTORY:
+    if not inject_context:
+        logger.debug("[LLM_CLIENT] Context injection skipped (inject_context=False).")
+    elif DISABLE_CONTEXT_HISTORY:
         logger.info("[ZERO-HISTORY] Context injection disabled for diagnostic mode.")
     else:
         try:
@@ -74,6 +85,24 @@ def llm_complete(system_content: str, user_content: str) -> str:
         except ImportError:
             pass
 
+    # ── Context Governance: enforce sliding window ──────────────────────
+    # Rough token estimate: 1 token ≈ 4 chars.  If the combined prompt
+    # exceeds 75% of num_ctx, trim the injected context from the TAIL of
+    # system_content.  The core instructions live at the head and must be
+    # preserved; the appended user history / context pack is expendable.
+    _CHARS_PER_TOKEN = 4
+    _CTX_BUDGET_RATIO = 0.75
+    total_chars = len(system_content) + len(user_content)
+    budget_chars = int(OLLAMA_NUM_CTX * _CTX_BUDGET_RATIO * _CHARS_PER_TOKEN)
+    if total_chars > budget_chars:
+        overshoot = total_chars - budget_chars
+        logger.warning(
+            f"[CONTEXT GOV] Prompt est. {total_chars // _CHARS_PER_TOKEN} tokens "
+            f"exceeds 75% budget ({OLLAMA_NUM_CTX}). Trimming {overshoot} chars "
+            "from system content tail (injected context)."
+        )
+        system_content = system_content[:len(system_content) - overshoot]
+
     logger.info(f"[LLM_CLIENT] Requesting GPU-accelerated inference for model: {LLM_MODEL}")
     logger.debug({"model": LLM_MODEL, "user": user_content})
     started_at = time.monotonic()
@@ -82,10 +111,6 @@ def llm_complete(system_content: str, user_content: str) -> str:
     RESOURCE_AUDIT.capture_process_inventory("llm_pre_call_inventory")
 
     # ── Strict VRAM Budget ─────────────────────────────────────────────────
-    # The 3B model's cudaMalloc was requesting ~1918 MiB at num_ctx=512.
-    # With num_ctx=256, f16_kv=false, num_batch=1, this should drop to
-    # ~1200 MiB.  Auto-scaling decrements by 64 (finer steps at low ctx)
-    # on OOM, with a floor of 128 tokens.
     _CTX_DECREMENT = 64
     _CTX_FLOOR = 128
     effective_num_ctx = OLLAMA_NUM_CTX
@@ -112,19 +137,16 @@ def llm_complete(system_content: str, user_content: str) -> str:
     heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
     heartbeat_thread.start()
 
-    def _build_extra_body(num_ctx_val):
-        """Build the Ollama extra_body payload with the given num_ctx."""
+    def _build_options(num_ctx_val):
+        """Build the Ollama options payload with the given num_ctx."""
         return {
-            "keep_alive": 0,
-            "options": {
-                "num_gpu": OLLAMA_NUM_GPU,
-                "num_thread": 4,
-                "num_ctx": num_ctx_val,
-                "num_predict": min(OLLAMA_NUM_PREDICT, num_ctx_val),
-                "num_batch": 1,
-                "f16_kv": False,
-                "temperature": OPENAI_TEMPERATURE,
-            },
+            "num_gpu": OLLAMA_NUM_GPU,
+            "num_thread": 4,
+            "num_ctx": num_ctx_val,
+            "num_predict": min(OLLAMA_NUM_PREDICT, num_ctx_val),
+            "num_batch": 1,
+            "f16_kv": False,
+            "temperature": OPENAI_TEMPERATURE,
         }
 
     def _is_oom_error(exc: Exception) -> bool:
@@ -132,8 +154,8 @@ def llm_complete(system_content: str, user_content: str) -> str:
         msg = str(exc).lower()
         return any(tok in msg for tok in ("500", "runner", "oom", "terminated", "killed"))
 
-    def _dispatch_llm(model_name, extra_body, num_ctx_val):
-        """Execute the LLM call.  Returns response text or raises."""
+    def _dispatch_llm(model_name, options, num_ctx_val):
+        """Execute the LLM call via Ollama's native /api/chat endpoint."""
         logger.info(
             f"[LLM_CLIENT] GPU payload: num_gpu={OLLAMA_NUM_GPU}, num_thread=4, "
             f"num_ctx={num_ctx_val}, num_predict={min(OLLAMA_NUM_PREDICT, num_ctx_val)}, "
@@ -147,55 +169,55 @@ def llm_complete(system_content: str, user_content: str) -> str:
             num_predict=min(OLLAMA_NUM_PREDICT, num_ctx_val),
             f16_kv=False,
         )
+
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user_content},
+            ],
+            "stream": False,
+            "keep_alive": 0,
+            "options": options,
+        }
+
         with RESOURCE_AUDIT.track_peak(
             f"LLM/{model_name}/handshake_and_generate",
             metadata={"num_ctx": num_ctx_val, "num_gpu": OLLAMA_NUM_GPU},
         ):
             with heavy_stage(f"LLM/{model_name}"):
-                try:
-                    RESOURCE_AUDIT.capture_point(
-                        f"LLM/{model_name}/pre_dispatch",
-                        extra={"phase": "handshake", "num_ctx": num_ctx_val},
+                RESOURCE_AUDIT.capture_point(
+                    f"LLM/{model_name}/pre_dispatch",
+                    extra={"phase": "handshake", "num_ctx": num_ctx_val},
+                )
+                resp = _requests.post(
+                    _OLLAMA_CHAT_URL,
+                    json=payload,
+                    timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+                )
+                RESOURCE_AUDIT.capture_point(f"LLM/{model_name}/post_dispatch")
+
+                if resp.status_code != 200:
+                    error_msg = resp.text[:200]
+                    raise RuntimeError(
+                        f"Ollama HTTP {resp.status_code}: {error_msg}"
                     )
-                    resp = client.responses.create(
-                        model=model_name,
-                        reasoning={"effort": "low"},
-                        instructions=system_content,
-                        input=user_content,
-                        max_output_tokens=OPENAI_MAX_TOKENS,
-                        extra_body=extra_body,
-                        timeout=LLM_REQUEST_TIMEOUT_SECONDS,
-                    )
-                    RESOURCE_AUDIT.capture_point(f"LLM/{model_name}/post_dispatch")
-                    return resp.output_text
-                except AttributeError:
-                    RESOURCE_AUDIT.capture_point(
-                        f"LLM/{model_name}/pre_dispatch_chat_completions",
-                        extra={"phase": "handshake", "num_ctx": num_ctx_val},
-                    )
-                    resp = client.chat.completions.create(
-                        model=model_name,
-                        messages=[
-                            {"role": "system", "content": system_content},
-                            {"role": "user", "content": user_content},
-                        ],
-                        max_tokens=OPENAI_MAX_TOKENS,
-                        temperature=OPENAI_TEMPERATURE,
-                        extra_body=extra_body,
-                        timeout=LLM_REQUEST_TIMEOUT_SECONDS,
-                    )
-                    RESOURCE_AUDIT.capture_point(f"LLM/{model_name}/post_dispatch_chat_completions")
-                    return resp.choices[0].message.content
+
+                data = resp.json()
+                content = data.get("message", {}).get("content", "")
+                if not content:
+                    raise RuntimeError(f"Empty response from Ollama: {data}")
+                return content
 
     try:
         for model_name in models_to_try:
             try:
                 logger.info(f"LLM attempt using model: {model_name}")
                 clear_inference_cache(f"Before LLM attempt ({model_name})")
-                extra_body = _build_extra_body(effective_num_ctx)
+                options = _build_options(effective_num_ctx)
 
                 try:
-                    result = _dispatch_llm(model_name, extra_body, effective_num_ctx)
+                    result = _dispatch_llm(model_name, options, effective_num_ctx)
                 except Exception as first_err:
                     if _is_oom_error(first_err) and effective_num_ctx - _CTX_DECREMENT >= _CTX_FLOOR:
                         # ── Auto-Scale: decrement num_ctx and retry once ──
@@ -206,8 +228,8 @@ def llm_complete(system_content: str, user_content: str) -> str:
                             f"Decrementing to num_ctx={effective_num_ctx} and retrying."
                         )
                         clear_inference_cache(f"After OOM, before retry at num_ctx={effective_num_ctx}")
-                        extra_body = _build_extra_body(effective_num_ctx)
-                        result = _dispatch_llm(model_name, extra_body, effective_num_ctx)
+                        options = _build_options(effective_num_ctx)
+                        result = _dispatch_llm(model_name, options, effective_num_ctx)
                     else:
                         raise
 
@@ -237,6 +259,13 @@ _LLM_POOL = None
 _LLM_POOL_LOCK = threading.Lock()
 
 
+def _shutdown_llm_pool():
+    global _LLM_POOL
+    if _LLM_POOL is not None:
+        _LLM_POOL.shutdown(wait=False)
+        _LLM_POOL = None
+
+
 def _get_llm_pool():
     global _LLM_POOL
     if _LLM_POOL is None:
@@ -246,6 +275,7 @@ def _get_llm_pool():
                 _LLM_POOL = concurrent.futures.ThreadPoolExecutor(
                     max_workers=1, thread_name_prefix="llm_async"
                 )
+                atexit.register(_shutdown_llm_pool)
     return _LLM_POOL
 
 
