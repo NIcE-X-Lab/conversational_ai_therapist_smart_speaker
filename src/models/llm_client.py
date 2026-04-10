@@ -5,6 +5,7 @@ Uses Ollama's native /api/chat endpoint directly instead of the OpenAI-compat
 with Ollama v0.20.x.
 """
 import atexit
+import json
 import os
 import time
 import threading
@@ -20,6 +21,7 @@ from src.utils.config_loader import (
     OLLAMA_NUM_PREDICT,
     OLLAMA_NUM_GPU,
     DISABLE_CONTEXT_HISTORY,
+    LLM_LOG_STREAMING,
 )
 from src.utils.inference_guard import (
     clear_inference_cache,
@@ -176,7 +178,7 @@ def llm_complete(system_content: str, user_content: str, *, inject_context: bool
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": user_content},
             ],
-            "stream": False,
+            "stream": LLM_LOG_STREAMING,
             "keep_alive": 0,
             "options": options,
         }
@@ -190,24 +192,73 @@ def llm_complete(system_content: str, user_content: str, *, inject_context: bool
                     f"LLM/{model_name}/pre_dispatch",
                     extra={"phase": "handshake", "num_ctx": num_ctx_val},
                 )
-                resp = _requests.post(
+                request_timeout = (
+                    (10, LLM_REQUEST_TIMEOUT_SECONDS)
+                    if LLM_LOG_STREAMING
+                    else LLM_REQUEST_TIMEOUT_SECONDS
+                )
+
+                with _requests.post(
                     _OLLAMA_CHAT_URL,
                     json=payload,
-                    timeout=LLM_REQUEST_TIMEOUT_SECONDS,
-                )
-                RESOURCE_AUDIT.capture_point(f"LLM/{model_name}/post_dispatch")
+                    timeout=request_timeout,
+                    stream=LLM_LOG_STREAMING,
+                ) as resp:
+                    if resp.status_code != 200:
+                        error_msg = resp.text[:200]
+                        raise RuntimeError(
+                            f"Ollama HTTP {resp.status_code}: {error_msg}"
+                        )
 
-                if resp.status_code != 200:
-                    error_msg = resp.text[:200]
-                    raise RuntimeError(
-                        f"Ollama HTTP {resp.status_code}: {error_msg}"
-                    )
+                    if LLM_LOG_STREAMING:
+                        logger.info("[LLM_STREAM] Streaming enabled for debug visibility.")
+                        content_chunks = []
+                        for raw_line in resp.iter_lines(decode_unicode=True):
+                            if not raw_line:
+                                continue
 
-                data = resp.json()
-                content = data.get("message", {}).get("content", "")
-                if not content:
-                    raise RuntimeError(f"Empty response from Ollama: {data}")
-                return content
+                            if isinstance(raw_line, bytes):
+                                line = raw_line.decode("utf-8", errors="ignore").strip()
+                            else:
+                                line = str(raw_line).strip()
+                            if not line:
+                                continue
+                            if line.startswith("data:"):
+                                line = line[5:].strip()
+                            if line == "[DONE]":
+                                break
+
+                            try:
+                                event = json.loads(line)
+                            except json.JSONDecodeError:
+                                logger.debug(f"[LLM_STREAM] Ignored non-JSON chunk: {line[:120]}")
+                                continue
+
+                            if event.get("error"):
+                                raise RuntimeError(f"Ollama stream error: {event.get('error')}")
+
+                            chunk = event.get("message", {}).get("content", "")
+                            if chunk:
+                                content_chunks.append(chunk)
+                                safe_chunk = chunk.replace("\n", "\\n")
+                                logger.info(f"[LLM_STREAM] {safe_chunk}")
+
+                            if event.get("done"):
+                                break
+
+                        RESOURCE_AUDIT.capture_point(f"LLM/{model_name}/post_dispatch")
+                        content = "".join(content_chunks).strip()
+                        if not content:
+                            raise RuntimeError("Empty response from Ollama streaming API.")
+                        logger.info(f"[LLM_STREAM] Stream complete. chars={len(content)}")
+                        return content
+
+                    data = resp.json()
+                    RESOURCE_AUDIT.capture_point(f"LLM/{model_name}/post_dispatch")
+                    content = data.get("message", {}).get("content", "")
+                    if not content:
+                        raise RuntimeError(f"Empty response from Ollama: {data}")
+                    return content
 
     try:
         for model_name in models_to_try:

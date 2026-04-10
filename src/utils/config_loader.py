@@ -64,6 +64,11 @@ LLM_FALLBACK_MODELS = [
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
 OPENAI_MAX_TOKENS = int(os.environ.get("OPENAI_MAX_TOKENS", "400"))
 LLM_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "90"))
+# Test-mode toggle: when enabled, llm_client requests stream=True and logs
+# token chunks in real time while still returning the final aggregated string.
+LLM_LOG_STREAMING = os.environ.get(
+    "LLM_LOG_STREAMING", "0"
+).strip().lower() in {"1", "true", "yes", "on"}
 
 # Ollama per-request safety controls to reduce Jetson memory pressure.
 # num_ctx=256: Aggressive cap to fit the KV cache handshake into fragmented
