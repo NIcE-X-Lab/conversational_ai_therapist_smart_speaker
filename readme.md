@@ -2,7 +2,48 @@
 
 ## Overview
 
-CaiTI is a fully local, privacy-preserving smart-speaker system that delivers **Motivational Interviewing (MI)** and **Cognitive Behavioral Therapy (CBT)** micro-interventions. Built for the **NVIDIA Jetson** platform (Orin Nano/NX/AGX), the system operates entirely offline as a headless audio assistant. A Python-based speech-client loop communicates with a local Dialogue Engine powered by a fine-tuned **Gemma 2B** model served through Ollama.
+CaiTI is a fully local, privacy-preserving smart-speaker system that delivers **Motivational Interviewing (MI)** and **Cognitive Behavioral Therapy (CBT)** micro-interventions. Built for the **NVIDIA Jetson** platform (Orin Nano/NX/AGX), the system operates entirely offline as a headless audio assistant. A Python-based speech-client loop communicates with a local Dialogue Engine powered by **Gemma 4 E2B** running in-process via **LiteRT-LM** — no external server required.
+
+---
+
+## Model Info
+
+### Gemma 4 E2B (LiteRT)
+
+The Gemma 4 E2B is a lightweight, state-of-the-art open model from Google, built on the same research as the Gemini family. This version is optimized for on-device, offline inference on edge hardware like the NVIDIA Jetson Orin Nano.
+
+| Property | Value |
+|----------|-------|
+| **Model Name** | `gemma-4-E2B-it-litert-lm` |
+| **Source** | [litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) |
+| **Format** | `.litertlm` (Optimized for LiteRT-LM framework) |
+| **Size** | 2.58 GB |
+| **Context Window** | Up to 32k tokens (standard) / 512 used for Jetson |
+
+### Tech Stack
+
+The model utilizes the **LiteRT-LM** orchestration layer, which sits atop Google's high-performance LiteRT runtime. On Jetson hardware, it leverages:
+
+- **XNNPack**: Hardware acceleration for CPU execution
+- **ML Drift**: Hardware acceleration for GPU execution
+- **Memory Mapping**: Uses mmap for embedding parameters (1.12 GB) to reduce active working memory footprint
+
+### Jetson Orin Nano Benchmarks
+
+Performance metrics captured using 1024 prefill tokens and 256 decode tokens:
+
+| Backend | Prefill (T/s) | Decode (T/s) | Time-to-First-Token | Memory (MB) |
+|---------|--------------|--------------|---------------------|-------------|
+| GPU (ML Drift) | 1,142 | 24.2 | 0.9s | 2,739 |
+| CPU (4 Threads) | 109 | 12.2 | 9.4s | 3,681 |
+
+The GPU backend provides a **10x improvement** in prefill speed and significantly lower latency (TTFT) compared to CPU on Jetson Orin Nano.
+
+### Key Features for IoT & Edge
+
+- **Privacy**: Complete local execution with no internet connection required
+- **Advanced Capabilities**: Native support for KV-cache management, prompt templating, and function calling
+- **Small Footprint**: Highly optimized for devices with limited RAM; vision and audio modules load dynamically as needed
 
 ---
 
@@ -12,7 +53,7 @@ The architecture is built on three pillars:
 
 1. **Clinical Observability** — Every conversational turn records RL Q-values, semantic scores, and validation flags to a structured SQLite database and per-session JSON/CSV logs. Researchers can audit exactly *why* the AI chose a specific clinical dimension. Sessions are logged independently to `data/logs/[UserID]/[Timestamp].{log,json}`.
 
-2. **Edge Privacy** — By using `faster-whisper`, lightweight local SER (MFCC-RF), `Piper`, and local `Ollama` models, sensitive patient data never leaves the device. The expensive LLM layer is triggered only upon confirmed speech intent.
+2. **Edge Privacy** — By using `faster-whisper`, lightweight local SER (MFCC-RF), `Piper`, and in-process LiteRT-LM inference, sensitive patient data never leaves the device. The expensive LLM layer is triggered only upon confirmed speech intent.
 
 3. **Sandboxed State Management** — Strict session lifecycle prevents "user-leakage." On session termination, RL memory (Pandas DataFrames) and screening state are explicitly purged, ensuring the next user starts with a clean slate seeded only from their historic database context.
 
@@ -73,8 +114,8 @@ The architecture is built on three pillars:
           +--------+-------+  +---------------+
                    |
           +--------v-------+
-          |   LLM Client   |  ──> Ollama (Gemma 2B / llama3.2)
-          |  (llm_client)  |      via OpenAI-compatible API
+          |   LLM Client   |  ──> LiteRT-LM (Gemma 4 E2B, in-process)
+          |  (llm_client)  |      GPU delegate with CPU fallback
           +--------+-------+
                    |
           +--------v-------+
@@ -111,7 +152,7 @@ src/
 │   └── therapy_content.py     # PHQ-4 / GAD-2 screening & meditation content
 │
 ├── models/                    # AI model wrappers
-│   ├── llm_client.py          # Unified Ollama LLM caller + interstitial engine
+│   ├── llm_client.py          # LiteRT-LM in-process inference + interstitial engine
 │   ├── stt.py                 # Faster-Whisper STT + lightweight MFCC SER
 │   ├── tts.py                 # Piper neural TTS subprocess wrapper
 │   └── light_ser.py           # Lightweight MFCC random-forest SER classifier
@@ -148,6 +189,8 @@ The `AudioRecorder` captures audio via PyAudio with WebRTC-VAD for voice activit
 - ALSA warning suppression via ctypes for clean Jetson operation
 - OS buffer flushing on stream start to avoid echo from recent TTS playback
 - VAD callback hooks to the GPIO LED for visual feedback
+- **Response-completion detection**: 2.0s sustained silence threshold with 0.4s trailing pad to catch trailing words. If speech resumes during the trailing window, recording automatically extends
+- **Fragment filtering**: Recordings shorter than 0.3s of speech are discarded as noise/false positives
 
 When speech is captured, `STTGenerator` performs a memory-aware sequential pipeline serialized via `inference_guard.heavy_stage()`:
 - **Faster-Whisper STT** (`faster-whisper`) produces the transcript with low-memory decode settings
@@ -156,21 +199,43 @@ When speech is captured, `STTGenerator` performs a memory-aware sequential pipel
 
 Both results are packaged as `{"transcript": "...", "detected_emotion": "..."}` and pushed onto the `INPUT_QUEUE`. The SER backend is selectable via `SER_BACKEND` env var (defaults to `light_mfcc_rf`).
 
-**VRAM Shielding**: On 8GB Jetson, Whisper and the LLM cannot coexist in VRAM. `STTGenerator` exposes `suspend_all()` / `resume_all()` methods that fully unload both the Whisper model and SER classifier before the LLM handshake, then reload them afterward. RSS deltas are logged at each transition.
+**VRAM Shielding**: On 8GB Jetson, Whisper and the LLM cannot coexist in VRAM. `STTGenerator` exposes `suspend_all()` / `resume_all()` methods that fully unload both the Whisper model and SER classifier before the LLM inference, then reload them afterward. RSS deltas are logged at each transition.
 
 **Environment Verification**: On import, `stt.py` checks for the heavy `openai-whisper` package (which pulls ~2GB PyTorch). If detected, the process exits immediately with `[ENVIRONMENT ERROR]` and instructions to uninstall.
 
 ### 2. Speech Interaction Service (`src/services/speech_service.py`)
 
-The `SpeechInteractionService` orchestrates the real-time client loop:
+The `SpeechInteractionService` orchestrates the real-time client loop with explicit state tracking (`idle`, `onboarding`, `main_listen`, `main_process`, `intermission_screening`, `intermission_exercise`, `music_fallback`, `speaking`):
 
 - **Idle State**: Polls 1-second audio windows for wake-word detection ("Hello CaiTI", "Hey Katie", etc.)
-- **Onboarding**: On wake-word or GPIO Button 1, asks for user name, initializes session via `io_record.reset_session()`. A multi-layer **Name Guard** rejects common fillers ("Of course", "Good morning", "I'm fine") using word and phrase blacklists, minimum character thresholds, and prefix stripping ("My name is..." → name only)
-- **Active Session**: Turn-based loop — dequeue agent text from `OUTPUT_QUEUE`, TTS+play it, then listen for user response and push to `INPUT_QUEUE`
-- **Sequential VRAM Handoff** ("Safe-Pass"): After the user speaks, the service (1) unloads both Whisper and SER via `stt.suspend_all()`, (2) waits 0.5s for OS memory reclamation, (3) lets the LLM handshake proceed, then (4) reloads both models via `stt.resume_all()`. Memory snapshots are logged at each phase
-- **Intermission Watchdog**: If the LLM takes longer than 3 seconds, PHQ-4 screening questions and guided breathing exercises play automatically. When the LLM response arrives, the current TTS clip finishes naturally (no mid-sentence interruption), then a randomized **bridge phrase** (e.g., "Thank you for reflecting on that with me. Now, going back to what you shared...") transitions smoothly into the therapist's answer
+- **Onboarding**: On wake-word or GPIO Button 1, asks for user name, initializes session immediately via `io_record.reset_session()`. A multi-layer **Name Guard** rejects common fillers ("Of course", "Good morning", "I'm fine") using word and phrase blacklists, minimum character thresholds, and prefix stripping ("My name is..." -> name only)
+- **Active Session**: Turn-based loop — the first agent utterance is dequeued from `OUTPUT_QUEUE` and spoken. Subsequent turns cycle: listen -> send input -> VRAM handoff -> intermission (speaks next response) -> loop back to listen. This avoids the deadlock where `output_queue.get()` blocks while the handler waits for input
+- **Sequential VRAM Handoff**: After the user speaks, the service (1) unloads both Whisper and SER via `stt.suspend_all()`, (2) waits 0.3s for OS memory reclamation, (3) lets the LLM inference proceed, then (4) reloads models for the next listen cycle
+- **STT Retry Logic**: Short transcripts (1-2 words) trigger a brief continuation listen (4s) to merge split utterances into a single coherent response
+
+#### Intermission State Machine
+
+If the LLM takes longer than 3 seconds, a state machine engages the user:
+
+```
+WAITING (silent, < 3s) -> SCREENING -> EXERCISE -> MUSIC
+                            |             |
+                         (opt-out)     (opt-out)
+                            +------+------+
+                                   v
+                                 MUSIC
+```
+
+| State | Behavior |
+|-------|----------|
+| **SCREENING** | Cycles through all 4 PHQ-4 questions without repeats. STT is briefly resumed to capture the user's spoken answer. Supports "repeat" requests, opt-out, and gentle re-prompts on silence (12s timeout) |
+| **EXERCISE** | Cycles through 5 guided breathing exercises with 30s hold time per exercise. When all 5 are used, the pool resets and cycles again |
+| **MUSIC** | Plays ambient music (`assets/waiting_music.wav`) as a final fallback. Entered when the user opts out or all exercises are exhausted |
+
+User can say "skip", "stop", or "opt out" at any time to jump to music. When the LLM response arrives, the current sentence finishes naturally, a randomized bridge phrase provides a smooth transition, then the therapist's response is delivered.
+
 - **Modes**: `hands_free` (auto-listen after agent speaks) or `manual` (wait for `manual_input_event`)
-- **Voice Commands**: "end session" / "stop session" triggers session termination
+- **Voice Commands**: "end session" / "stop session" triggers immediate session termination
 - **Hardware Events**: GPIO buttons for Start/End/Opt-Out are polled each loop iteration
 
 ### 3. Reinforcement Learning Orchestrator (`src/core/handler_rl.py`)
@@ -191,7 +256,7 @@ The `SpeechInteractionService` orchestrates the real-time client loop:
 
 **Questioner**:
 - Selects question variants from the library, optionally rephrases via LLM
-- Classifies user response segments through `ResponseBridge` → `ResponseAnalyzer`
+- Classifies user response segments through `ResponseBridge` -> `ResponseAnalyzer`
 - Handles invalid responses with an LLM-generated retry guide (clarification, angle-shift, or restatement)
 - Invokes `ReflectionValidation` for follow-up relevance checking
 
@@ -204,16 +269,11 @@ The `SpeechInteractionService` orchestrates the real-time client loop:
 
 **DLA Parsing**: Robust parser handling multiple LLM output formats — plain text (`talk, 1`), JSON (`{"res": "talk, 1"}`), prefixed (`DLA_3_talk, 1`) — with cascading fallback logic.
 
-**IntermissionManager**: Non-blocking interstitial content during slow LLM inference:
-1. If inference < 3s: wait silently (fast path)
-2. If >= 3s: deliver **GAD-2/PHQ-2 clinical screening** questions
-3. If screening complete/refused: cycle through **guided meditations** (5 breathing exercises)
-4. If still waiting: play **ambient music** (`assets/waiting_music.wav`)
-5. User can opt out at any time ("skip", "stop", "don't want to")
-
-Screening scores are persisted to DB and trigger clinical flags:
+**IntermissionManager**: Thread-safe interstitial content manager used by `llm_complete_with_interstitial()` for pipeline-internal LLM waits (e.g., reflection validation, CBT reasoning). Persists screening scores to DB and triggers clinical flags:
 - `GAD2_POSITIVE` when anxiety >= 3
 - `PHQ4_HIGH_RISK` when total >= 6
+
+The primary user-facing intermission runs in `speech_service.py` (see Section 2 above), which uses its own state machine with voice interaction, STT resume/suspend, and opt-out handling.
 
 ### 6. Reflection Validation Module (`src/core/reflection_validation.py`)
 
@@ -241,35 +301,29 @@ Unified LLM interface with three calling modes:
 
 | Function | Behavior |
 |----------|----------|
-| `llm_complete()` | Synchronous call to Ollama via OpenAI-compatible API |
+| `llm_complete()` | Synchronous in-process LiteRT-LM inference (via `litert_lm.Engine`) |
 | `llm_complete_async()` | Background thread pool execution |
 | `llm_complete_with_interstitial()` | Async + intermission engine for latency coverage |
 
 All calls automatically inject:
 - **User context** (preferences + session summaries from DB)
 - **Context pack** (latest transcript, emotion tag, RL state, screening scores)
-- Context injection can be disabled via `DISABLE_CONTEXT_HISTORY=1` for diagnostic isolation of init-peak vs. context-bloat OOM crashes
-- Supports both `client.responses.create` and `client.chat.completions.create` APIs (automatic fallback)
-- **Model fallback chain**: If the primary `LLM_MODEL` fails, the client iterates through `LLM_FALLBACK_MODELS` before returning a graceful error message
+- Context injection can be disabled via `DISABLE_CONTEXT_HISTORY=1` for diagnostic isolation
 
-**Strict VRAM Budget**: Each Ollama request enforces a hard memory profile via `extra_body`:
-- `num_ctx=256` (default, overridable) — aggressive cap to fit KV cache into fragmented Jetson VRAM
-- `num_batch=1` — single-batch processing to minimize peak allocation
-- `f16_kv=false` — 8-bit KV cache to halve memory vs. FP16
-- `num_gpu=1` — GPU execution enforced (CPU fallback causes 7-minute inference)
-- `keep_alive=0` — model unloaded immediately after each request to free VRAM
+**Gemma Chat Template**: Since Gemma has no native system role, the system prompt is folded into the user turn using the `<start_of_turn>user` / `<start_of_turn>model` template format.
 
-**Auto-Scaling Context Window**: On cudaMalloc/OOM failure (HTTP 500, "runner terminated"), the client automatically decrements `num_ctx` by 64 and retries once. The floor is 128 tokens. This provides runtime recovery from VRAM fragmentation without manual intervention.
+**Lazy Singleton Engine**: The LiteRT-LM inference engine (`litert_lm.Engine`) is initialized on first call with thread-safe locking. CPU backend (XNNPack) is the default; GPU backend (ML Drift) is used when available and configured via `LITERT_BACKEND=gpu`.
 
-**VRAM monitoring**: Logs system memory snapshot (RAM, GPU sysfs, Ollama footprint) before and after each inference call. A heartbeat thread logs every 10s during inference so the terminal never appears dead.
+**Context Governance**: A sliding-window trimmer ensures the combined prompt stays within 75% of `LITERT_CONTEXT_LENGTH`. Injected context is trimmed from the tail while core instructions at the head are preserved.
+
+**Memory Monitoring**: Logs system memory snapshot (RAM, GPU sysfs telemetry) before and after each inference call. A heartbeat thread logs every 10s during inference so the terminal never appears dead.
 
 ### 8a. Inference Guard (`src/utils/inference_guard.py`)
 
 Serializes heavy inference stages (STT, SER, LLM) to prevent concurrent GPU/memory contention on resource-constrained Jetson hardware:
 - **`heavy_stage(name)`**: Context manager with a global threading lock ensuring only one heavy inference runs at a time
 - **`clear_inference_cache(reason)`**: Best-effort cleanup between phases — runs `gc.collect()` and optionally `torch.cuda.empty_cache()` when PyTorch is available
-- **`get_current_vram_usage()`**: Lightweight VRAM proxy via `ollama ps` subprocess
-- **`get_system_memory_snapshot()`**: Clinical-grade memory transparency combining system RAM (`free -h`), GPU telemetry (priority: sysfs zero-cost reads → `nvidia-smi` → `tegrastats`), and Ollama model footprint. Sysfs reads GPU clock frequency and utilization directly from `/sys/class/devfreq/` on Jetson (Orin Nano, Orin NX, Xavier NX paths supported)
+- **`get_system_memory_snapshot()`**: Clinical-grade memory transparency combining system RAM (`free -h`) and GPU telemetry (priority: sysfs zero-cost reads -> `nvidia-smi` -> `tegrastats`). Sysfs reads GPU clock frequency and utilization directly from `/sys/class/devfreq/` on Jetson (Orin Nano, Orin NX, Xavier NX paths supported)
 
 ### 8b. Lightweight SER (`src/models/light_ser.py`)
 
@@ -278,7 +332,7 @@ Pure-NumPy MFCC-based emotion classifier designed for memory-constrained devices
 - **RMS auto-gain normalization**: Input audio is normalized to a target RMS of 0.1 before feature extraction, preventing Jetson mic gain variance from inflating MFCC std features
 - **Silence gate**: Audio with raw RMS below 0.005 is immediately tagged as "neutral" without classification, preventing noise-only buffers from triggering false anger detections
 - Classifies into 4 emotions: neutral, happy, sad, angry via rule-based random-forest-style voting (15 decision stumps)
-- **Adaptive anger calibration**: A rolling 10-sample window tracks classification history. If 7+ of the last 10 results are "angry", MFCC std thresholds are automatically raised by 10% to suppress persistent mic-gain-induced anger bias. Calibrations are logged as `[SER CALIBRATE]` warnings
+- **Adaptive anger calibration**: A rolling 10-sample window tracks classification history. If 7+ of the last 10 results are "angry", MFCC std thresholds are automatically raised by 10% to suppress persistent mic-gain-induced anger bias
 - Zero external ML dependencies — uses only NumPy and soundfile
 - Configurable via `SER_BACKEND` env var (enabled when set to `light_mfcc_rf`, `mfcc_rf`, or `lightweight`)
 
@@ -316,7 +370,7 @@ Supports **per-pin active-low/active-high** configuration (via `PIN_BTN_*_ACTIVE
 Two-tier configuration:
 
 - **`config.yaml`**: Audio parameters, STT/TTS model paths, RL hyperparameters (epsilon, alpha, gamma, item_importance), database path, VAD aggressiveness
-- **`.env`**: Runtime secrets and host-specific overrides — Ollama URL, model name + fallback chain, request timeout, Ollama memory controls (`num_ctx`, `num_predict`, `num_gpu`), SER backend selection, TTS pacing (`length_scale`, `sentence_silence`), GPIO pin numbers, and per-pin active-low polarity flags
+- **`.env`**: Runtime secrets and host-specific overrides — LiteRT model path and backend, context length, max tokens, request timeout, SER backend selection, TTS pacing (`length_scale`, `sentence_silence`), GPIO pin numbers, and per-pin active-low polarity flags
 
 ### 12. Session I/O & Logging (`src/utils/io_record.py`)
 
@@ -335,12 +389,9 @@ Central hub for session state and inter-process communication:
 ```
 .
 ├── main.py                    # Application entrypoint (FastAPI + Flask dual-mode)
-├── LLM_therapist_Application.py  # Legacy backward-compatible shim
 ├── config.yaml                # System configuration (audio, RL, models, DB)
-├── Modelfile                  # Ollama Gemma 2B system prompt + inference params
 ├── requirements.txt           # Python dependencies
-├── environment.yml            # Conda environment specification
-├── .env                       # Runtime secrets (Ollama URL, model, GPIO pins)
+├── .env                       # Runtime secrets (LiteRT config, GPIO pins)
 │
 ├── src/                       # Source package (see Module Architecture above)
 │   ├── core/                  # Clinical domain logic
@@ -348,6 +399,10 @@ Central hub for session state and inter-process communication:
 │   ├── services/              # Orchestration services
 │   ├── drivers/               # Hardware & persistence drivers
 │   └── utils/                 # Shared utilities
+│
+├── models/                    # Model weights
+│   ├── litert/                # Gemma 4 E2B LiteRT model (.litertlm)
+│   └── piper/                 # Piper TTS voice model (.onnx)
 │
 ├── data/                      # Runtime data directory
 │   ├── therapist.db           # SQLite database (auto-created)
@@ -365,7 +420,8 @@ Central hub for session state and inter-process communication:
 │   └── eric_test/             # Remote speech client experiments
 │
 ├── scripts/                   # Deployment & management scripts
-│   ├── start_headless.sh      # Launch Ollama + backend (headless mode)
+│   ├── model_fetch.py         # Download Gemma 4 E2B model from HuggingFace
+│   ├── start_headless.sh      # Launch backend (headless mode)
 │   ├── stop_system.sh         # Kill all CaiTI processes
 │   ├── deploy_to_jetson.sh    # rsync code to Jetson device
 │   ├── deploy_and_run.sh      # Deploy + start + tail logs (one command)
@@ -373,9 +429,7 @@ Central hub for session state and inter-process communication:
 │   ├── find_pins.py           # GPIO pin discovery helper
 │   └── gpio_probe.py          # GPIO probe/debug tool
 │
-├── start_caiti.sh             # One-command deploy + run (wraps start_headless.sh)
-├── start_headless.sh          # Root-level convenience wrapper for scripts/start_headless.sh
-├── stop_system.sh             # Root-level convenience wrapper for scripts/stop_system.sh
+├── start_caiti.sh             # One-command deploy + run (sanitize, sync, launch)
 └── readme.md                  # This file
 ```
 
@@ -455,8 +509,9 @@ IDLE ──[wake-word / GPIO Button 1 / API /login]──> ONBOARDING
 ### Prerequisites
 
 * **Hardware**: NVIDIA Jetson (Orin series) or Linux PC with Mic/Speaker
-* **Software**: Python 3.10+, `portaudio19-dev`, Ollama
-* **Models**: Gemma 2B (or configured LLM), Piper TTS model, Whisper base.en
+* **Software**: Python 3.10+, `portaudio19-dev`
+* **Models**: Gemma 4 E2B LiteRT (auto-downloaded via `scripts/model_fetch.py`), Piper TTS model, Whisper base.en
+* **Python Packages**: `litert-lm-api` (LLM inference), `faster-whisper` (STT), `piper-tts` (TTS)
 
 ### Local Installation
 
@@ -468,6 +523,9 @@ sudo apt-get install portaudio19-dev python3-venv
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Download the Gemma 4 E2B LiteRT model (~2.6 GB)
+python scripts/model_fetch.py
 ```
 
 ### Configuration
@@ -475,16 +533,12 @@ pip install -r requirements.txt
 **`.env`** — Runtime configuration:
 ```bash
 JETSON_HOST="user@192.168.x.x"
-OLLAMA_BASE_URL="http://localhost:11434"
-LLM_MODEL="llama3.2:3b"
-LLM_FALLBACK_MODELS="gemma:2b"           # Comma-separated fallback model chain
+LLM_MODEL="gemma-4-E2B-it"
+LITERT_MODEL_PATH="./models/litert/gemma-4-E2B-it.litertlm"
+LITERT_BACKEND="cpu"                      # cpu (XNNPack) — gpu (ML Drift) support upcoming
+LITERT_CONTEXT_LENGTH=512                 # Context window (512 = safe for 8GB Jetson)
+LITERT_MAX_TOKENS=80                      # Max tokens to generate per turn
 LLM_REQUEST_TIMEOUT_SECONDS=90
-OPENAI_TEMPERATURE=0.7
-OPENAI_MAX_TOKENS=400
-OLLAMA_KEEP_ALIVE=0
-OLLAMA_NUM_CTX=256                        # Context window (256 = safe for 8GB Jetson; raise once stable)
-OLLAMA_NUM_PREDICT=256                    # Max tokens to predict (capped to num_ctx)
-OLLAMA_NUM_GPU=1                          # GPU layers (1 = GPU; 0 = CPU-only, causes 7-min inference)
 SER_BACKEND="light_mfcc_rf"              # SER engine: light_mfcc_rf | disabled
 DISABLE_CONTEXT_HISTORY=0                # Set to 1 to strip context from LLM (diagnostic mode)
 DISABLE_INTERNAL_SPEECH=0                # Set to 1 for API-only mode (no mic/speaker)
@@ -497,10 +551,6 @@ PIN_BTN_4=16
 PIN_LISTENING_LED=18
 PIN_LISTENING_LED_ACTIVE_LOW=0
 PIN_BUTTONS_ACTIVE_LOW=1
-PIN_BTN_START_ACTIVE_LOW=0
-PIN_BTN_END_ACTIVE_LOW=0
-PIN_BTN_OPT_OUT_ACTIVE_LOW=1
-PIN_BTN_4_ACTIVE_LOW=1
 ```
 
 **`config.yaml`** — System parameters:
@@ -516,32 +566,39 @@ rl:
   item_n_states: 38        # Number of clinical dimensions
 ```
 
-**`Modelfile`** — Ollama model configuration with system prompt optimized for 8GB Jetson (2048 context, 250 max predict, temperature 0.7).
-
 ---
 
 ## Managing the System
 
 | Command | Action | Description |
 |---------|--------|-------------|
-| `./start_caiti.sh` | **Deploy + Start** | One-command remote deployment: aggressive process sanitization (kills all project-associated Python, Ollama, llama-runner, ggml processes), dependency drift cleanup (auto-removes blocklisted packages like `openai-whisper`, `torch`, `mlc-ai-nightly`), filesystem cache drop, code sync via rsync, Piper voice repair, model provisioning, and launch |
-| `./scripts/start_headless.sh` | **Start (local)** | Unlocks GPIO pinmux, aggressive sanitization (same 5-phase cleanup), starts Ollama, launches backend |
-| `./stop_system.sh` | **Stop (local)** | Root-level convenience wrapper for `scripts/stop_system.sh` |
+| `./start_caiti.sh` | **Deploy + Start** | One-command remote deployment: process sanitization, dependency drift cleanup (auto-removes blocklisted packages), auto-installs `litert-lm-api`, filesystem cache drop, code + model sync via rsync, Piper voice repair, LiteRT model check, and launch |
+| `./scripts/start_headless.sh` | **Start (local)** | Unlocks GPIO pinmux, process sanitization, auto-installs `litert-lm-api`, LiteRT model auto-download, launches backend |
 | `./scripts/stop_system.sh` | **Stop** | Kills all CaiTI processes and frees ports |
-| `./scripts/deploy_to_jetson.sh` | **Deploy** | Syncs codebase, installs deps, downloads Piper model on Jetson |
+| `./scripts/deploy_to_jetson.sh` | **Deploy** | Syncs codebase to Jetson device |
 | `./scripts/deploy_and_run.sh` | **Deploy + Run** | Syncs code to Jetson, starts services, tails live logs |
+| `python scripts/model_fetch.py` | **Model Download** | Downloads Gemma 4 E2B LiteRT model from HuggingFace |
 | `tail -f backend_session.log` | **Monitor** | View real-time AI reasoning and transcriptions |
 
 ### Startup Checklist
 
 On boot, `main.py` runs a connectivity audit checking:
 - GPIO availability and pin configuration
-- Ollama connection, model availability, and keep-alive policy
-- Faster-Whisper model configuration
+- LiteRT model file existence and size (expects ~2.5 GB `.litertlm` file)
+- Faster-Whisper STT model configuration
 - Piper TTS model file existence
 - SQLite database connectivity
 
 After all subsystems initialize, a **Ghost Hunt** scans for child processes consuming >50MB RSS and logs warnings (`[GHOST HUNT]`). **RSS Audit** checkpoints log process memory at key lifecycle points (before startup, after init, after SpeechService load, after thread start) to pinpoint memory culprits.
+
+### Auto-Install Safety Net
+
+Both `start_headless.sh` and `start_caiti.sh` auto-install missing dependencies before launch:
+- `psutil` — process/memory monitoring
+- `litert-lm-api` — Gemma 4 LLM inference engine
+- `huggingface-hub` — model download from HuggingFace
+
+If the LiteRT model file is missing, `scripts/model_fetch.py` runs automatically to download it (~2.6 GB).
 
 ---
 
@@ -552,7 +609,7 @@ After all subsystems initialize, a **Ghost Hunt** scans for child processes cons
 | STT | Faster-Whisper (base.en) | Local speech-to-text transcription |
 | SER | Lightweight MFCC-RF (NumPy + soundfile) | Low-memory vocal emotion recognition |
 | TTS | Piper (en_US-amy-medium) | Neural text-to-speech with therapeutic pacing |
-| LLM | Gemma 2B / LLaMA 3.2 via Ollama | Clinical dialogue, classification, CBT reasoning |
+| LLM | Gemma 4 E2B via `litert-lm-api` | In-process clinical dialogue and classification |
 | VAD | WebRTC-VAD | Voice activity detection for recording triggers |
 | RL | Q-Learning (Pandas DataFrames) | Clinical dimension selection policy |
 | Screening | PHQ-4 / GAD-2 | Standardized anxiety/depression screening |

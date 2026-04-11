@@ -101,10 +101,19 @@ class HandlerRL:
         try:
             greeting_raw = "Hello, I'm CaiTI."
             user_ctx = io_rec.get_user_context()
+            user_name = str(getattr(io_rec, "SUBJECT_ID", "User") or "User")
+            identity_guard = (
+                "Identity Rules:\n"
+                "- AI_NAME: CaiTI\n"
+                f"- USER_NAME: {user_name}\n"
+                "- You are CaiTI. The user is USER_NAME.\n"
+                "- Never confuse the two identities.\n"
+            )
             
             if user_ctx:
                 rewrite_system_prompt = (
                     "You are a warm, concise, and professional therapist-assistant.\n\n"
+                    f"{identity_guard}\n"
                     "Task: Generate a welcoming opening greeting for a returning user. Transition into starting a new session.\n"
                     f"Here is the context from their previous sessions:\n{user_ctx}\n\n"
                     "Rules:\n"
@@ -116,6 +125,7 @@ class HandlerRL:
             else:
                 rewrite_system_prompt = (
                     "You are a warm, concise, and professional therapist-assistant.\n\n"
+                    f"{identity_guard}\n"
                     "Task: Generate a welcoming opening greeting for a user. Transition into starting the first session.\n"
                     "Rules:\n"
                     "- 1–2 short sentences.\n- Friendly, non-judgmental tone.\n"

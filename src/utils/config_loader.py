@@ -49,41 +49,17 @@ GAMMA = float(RL["gamma"])
 ITEM_IMPORTANCE = RL["item_importance"]
 NUMBER_QUESTIONS = RL["number_questions"]
 
-_ollama_base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-# Ensure the openai-compat path ends with /v1
-OPENAI_BASE_URL = _ollama_base.rstrip("/") + "/v1"
-# LLM configuration (replaces OPENAI_MODEL)
-LLM_MODEL = os.environ.get("LLM_MODEL", "gemma:2b")
-LLM_FALLBACK_MODELS = [
-    m.strip()
-    for m in os.environ.get("LLM_FALLBACK_MODELS", "").split(",")
-    if m.strip()
-]
+# LLM configuration — Gemma 4 E2B via LiteRT-LM (in-process inference)
+LLM_MODEL = os.environ.get("LLM_MODEL", "gemma-4-E2B-it")
+LITERT_MODEL_PATH = os.environ.get(
+    "LITERT_MODEL_PATH", "./models/litert/gemma-4-E2B-it.litertlm"
+)
+LITERT_BACKEND = os.environ.get("LITERT_BACKEND", "cpu").strip().lower()
+LITERT_CONTEXT_LENGTH = int(os.environ.get("LITERT_CONTEXT_LENGTH", "512"))
+LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "80"))
 
-# If using openai package to query ollama directly, we can define tokens here:
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
-OPENAI_MAX_TOKENS = int(os.environ.get("OPENAI_MAX_TOKENS", "400"))
 LLM_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "90"))
-# Test-mode toggle: when enabled, llm_client requests stream=True and logs
-# token chunks in real time while still returning the final aggregated string.
-LLM_LOG_STREAMING = os.environ.get(
-    "LLM_LOG_STREAMING", "0"
-).strip().lower() in {"1", "true", "yes", "on"}
-
-# Ollama per-request safety controls to reduce Jetson memory pressure.
-# num_ctx=256: Aggressive cap to fit the KV cache handshake into fragmented
-# VRAM.  The 3B model's cudaMalloc was requesting ~1918 MiB at num_ctx=512,
-# exceeding available contiguous memory.  256 halves the KV cache further
-# and should bring the request down to ~1200 MiB.  Override with env var
-# once memory headroom is confirmed.
-OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "256"))
-OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", str(OPENAI_MAX_TOKENS)))
-# Default to full GPU offload (num_gpu=99 = all layers).  CPU-only (num_gpu=0)
-# causes 7-minute inference on Jetson and should only be used as a deliberate
-# override for devices with no GPU.
-OLLAMA_NUM_GPU = int(os.environ.get("OLLAMA_NUM_GPU", "99"))
-
-OLLAMA_KEEP_ALIVE = int(os.environ.get("OLLAMA_KEEP_ALIVE", "0"))
 
 # Zero-History diagnostic toggle: when enabled, conversation context and user
 # history are stripped from LLM prompts.  If the crash still occurs on turn 1,

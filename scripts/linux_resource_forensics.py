@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect Linux/Ollama forensic evidence for memory crashes and process duplication."""
+"""Collect Linux forensic evidence for memory crashes and process duplication."""
 
 from __future__ import annotations
 
@@ -23,11 +23,8 @@ def _collect_command_block() -> Dict[str, Dict[str, object]]:
     commands = {
         "free_h": ["free", "-h"],
         "top_rss_processes": ["sh", "-lc", "ps -eo pid,ppid,pmem,rss,comm,args --sort=-rss | head -n 30"],
-        "tracked_processes": ["sh", "-lc", "pgrep -af 'ollama|python|piper|uvicorn|main.py' || true"],
-        "ollama_ps": ["ollama", "ps"],
-        "ollama_list": ["ollama", "list"],
+        "tracked_processes": ["sh", "-lc", "pgrep -af 'python|piper|uvicorn|main.py' || true"],
         "journal_kernel": ["journalctl", "-k", "--no-pager", "-n", "500"],
-        "journal_ollama": ["journalctl", "--no-pager", "-n", "500", "-u", "ollama"],
         "dmesg_tail": ["dmesg", "-T"],
     }
     out: Dict[str, Dict[str, object]] = {}
@@ -64,7 +61,7 @@ def _oom_evidence(text: str) -> List[str]:
 
 
 def _count_keyword_processes(process_block: str) -> Dict[str, int]:
-    counts = {"ollama": 0, "python": 0, "piper": 0, "uvicorn": 0}
+    counts = {"python": 0, "piper": 0, "uvicorn": 0}
     if not process_block:
         return counts
     for line in process_block.splitlines():
@@ -107,7 +104,6 @@ def _compose_resource_map(
     resource_report: Dict[str, object],
     process_counts: Dict[str, int],
     kernel_oom_hits: List[str],
-    ollama_oom_hits: List[str],
 ) -> Dict[str, str]:
     resource_map_data = resource_report.get("resource_map", {}) if isinstance(resource_report, dict) else {}
     if not isinstance(resource_map_data, dict):
@@ -123,16 +119,14 @@ def _compose_resource_map(
     dep_risk_count = len(dep_risks) if isinstance(dep_risks, list) else 0
 
     culprit = "Memory pressure appears mixed and requires staged isolation runs."
-    if kernel_oom_hits or ollama_oom_hits:
-        culprit = "Kernel/Ollama OOM evidence indicates runtime memory exhaustion during model handshake/load."
-    elif process_counts.get("ollama", 0) > 1:
-        culprit = "Multiple Ollama-related processes suggest runner duplication and possible ghost memory retention."
+    if kernel_oom_hits:
+        culprit = "Kernel OOM evidence indicates runtime memory exhaustion during model load."
     elif top_dynamic.lower().startswith("llm") or "llm" in top_dynamic.lower():
-        culprit = "LLM handshake/context expansion is the highest dynamic spike region."
+        culprit = "LLM inference/context expansion is the highest dynamic spike region."
     elif top_static != "unknown":
         culprit = f"Static model load concentration in {top_static}."
 
-    recommendation = "Cap OLLAMA_NUM_CTX to 512, keep f16_kv disabled, and enforce single ollama serve process."
+    recommendation = "Cap LITERT_CONTEXT_LENGTH to 512, keep f16_kv disabled, and monitor in-process LLM memory."
     if dep_risk_count > 10:
         recommendation += " Also trim unused high-memory dependencies from the runtime environment."
 
@@ -152,7 +146,7 @@ def _print_resource_map(resource_map: Dict[str, str]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Linux/Ollama forensic collector")
+    parser = argparse.ArgumentParser(description="Linux forensic collector")
     parser.add_argument(
         "--resource-report",
         default="data/logs/resource_map_latest.json",
@@ -175,10 +169,8 @@ def main() -> int:
     kernel_text = str(command_data.get("journal_kernel", {}).get("stdout", "")) + "\n" + str(
         command_data.get("dmesg_tail", {}).get("stdout", "")
     )
-    ollama_text = str(command_data.get("journal_ollama", {}).get("stdout", ""))
 
     kernel_hits = _oom_evidence(kernel_text)
-    ollama_hits = _oom_evidence(ollama_text)
     process_counts = _count_keyword_processes(str(command_data.get("tracked_processes", {}).get("stdout", "")))
     baseline_line = _parse_baseline_ram(str(command_data.get("free_h", {}).get("stdout", "")))
 
@@ -191,14 +183,12 @@ def main() -> int:
         resource_report,
         process_counts,
         kernel_hits,
-        ollama_hits,
     )
 
     final_report = {
         "resource_map": resource_map,
         "process_counts": process_counts,
         "kernel_oom_hits": kernel_hits[:100],
-        "ollama_oom_hits": ollama_hits[:100],
         "commands": command_data,
     }
 
@@ -212,7 +202,6 @@ def main() -> int:
     print("=== Linux Resource Forensics ===")
     print(f"Report written: {args.output}")
     print(f"Kernel/OOM hits: {len(kernel_hits)}")
-    print(f"Ollama/OOM hits: {len(ollama_hits)}")
     print(f"Process counts: {process_counts}")
     _print_resource_map(resource_map)
     return 0

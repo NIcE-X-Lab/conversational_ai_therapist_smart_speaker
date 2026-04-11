@@ -7,7 +7,6 @@ import queue
 import json
 import pandas as pd
 import uuid
-import requests
 from flask import Flask, request as flask_request, jsonify
 from flask_cors import CORS
 
@@ -22,10 +21,9 @@ from src.utils.log_util import get_logger
 from src.utils.resource_audit import get_resource_audit
 from src.utils import io_record
 from src.utils.config_loader import (
-    SUBJECT_ID, RECORD_CSV, OPENAI_BASE_URL, LLM_MODEL,
+    SUBJECT_ID, RECORD_CSV, LLM_MODEL, LITERT_MODEL_PATH,
     DB_PATH, STT_MODEL_PATH, TTS_MODEL_PATH,
     PIN_BTN_START, PIN_BTN_END, PIN_BTN_OPT_OUT, PIN_LISTENING_LED,
-    OLLAMA_KEEP_ALIVE
 )
 
 # ── Memory autopsy helper ───────────────────────────────────────────────
@@ -54,8 +52,8 @@ def _log_process_rss(label: str):
 def _ghost_hunt(rss_threshold_mb: float = 50.0):
     """Identify child processes consuming > rss_threshold_mb and log them.
 
-    This helps detect zombie Ollama runners, leaked model-loading forks,
-    or any non-essential process eating into the Jetson's 8GB budget.
+    This helps detect leaked model-loading forks or any non-essential
+    process eating into the Jetson's 8GB budget.
     """
     try:
         import psutil
@@ -112,19 +110,18 @@ def _startup_checklist():
     except Exception as e:
         lines.append(f"[!] GPIO FAILED: {e}")
 
-    # 2. Ollama / LLM
-    try:
-        base = OPENAI_BASE_URL.replace("/v1", "")
-        resp = requests.get(f"{base}/api/tags", timeout=3)
-        available = [m["name"] for m in resp.json().get("models", [])]
-        model_found = any(LLM_MODEL in m for m in available)
-        lines.append(
-            f"[{'x' if model_found else '!'}] Ollama Connected ({LLM_MODEL})"
-            + ("" if model_found else f" ⚠ model not pulled yet, available: {available}")
-        )
-        lines.append(f"[x] Ollama Keep Alive configured ({OLLAMA_KEEP_ALIVE})")
-    except Exception as e:
-        lines.append(f"[!] Ollama UNREACHABLE: {e}")
+    # 2. LiteRT-LM Model
+    litert_ok = os.path.isfile(LITERT_MODEL_PATH)
+    lines.append(
+        f"[{'x' if litert_ok else '!'}] LiteRT Model "
+        f"{'found' if litert_ok else 'NOT FOUND'} ({LITERT_MODEL_PATH})"
+    )
+    if litert_ok:
+        try:
+            size_mb = os.path.getsize(LITERT_MODEL_PATH) / (1024 * 1024)
+            lines.append(f"[x] LiteRT Model Size: {size_mb:.0f}MB ({LLM_MODEL})")
+        except OSError:
+            pass
 
     # 3. STT / TTS
     try:

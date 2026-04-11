@@ -1,12 +1,22 @@
 import subprocess
 import time
 from src.utils.log_util import get_logger
+from src.drivers.audio import set_ai_speaking
 
 logger = get_logger("AudioPlayer")
 
 class AudioPlayer:
-    def __init__(self):
+    def __init__(self, playback_signal_handler=None):
         self.process = None
+        self.playback_signal_handler = playback_signal_handler
+
+    def _emit_playback_signal(self, signal: str):
+        if not self.playback_signal_handler:
+            return
+        try:
+            self.playback_signal_handler(signal)
+        except Exception as e:
+            logger.debug(f"Playback signal handler failed ({signal}): {e}")
 
     def _get_device_string(self):
         """
@@ -33,7 +43,7 @@ class AudioPlayer:
         logger.warning("No USB Audio Device found. Using default.")
         return "default"
 
-    def play(self, filename, stop_event=None):
+    def play(self, filename, stop_event=None, duck=True):
         """
         Play a WAV file using aplay.
         If stop_event is provided, we monitor it to terminate the process.
@@ -44,6 +54,10 @@ class AudioPlayer:
         logger.info(f"Playing {filename} on {device}...")
         
         try:
+            if duck:
+                set_ai_speaking(True)
+                self._emit_playback_signal("DUCK")
+
             self.process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
             # Monitor loop
@@ -61,6 +75,9 @@ class AudioPlayer:
             logger.error(f"Playback error: {e}")
         finally:
             self.process = None
+            if duck:
+                self._emit_playback_signal("RESTORE")
+                set_ai_speaking(False)
 
     def stop_playback(self):
         """Signal the current playback to stop."""

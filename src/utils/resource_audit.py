@@ -324,7 +324,7 @@ class ResourceAudit:
             "process_pid": os.getpid(),
             "python_threads": threading.active_count(),
             "child_processes": 0,
-            "keyword_counts": {"ollama": 0, "python": 0, "piper": 0, "ffmpeg": 0},
+            "keyword_counts": {"python": 0, "piper": 0, "ffmpeg": 0},
         }
 
         if self._process is not None:
@@ -434,7 +434,7 @@ class ResourceAudit:
         if utilization >= self.context_warn_ratio:
             logger.warning(
                 "[CONTEXT_BLOAT] Prompt utilization %.1f%% exceeds warning threshold %.1f%%. "
-                "Consider reducing context pack size or lowering OLLAMA_NUM_CTX.",
+                "Consider reducing context pack size or lowering LITERT_CONTEXT_LENGTH.",
                 utilization * 100.0,
                 self.context_warn_ratio * 100.0,
             )
@@ -470,9 +470,9 @@ class ResourceAudit:
         prompt_util = float(top_prompt.get("ctx_utilization", 0.0))
 
         if "llm" in top_dynamic_zone.lower() and prompt_util >= self.context_warn_ratio:
-            culprit = "Context-window growth and KV cache pressure in the LLM handshake layer."
+            culprit = "Context-window growth and KV cache pressure in the LLM inference layer."
             recommendation = (
-                "Cap OLLAMA_NUM_CTX at 512, prune context-pack fields per turn, "
+                "Cap LITERT_CONTEXT_LENGTH at 512, prune context-pack fields per turn, "
                 "and keep f16_kv disabled on constrained devices."
             )
         elif "stt" in top_static_module.lower() or "whisper" in top_static_module.lower():
@@ -481,12 +481,7 @@ class ResourceAudit:
                 "Keep Faster-Whisper at int8/base.en or smaller and avoid loading extra SER backends in parallel."
             )
         elif self._process_records:
-            last_proc = self._process_records[-1]
-            counts = last_proc.get("keyword_counts", {})
-            ollama_count = int(counts.get("ollama", 0)) if isinstance(counts, dict) else 0
-            if ollama_count > 1:
-                culprit = "Potential duplicate Ollama runners/processes increasing memory pressure."
-                recommendation = "Ensure a single ollama serve instance and enforce keep_alive=0 between turns."
+            pass  # No external server process to monitor with LiteRT in-process inference
 
         resource_map = {
             "baseline_ram_gb": round(baseline_mb / 1024.0, 3),

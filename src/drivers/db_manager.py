@@ -91,15 +91,28 @@ class DBManager:
 
         # Clinical Screening table (PHQ-4 / GAD-2 sub-scores)
         c.execute('''CREATE TABLE IF NOT EXISTS clinical_screening
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      session_id INTEGER,
-                      anxiety_score INTEGER,     -- GAD-2 sub-total (0-6)
-                      depression_score INTEGER,  -- PHQ-2 sub-total (0-6)
-                      phq4_total INTEGER,        -- composite (0-12)
-                      gad2_positive INTEGER DEFAULT 0,
-                      phq4_high_risk INTEGER DEFAULT 0,
-                      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                      FOREIGN KEY(session_id) REFERENCES sessions(id))''')
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  session_id INTEGER,
+                  anxiety_score INTEGER,     -- GAD-2 sub-total (0-6)
+                  depression_score INTEGER,  -- PHQ-2 sub-total (0-6)
+                  phq4_total INTEGER,        -- composite (0-12)
+                  gad2_positive INTEGER DEFAULT 0,
+                  phq4_high_risk INTEGER DEFAULT 0,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY(session_id) REFERENCES sessions(id))''')
+
+        # Intermission Screening status table (per PHQ question in waiting ladder)
+        c.execute('''CREATE TABLE IF NOT EXISTS intermission_screening
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  session_id INTEGER,
+                  question_id TEXT,
+                  status TEXT,               -- ANSWERED or SKIPPED
+                  score INTEGER,
+                  response_text TEXT,
+                  reason TEXT,
+                  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  UNIQUE(session_id, question_id),
+                  FOREIGN KEY(session_id) REFERENCES sessions(id))''')
 
         conn.commit()
         conn.close()
@@ -286,3 +299,62 @@ class DBManager:
                 "phq4_high_risk": bool(row[4])
             }
         return None
+
+    def upsert_intermission_screening_status(
+        self,
+        session_id: int,
+        question_id: str,
+        status: str,
+        score: int | None = None,
+        response_text: str | None = None,
+        reason: str | None = None,
+    ):
+        """Create or update per-question intermission screening status."""
+        norm_status = str(status or "").upper().strip()
+        if norm_status not in {"ANSWERED", "SKIPPED"}:
+            raise ValueError(f"Invalid intermission status: {status}")
+
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
+        c = conn.cursor()
+        c.execute(
+            """INSERT INTO intermission_screening
+               (session_id, question_id, status, score, response_text, reason, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(session_id, question_id) DO UPDATE SET
+                   status=excluded.status,
+                   score=excluded.score,
+                   response_text=excluded.response_text,
+                   reason=excluded.reason,
+                   updated_at=CURRENT_TIMESTAMP""",
+            (
+                session_id,
+                question_id,
+                norm_status,
+                score,
+                response_text,
+                reason,
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_intermission_screening_statuses(self, session_id: int):
+        """Return the latest intermission status for each screening question."""
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
+        c = conn.cursor()
+        c.execute(
+            """SELECT question_id, status, score, response_text, reason
+               FROM intermission_screening WHERE session_id=?""",
+            (session_id,),
+        )
+        rows = c.fetchall()
+        conn.close()
+        result = {}
+        for qid, status, score, response_text, reason in rows:
+            result[qid] = {
+                "status": status,
+                "score": score,
+                "response_text": response_text,
+                "reason": reason,
+            }
+        return result

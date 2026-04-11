@@ -9,13 +9,16 @@ coloredlogs>=15.0
 requests>=2.31.0
 psutil>=5.9.0
 
-# Cognition / LLM — uses Ollama native /api/chat via requests (no openai SDK needed)
+# LLM — Gemma 4 E2B via LiteRT-LM (in-process inference, no external server)
+litert-lm-api
+huggingface-hub
 
 # Speech / Models — CRITICAL: pin versions to prevent CUDA dependency drift
 # faster-whisper pulls ctranslate2 which bundles its own CUDA bindings.
 # Do NOT install openai-whisper (it pulls full PyTorch ~2GB, OOM on Jetson).
 faster-whisper>=1.0.0,<2.0.0
 piper-tts
+pygame>=2.5.0
 
 # API / Backend
 fastapi>=0.104.0

@@ -47,6 +47,15 @@ SSH_OPTS="-o ConnectTimeout=10"
 echo "[INFO] Target Jetson: $JETSON_HOST_VALUE"
 echo "[INFO] Remote project path: $REMOTE_PROJECT_DIR"
 
+# ── Local model download (if needed) ─────────────────────────────────────
+LITERT_MODEL_DIR="models/litert"
+if [[ ! -f "$LITERT_MODEL_DIR/.download_complete" ]]; then
+  echo "[INFO] LiteRT model not found locally. Downloading..."
+  python3 scripts/model_fetch.py
+else
+  echo "[OK] LiteRT model present locally."
+fi
+
 echo "[Stage 2/4] Remote sanitization and code synchronization"
 SSH_READY=0
 for attempt in $(seq 1 24); do
@@ -77,17 +86,8 @@ ssh $SSH_OPTS "$JETSON_HOST_VALUE" bash -s << 'SANITIZE_EOF'
     fi
   done
 
-  # Phase 2: Kill Ollama server and all llama-runner / ggml workers
-  for proc in ollama llama-runner ggml; do
-    pids=$(pgrep -f "$proc" 2>/dev/null || true)
-    if [ -n "$pids" ]; then
-      echo "  [SANITIZE] Killing $proc processes: $pids"
-      echo "$pids" | xargs kill -9 2>/dev/null || true
-    fi
-  done
-
-  # Phase 3: Release bound ports (API server, Flask)
-  for port in 8000 8001 8080 11434; do
+  # Phase 2: Release bound ports (API server, Flask)
+  for port in 8000 8001 8080; do
     fuser -k "$port/tcp" 2>/dev/null || true
   done
 
@@ -128,7 +128,9 @@ if ! rsync -az --delete -e "ssh $SSH_OPTS" \
   --include='/src/***' \
   --include='/assets/***' \
   --include='/data/libs/***' \
+  --include='/models/litert/***' \
   --include='/models/piper/***' \
+  --include='/scripts/***' \
   --include='/.env' \
   --include='/main.py' \
   --include='/config.yaml' \
@@ -138,14 +140,11 @@ if ! rsync -az --delete -e "ssh $SSH_OPTS" \
   echo "[ERROR] rsync failed. Sync aborted."
   exit 1
 fi
-echo "[OK] Code synchronized"
+echo "[OK] Code and model synchronized"
 
 echo "[Stage 3/4] Remote environment setup"
 
 # ── Build the remote launch script locally, then upload + execute ──────────
-# This avoids the ssh -tt + heredoc problem where the PTY echoes raw script
-# source instead of executing it.  Also sidesteps nested heredoc conflicts
-# (the PY heredoc inside the old REMOTE_SCRIPT heredoc).
 REMOTE_LAUNCH_SCRIPT=$(mktemp "${TMPDIR:-/tmp}/caiti_remote_XXXXXX.sh")
 trap 'rm -f "$REMOTE_LAUNCH_SCRIPT"' EXIT
 
@@ -173,6 +172,7 @@ fi
 
 mkdir -p data/logs
 mkdir -p models/piper
+mkdir -p models/litert
 
 VOICE_BASENAME="en_US-amy-medium"
 VOICE_ONNX="models/piper/${VOICE_BASENAME}.onnx"
@@ -249,8 +249,6 @@ if ! is_valid_voice_pair "$VOICE_ONNX" "$VOICE_JSON"; then
 fi
 
 # ── Dependency drift cleanup (remove known memory-risk packages) ──────────
-# These packages can slip in via transitive deps or manual experiments.
-# Each one either pulls full PyTorch or conflicts with ctranslate2's CUDA.
 BLOCKLIST_PKGS="openai-whisper whisper mlc-ai-nightly torch torchaudio onnxruntime-gpu"
 for pkg in $BLOCKLIST_PKGS; do
   if pip show "$pkg" >/dev/null 2>&1; then
@@ -259,7 +257,7 @@ for pkg in $BLOCKLIST_PKGS; do
   fi
 done
 
-# ── Auto-install audit dependencies ───────────────────────────────────────
+# ── Auto-install dependencies ─────────────────────────────────────────────
 for _dep in psutil setproctitle; do
   if ! python3 -c "import $_dep" 2>/dev/null; then
     echo "[AUTO-INSTALL] Installing missing dependency: $_dep"
@@ -267,62 +265,38 @@ for _dep in psutil setproctitle; do
   fi
 done
 
+# LiteRT-LM inference engine
+if ! python3 -c "import litert_lm" 2>/dev/null; then
+  echo "[AUTO-INSTALL] Installing litert-lm-api..."
+  pip install litert-lm-api || echo "[WARN] Failed to install litert-lm-api"
+fi
+
+# HuggingFace Hub for model downloads
+if ! python3 -c "import huggingface_hub" 2>/dev/null; then
+  echo "[AUTO-INSTALL] Installing huggingface-hub..."
+  pip install --quiet huggingface-hub || echo "[WARN] Failed to install huggingface-hub"
+fi
+
 # ── CUDA / GPU environment ─────────────────────────────────────────────────
 export LD_LIBRARY_PATH="/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export OLLAMA_KEEP_ALIVE=0
-export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
-export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-1}"
 export ALSA_LOG_LEVEL=none
 export PYTHONUNBUFFERED=1
 export CONSOLE_LOG_LEVEL=${CONSOLE_LOG_LEVEL:-INFO}
 
-# ── Model provisioning (GPU-first, non-hanging) ───────────────────────────
-OLLAMA_PULL_TIMEOUT="${OLLAMA_PULL_TIMEOUT:-300}"
-
-if command -v ollama >/dev/null 2>&1 && [[ -n "${LLM_MODEL:-}" ]]; then
-  if [[ "$LLM_MODEL" == *"-cpu" ]]; then
-    BASE_MODEL="${LLM_MODEL%-cpu}"
-    echo "[WARN] CPU model suffix detected ($LLM_MODEL). Stripping to GPU model: $BASE_MODEL"
-    export LLM_MODEL="$BASE_MODEL"
-  fi
-
-  model_exists() {
-    ollama list 2>/dev/null | awk '{print $1}' | grep -q "^${1}$"
-  }
-
-  if model_exists "$LLM_MODEL"; then
-    echo "[OK] Model '$LLM_MODEL' already available."
+# ── LiteRT Model Check ───────────────────────────────────────────────────
+LITERT_MODEL_DIR="models/litert"
+if [[ -f "$LITERT_MODEL_DIR/.download_complete" ]]; then
+  echo "[OK] LiteRT model present."
+else
+  echo "[INFO] LiteRT model not found. Running model_fetch.py..."
+  if python3 scripts/model_fetch.py; then
+    echo "[OK] LiteRT model downloaded."
   else
-    echo "[INFO] Model '$LLM_MODEL' not found. Attempting pull (timeout ${OLLAMA_PULL_TIMEOUT}s)..."
-    if timeout "$OLLAMA_PULL_TIMEOUT" ollama pull "$LLM_MODEL" 2>&1; then
-      echo "[OK] Pulled model: $LLM_MODEL"
-    else
-      echo "[WARN] Pull failed or timed out for '$LLM_MODEL'."
-      BASE_TAG="${LLM_MODEL%%:*}"
-      EXISTING_BASE=$(ollama list 2>/dev/null | awk '{print $1}' \
-        | grep "^${BASE_TAG}:" | head -1 || true)
-      if [[ -n "$EXISTING_BASE" && "$EXISTING_BASE" != "$LLM_MODEL" ]]; then
-        echo "[INFO] Found local base variant: $EXISTING_BASE. Aliasing to $LLM_MODEL..."
-        if ollama copy "$EXISTING_BASE" "$LLM_MODEL" 2>/dev/null; then
-          echo "[OK] Aliased $EXISTING_BASE -> $LLM_MODEL"
-        else
-          echo "[ERROR] Alias via 'ollama copy' failed."
-          echo "[ERROR] Unable to provision model. Run manually: ollama pull $LLM_MODEL"
-          exit 1
-        fi
-      else
-        echo "[ERROR] No local base variant found for '${BASE_TAG}:*'."
-        echo "[ERROR] Unable to provision model. Check network and run: ollama pull $LLM_MODEL"
-        exit 1
-      fi
-    fi
+    echo "[ERROR] Model download failed. Run manually: python3 scripts/model_fetch.py"
+    exit 1
   fi
-
-  MODEL_SIZE=$(ollama list 2>/dev/null | awk -v m="$LLM_MODEL" '$1==m {print $3}' || echo "unknown")
-  echo "[INFO] Model: $LLM_MODEL, Size: ${MODEL_SIZE:-unknown}. GPU execution enforced (num_gpu>=1)."
 fi
 
-echo "[OK] VRAM cleared"
 echo "[OK] CaiTI online"
 
 if command -v stdbuf >/dev/null 2>&1; then
@@ -339,7 +313,5 @@ scp $SSH_OPTS "$REMOTE_LAUNCH_SCRIPT" "$JETSON_HOST_VALUE:$REMOTE_TMP_SCRIPT" >/
 echo "[INFO] Launch script uploaded to $JETSON_HOST_VALUE:$REMOTE_TMP_SCRIPT"
 
 # Execute: non-interactive SSH with the REMOTE_PROJECT_DIR env var set.
-# Use -t (single) for log streaming to terminal; the script itself is a file
-# so there's no heredoc/PTY conflict.
 ssh -t $SSH_OPTS "$JETSON_HOST_VALUE" \
   "REMOTE_PROJECT_DIR='$REMOTE_PROJECT_DIR' bash '$REMOTE_TMP_SCRIPT'; rm -f '$REMOTE_TMP_SCRIPT'"

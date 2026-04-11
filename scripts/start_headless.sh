@@ -27,7 +27,6 @@ if command -v busybox > /dev/null; then
 fi
 
 # Reset run logs to avoid stale errors from previous sessions
-: > ollama.log
 : > backend_session.log
 
 # ── Aggressive process sanitization ──────────────────────────────────────
@@ -42,17 +41,8 @@ for pat in 'LLM_therapist' 'conversational_ai_therapist' 'main\.py' 'speech_serv
     fi
 done
 
-# Kill stale llama-runner / ggml processes (but NOT ollama itself — systemd manages it)
-for proc in llama-runner ggml; do
-    pids=$(pgrep -f "$proc" 2>/dev/null || true)
-    if [ -n "$pids" ]; then
-        echo "  [SANITIZE] Killing $proc: $pids"
-        echo "$pids" | xargs kill -9 2>/dev/null || true
-    fi
-done
-
 # Release bound ports
-for port in 8000 8001 8080 11434; do
+for port in 8000 8001 8080; do
     fuser -k "$port/tcp" 2>/dev/null || true
 done
 
@@ -104,7 +94,7 @@ fi
 source .venv/bin/activate
 echo "Sourcing .env variables..."
 
-# ── Auto-install audit dependencies ───────────────────────────────────────
+# ── Auto-install dependencies ─────────────────────────────────────────────
 for _dep in psutil setproctitle; do
     if ! python3 -c "import $_dep" 2>/dev/null; then
         echo "  [AUTO-INSTALL] Installing missing dependency: $_dep"
@@ -112,86 +102,36 @@ for _dep in psutil setproctitle; do
     fi
 done
 
-# Start Ollama LLM Service (if not already running)
-# Prefer systemd service; fall back to manual start with full path
-OLLAMA_BIN=$(command -v ollama 2>/dev/null || echo "/usr/local/bin/ollama")
-if ! pgrep -x ollama > /dev/null; then
-    # Try systemd first
-    if systemctl is-enabled ollama >/dev/null 2>&1; then
-        echo "Starting Ollama via systemd..."
-        _sudo systemctl start ollama || true
-    else
-        echo "Starting Ollama manually..."
-        nohup "$OLLAMA_BIN" serve > ollama.log 2>&1 &
-        echo "Ollama PID: $!"
-    fi
-    # Wait up to 15s for Ollama to become ready
-    for i in $(seq 1 15); do
-        if curl -s --max-time 1 http://localhost:11434/api/tags > /dev/null 2>&1; then
-            echo "✅ Ollama is ready."
-            break
-        fi
-        echo "Waiting for Ollama... ($i/15)"
-        sleep 1
-    done
+# LiteRT-LM inference engine
+if ! python3 -c "import litert_lm" 2>/dev/null; then
+    echo "  [AUTO-INSTALL] Installing litert-lm-api..."
+    pip install --quiet litert-lm-api || echo "  [WARN] Failed to install litert-lm-api"
+fi
+
+# HuggingFace Hub for model downloads
+if ! python3 -c "import huggingface_hub" 2>/dev/null; then
+    echo "  [AUTO-INSTALL] Installing huggingface-hub..."
+    pip install --quiet huggingface-hub || echo "  [WARN] Failed to install huggingface-hub"
+fi
+
+# ── LiteRT Model Provisioning ────────────────────────────────────────────
+LITERT_MODEL_PATH="${LITERT_MODEL_PATH:-./models/litert/gemma-4-E2B-it.litertlm}"
+LITERT_MODEL_DIR="$(dirname "$LITERT_MODEL_PATH")"
+
+if [ -f "$LITERT_MODEL_DIR/.download_complete" ]; then
+    echo "✅ LiteRT model present at $LITERT_MODEL_DIR"
 else
-    echo "✅ Ollama already running."
-fi
-
-# Ensure configured model exists in Ollama registry
-if [ -z "$LLM_MODEL" ]; then
-    echo "❌ LLM_MODEL is not set. Please set it in .env"
-    exit 1
-fi
-
-# Strip -cpu suffix — always use the base GPU-capable model to avoid 7-min deadlock
-if [[ "$LLM_MODEL" == *"-cpu" ]]; then
-    BASE_MODEL="${LLM_MODEL%-cpu}"
-    echo "⚠️  CPU model suffix detected ($LLM_MODEL). Stripping to GPU model: $BASE_MODEL"
-    export LLM_MODEL="$BASE_MODEL"
-fi
-
-OLLAMA_PULL_TIMEOUT="${OLLAMA_PULL_TIMEOUT:-300}"
-
-# Robust model existence check — exact match on first column.
-model_exists() {
-    "$OLLAMA_BIN" list 2>/dev/null | awk '{print $1}' | grep -q "^${1}$"
-}
-
-if model_exists "$LLM_MODEL"; then
-    echo "✅ Ollama model '$LLM_MODEL' is available (GPU execution enforced)."
-else
-    echo "⚠️  Model '$LLM_MODEL' not found. Attempting pull (timeout ${OLLAMA_PULL_TIMEOUT}s)..."
-    if timeout "$OLLAMA_PULL_TIMEOUT" "$OLLAMA_BIN" pull "$LLM_MODEL" 2>&1; then
-        echo "✅ Pulled model: $LLM_MODEL"
+    echo "⚠️  LiteRT model not found. Running model_fetch.py..."
+    if python3 scripts/model_fetch.py; then
+        echo "✅ LiteRT model downloaded successfully."
     else
-        echo "⚠️  Pull failed/timed out. Checking for local base variant to alias..."
-        BASE_TAG="${LLM_MODEL%%:*}"
-        EXISTING_BASE=$("$OLLAMA_BIN" list 2>/dev/null | awk '{print $1}' \
-            | grep "^${BASE_TAG}:" | head -1 || true)
-
-        if [[ -n "$EXISTING_BASE" && "$EXISTING_BASE" != "$LLM_MODEL" ]]; then
-            echo "   Found: $EXISTING_BASE. Aliasing to $LLM_MODEL..."
-            if "$OLLAMA_BIN" copy "$EXISTING_BASE" "$LLM_MODEL" 2>/dev/null; then
-                echo "✅ Aliased $EXISTING_BASE -> $LLM_MODEL"
-            else
-                echo "❌ Alias failed. Run manually: $OLLAMA_BIN pull $LLM_MODEL"
-                exit 1
-            fi
-        else
-            echo "❌ No local variant of '${BASE_TAG}:*' found."
-            echo "   Run: $OLLAMA_BIN pull $LLM_MODEL"
-            exit 1
-        fi
+        echo "❌ Model download failed. Run manually: python scripts/model_fetch.py"
+        exit 1
     fi
 fi
 
 # CUDA GPU enforcement — ensure Maxwell/Pascal libraries are on the path
 export LD_LIBRARY_PATH="/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-
-# Ollama VRAM isolation: single model, single request, zero sharing
-export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
-export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-1}"
 
 # Start Backend
 echo "Starting Dialogue Engine (Server)..."
@@ -202,4 +142,4 @@ BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"
 
 echo "Headless System Started!"
-echo "Logs: tail -f backend_session.log ollama.log"
+echo "Logs: tail -f backend_session.log"

@@ -8,12 +8,29 @@ data/results
 data/logs
 __pycache__/
 **/__pycache__/
+.pytest_cache
 
 workplan.txt
 workflow.png
 src/tools/
 .cursorignore
+.claude
 
 tests/
 _archive/
 /llm_model/
+
+# Local environment and build artifacts
+.venv/
+.local/
+
+# Runtime-generated artifacts
+default.profraw
+backend_session.log
+data/q_tables/item_qtable_*.csv
+assets/waiting_music.wav
+
+# Local model artifacts (large binaries)
+models/litert/*.litertlm
+models/litert/*.task
+models/litert/.download_complete

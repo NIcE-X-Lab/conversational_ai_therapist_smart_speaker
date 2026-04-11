@@ -26,6 +26,6 @@ PROJECT_DIR="~/project"
 
 # SSH and run the headless system
 echo "Step 2: Starting the system on Jetson ($JETSON_HOST)..."
-ssh -t -t -o StrictHostKeyChecking=no "$JETSON_HOST" "cd $PROJECT_DIR && echo 'Executing scripts/start_headless.sh...' && bash ./scripts/start_headless.sh && echo '' && echo '===================================================' && echo 'System started in background. Tailing live logs...' && echo 'Press [Ctrl+C] to stop tailing and return to local.' && echo '===================================================' && tail -f backend_session.log ollama.log"
+ssh -t -t -o StrictHostKeyChecking=no "$JETSON_HOST" "cd $PROJECT_DIR && echo 'Executing scripts/start_headless.sh...' && bash ./scripts/start_headless.sh && echo '' && echo '===================================================' && echo 'System started in background. Tailing live logs...' && echo 'Press [Ctrl+C] to stop tailing and return to local.' && echo '===================================================' && tail -f backend_session.log"
 
 echo "Done! The system is deployed and running on the Jetson."

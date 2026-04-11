@@ -45,27 +45,6 @@ def clear_inference_cache(reason: str = "") -> None:
         pass
 
 
-def get_current_vram_usage() -> str:
-    """
-    Return a lightweight VRAM proxy string from `ollama ps`.
-    Example row: NAME ID SIZE PROCESSOR CONTEXT UNTIL
-    """
-    try:
-        proc = subprocess.run(
-            ["ollama", "ps"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=4,
-        )
-        lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-        if len(lines) <= 1:
-            return "no model loaded"
-        return lines[1]
-    except Exception as e:
-        return f"unavailable ({e})"
-
-
 def _read_sysfs_gpu() -> str | None:
     """
     Read GPU frequency and utilization directly from sysfs on Jetson.
@@ -127,7 +106,6 @@ def get_system_memory_snapshot() -> str:
     Returns a multi-line string with:
       - System RAM from 'free -h'
       - GPU/VRAM from sysfs (zero-cost), nvidia-smi, or tegrastats
-      - Ollama model footprint from 'ollama ps'
     All sources are best-effort — missing tools are silently skipped.
     """
     parts = []
@@ -188,8 +166,5 @@ def get_system_memory_snapshot() -> str:
             pass
 
     parts.append(gpu_info if gpu_info else "GPU: no sysfs, nvidia-smi, or tegrastats")
-
-    # ── Ollama model footprint ─────────────────────────────────────────
-    parts.append(f"Ollama: {get_current_vram_usage()}")
 
     return " | ".join(parts)
