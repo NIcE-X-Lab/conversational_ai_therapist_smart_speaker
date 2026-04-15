@@ -142,6 +142,13 @@ def init_record(user_id_override: str = None):
     except Exception:
         pass  # llm_client not yet loaded on first import is okay
 
+    # Reset rolling clinical takeaway for the new session
+    try:
+        from src.core.context_manager import get_context_manager
+        get_context_manager().reset()
+    except Exception:
+        pass
+
     if user_id_override:
         logger.info(f"Overriding SUBJECT_ID with {user_id_override}")
         SUBJECT_ID = user_id_override
@@ -189,6 +196,9 @@ def init_record(user_id_override: str = None):
         _LAST_AUTO_RECORD_CSV = RECORD_CSV
     _JSON_LOG_PATH = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.json")
     
+    # Initialize session dossier (structured JSON log)
+    _init_dossier()
+
     # Initialize CSV
     append_to_csv("internal", "system", f"Session initialized. User: {SUBJECT_ID}, DB ID: {SESSION_ID}")
 
@@ -218,10 +228,29 @@ def log_question(text: str, meta_data: dict = None):
         DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "agent", combined, meta_data=meta_data)
         CURRENT_TURN_INDEX += 1
     
-    # Sync to CSV 
+    # Sync to CSV
     append_to_csv("turn", "agent", combined)
     log_json_event("agent_turn", {"text": combined})
-    
+
+    # Feed the rolling clinical takeaway engine
+    try:
+        from src.core.context_manager import get_context_manager
+        get_context_manager().record_turn("agent", combined)
+    except Exception:
+        pass
+
+    # Record to session dossier (pairs last user transcript with this agent reply)
+    if _DOSSIER and not _DOSSIER._closed:
+        _DOSSIER.record_interaction(
+            raw_transcription=_LAST_USER_TRANSCRIPT,
+            llm_response=combined,
+            rl_decision_logic=_LAST_RL_STATE,
+            ser_metrics={
+                "emotion_tag": _LAST_USER_EMOTION,
+                "screening_scores": _LATEST_SCREENING_SCORES,
+            },
+        )
+
     # Clear prefix
     _PENDING_QUESTION_PREFIX = ""
     logger.info(f"Prompted question: {combined}")
@@ -282,6 +311,13 @@ def get_answer() -> Tuple[List, List[str]]:
 
     set_last_user_signal(user_input_text, emotion_str)
 
+    # Feed the rolling clinical takeaway engine
+    try:
+        from src.core.context_manager import get_context_manager
+        get_context_manager().record_turn("user", user_input_text)
+    except Exception:
+        pass
+
     user_input_text = user_input_text.replace(", and", ".").replace("but", ".")
     raw_segments = user_input_text.split(".")
     
@@ -334,6 +370,16 @@ def get_resp_log() -> str:
     append_to_csv("turn", "user", user_response)
     log_json_event("user_turn", {"response": user_response})
 
+    # Feed the rolling clinical takeaway engine
+    try:
+        from src.core.context_manager import get_context_manager
+        # Strip emotion metadata before recording
+        import re as _re
+        _clean = _re.sub(r"\[Detected Emotion:\s*\w+\]", "", user_response).strip()
+        get_context_manager().record_turn("user", _clean or user_response)
+    except Exception:
+        pass
+
     logger.info(f"Received user response: {user_response}")
     return user_response
 
@@ -352,4 +398,103 @@ def dump_session_history_to_terminal() -> None:
     logger.info("=========== SESSION HISTORY END ===========")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  Session Dossier — per-interaction structured JSON log
+# ══════════════════════════════════════════════════════════════════════════════
+
+class SessionDossier:
+    """Accumulates structured per-interaction records and flushes to a single
+    JSON file under ``data/sessions/session_<SUBJECT>_<TIMESTAMP>.json``.
+
+    Each interaction captures:
+      - raw_transcription (user STT text)
+      - llm_response (agent reply)
+      - rl_decision_logic (state, action, q-values snapshot)
+      - ser_metrics (emotion tag, screening scores)
+      - resource_telemetry (memory snapshot, inference timing)
+
+    The dossier is append-only during the session and written atomically on
+    ``save_and_close()``.
+    """
+
+    def __init__(self, subject_id: str, session_id):
+        import datetime
+        self._subject = subject_id
+        self._session_id = session_id
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self._dir = os.path.join(os.path.abspath("."), "data", "sessions")
+        self._path = os.path.join(self._dir, f"session_{subject_id}_{ts}.json")
+        self._interactions: list = []
+        self._meta: dict = {
+            "subject_id": subject_id,
+            "session_id": session_id,
+            "started_at": datetime.datetime.now().isoformat(),
+            "ended_at": None,
+        }
+        self._lock = threading.Lock()
+        self._closed = False
+        logger.info(f"[DOSSIER] Initialized: {self._path}")
+
+    def record_interaction(
+        self,
+        raw_transcription: str = "",
+        llm_response: str = "",
+        rl_decision_logic: dict | None = None,
+        ser_metrics: dict | None = None,
+        resource_telemetry: dict | None = None,
+    ):
+        """Append one interaction record to the in-memory dossier."""
+        if self._closed:
+            return
+        import datetime
+        entry = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "raw_transcription": raw_transcription,
+            "llm_response": llm_response,
+            "rl_decision_logic": rl_decision_logic or {},
+            "ser_metrics": ser_metrics or {},
+            "resource_telemetry": resource_telemetry or {},
+        }
+        with self._lock:
+            self._interactions.append(entry)
+
+    def save_and_close(self):
+        """Flush the accumulated dossier to disk as a single JSON file."""
+        if self._closed:
+            return
+        import datetime
+        self._meta["ended_at"] = datetime.datetime.now().isoformat()
+        self._meta["total_interactions"] = len(self._interactions)
+        payload = {
+            "meta": self._meta,
+            "interactions": self._interactions,
+        }
+        try:
+            os.makedirs(self._dir, exist_ok=True)
+            with open(self._path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, default=str)
+            logger.info(f"[DOSSIER] Saved {len(self._interactions)} interactions to {self._path}")
+        except Exception as e:
+            logger.error(f"[DOSSIER] Failed to save: {e}")
+        finally:
+            self._closed = True
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+
+# Module-level dossier singleton — created per session in init_record()
+_DOSSIER: SessionDossier | None = None
+
+
+def get_dossier() -> SessionDossier | None:
+    return _DOSSIER
+
+
+def _init_dossier():
+    global _DOSSIER
+    if _DOSSIER is not None and not _DOSSIER._closed:
+        _DOSSIER.save_and_close()
+    _DOSSIER = SessionDossier(SUBJECT_ID, SESSION_ID)
 

@@ -132,6 +132,13 @@ def llm_complete(system_content: str, user_content: str, *, inject_context: bool
     elif DISABLE_CONTEXT_HISTORY:
         logger.info("[ZERO-HISTORY] Context injection disabled for diagnostic mode.")
     else:
+        # Prepend rolling clinical takeaway so the Brain always has
+        # up-to-date clinical status regardless of context trimming.
+        try:
+            from src.core.context_manager import get_context_manager
+            system_content = get_context_manager().inject_into_prompt(system_content)
+        except Exception:
+            pass
         try:
             from src.utils.io_record import get_user_context, get_context_pack
             user_ctx = get_user_context()

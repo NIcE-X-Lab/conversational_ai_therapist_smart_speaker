@@ -533,6 +533,8 @@ python scripts/model_fetch.py
 **`.env`** — Runtime configuration:
 ```bash
 JETSON_HOST="user@192.168.x.x"
+LAPTOP_HOST="user@192.168.x.x"          # Laptop SSH host used when running start_jetson_sync.sh on Jetson
+LAPTOP_PROJECT_DIR="/home/user/projects/unc_lab/conversational_ai_therapist_smart_speaker"
 LLM_MODEL="gemma-4-E2B-it"
 LITERT_MODEL_PATH="./models/litert/gemma-4-E2B-it.litertlm"
 LITERT_BACKEND="cpu"                      # cpu (XNNPack) — gpu (ML Drift) support upcoming
@@ -573,6 +575,8 @@ rl:
 | Command | Action | Description |
 |---------|--------|-------------|
 | `./start_caiti.sh` | **Deploy + Start** | One-command remote deployment: process sanitization, dependency drift cleanup (auto-removes blocklisted packages), auto-installs `litert-lm-api`, filesystem cache drop, code + model sync via rsync, Piper voice repair, LiteRT model check, and launch |
+| `./start_jetson_sync.sh` | **Jetson Full Start** | Run directly on Jetson: attempts pull-sync from laptop over SSH/rsync, then performs full `start_caiti`-equivalent sanitization/setup/launch with live logs; if laptop is unavailable it auto-falls back to current local code (`REQUIRE_LAPTOP_SYNC=1` forces sync to be mandatory). Includes single-instance lock to prevent overlapping runs from killing each other (`AGGRESSIVE_PYTHON_NUKE=1` re-enables global python kill) |
+| `./start_jetson sync` | **Jetson Full Start (Shortcut)** | Shortcut wrapper for `./start_jetson_sync.sh` with the same behavior |
 | `./scripts/start_headless.sh` | **Start (local)** | Unlocks GPIO pinmux, process sanitization, auto-installs `litert-lm-api`, LiteRT model auto-download, launches backend |
 | `./scripts/stop_system.sh` | **Stop** | Kills all CaiTI processes and frees ports |
 | `./scripts/deploy_to_jetson.sh` | **Deploy** | Syncs codebase to Jetson device |

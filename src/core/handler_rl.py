@@ -511,12 +511,37 @@ class HandlerRL:
                     "anxiety_scores": anxiety_scores,
                     "depression_scores": depression_scores,
                 })
+                # Mark this and all remaining questions as SKIPPED in
+                # the intermission tracker so the ladder never re-asks.
+                if io_rec.DB and io_rec.SESSION_ID:
+                    for remaining in CLINICAL_SCREENING[i:]:
+                        try:
+                            io_rec.DB.upsert_intermission_screening_status(
+                                session_id=io_rec.SESSION_ID,
+                                question_id=remaining["id"],
+                                status="SKIPPED",
+                                reason="phq4_opt_out",
+                            )
+                        except Exception:
+                            pass
                 break
 
             # Score the response
             score = score_response(clean_resp)
             if score == -1:
                 logger.info(f"[PHQ-4] Refusal detected at question {i+1} ({q['id']}).")
+                # Mark remaining questions as SKIPPED for the intermission ladder
+                if io_rec.DB and io_rec.SESSION_ID:
+                    for remaining in CLINICAL_SCREENING[i:]:
+                        try:
+                            io_rec.DB.upsert_intermission_screening_status(
+                                session_id=io_rec.SESSION_ID,
+                                question_id=remaining["id"],
+                                status="SKIPPED",
+                                reason="phq4_refusal",
+                            )
+                        except Exception:
+                            pass
                 break
 
             logger.info(f"[PHQ-4] {q['id']}: response='{clean_resp}' -> score={score}")
@@ -542,6 +567,20 @@ class HandlerRL:
                     )
                 except Exception as e:
                     logger.warning(f"[PHQ-4] Failed to persist score: {e}")
+
+                # Mark question as ANSWERED in the intermission tracker DB so
+                # the speech-service intermission ladder never re-asks it.
+                try:
+                    io_rec.DB.upsert_intermission_screening_status(
+                        session_id=io_rec.SESSION_ID,
+                        question_id=q["id"],
+                        status="ANSWERED",
+                        score=score,
+                        response_text=clean_resp,
+                        reason="phq4_screening",
+                    )
+                except Exception as e:
+                    logger.warning(f"[PHQ-4] Failed to sync intermission status for {q['id']}: {e}")
 
             io_rec.log_reasoning("phq4_response", {
                 "question_id": q["id"],

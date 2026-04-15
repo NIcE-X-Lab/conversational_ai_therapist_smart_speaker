@@ -1,13 +1,61 @@
-import subprocess
+"""Unified Pygame-based audio player for TTS voice playback.
+
+Uses pygame.mixer.Sound instead of aplay subprocess to avoid ALSA hardware
+lock conflicts.  Both the BackgroundMusicThread (pygame.mixer.music) and this
+player (pygame.mixer.Sound) share the same mixer, allowing voice and music to
+overlap without "Device Busy" errors.
+"""
+
+import os
 import time
+import threading
 from src.utils.log_util import get_logger
 from src.drivers.audio import set_ai_speaking
 
 logger = get_logger("AudioPlayer")
 
+_pygame = None
+_mixer_ready = False
+_mixer_lock = threading.Lock()
+
+
+def _ensure_mixer() -> bool:
+    """Initialise the pygame mixer once (thread-safe).
+
+    The BackgroundMusicThread may have already initialised the mixer —
+    this is safe to call again (pygame.mixer.init is a no-op if already
+    initialised).
+    """
+    global _pygame, _mixer_ready
+    if _mixer_ready:
+        return True
+    with _mixer_lock:
+        if _mixer_ready:
+            return True
+        try:
+            import pygame
+            _pygame = pygame
+            if not pygame.mixer.get_init():
+                # 22050 Hz stereo, 1024-sample buffer: matches BackgroundMusicThread
+                # config so whichever initialises first sets the same parameters.
+                pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
+            _mixer_ready = True
+            logger.info(f"Pygame mixer ready: {pygame.mixer.get_init()}")
+            return True
+        except Exception as e:
+            logger.error(f"Pygame mixer init failed: {e}")
+            return False
+
+
 class AudioPlayer:
+    """Play WAV files through the unified pygame mixer.
+
+    Replaces the old aplay-subprocess approach to eliminate ALSA device
+    contention between music and voice playback.
+    """
+
     def __init__(self, playback_signal_handler=None):
-        self.process = None
+        self._channel = None
         self.playback_signal_handler = playback_signal_handler
 
     def _emit_playback_signal(self, signal: str):
@@ -18,74 +66,63 @@ class AudioPlayer:
         except Exception as e:
             logger.debug(f"Playback signal handler failed ({signal}): {e}")
 
-    def _get_device_string(self):
-        """
-        Find the ALSA device string for the USB Audio device.
-        We invoke 'aplay -l' and parse the output to find card number.
-        Returns 'plughw:<card>,0' or 'default'.
-        """
-        try:
-            result = subprocess.run(['aplay', '-l'], capture_output=True, text=True)
-            for line in result.stdout.split('\n'):
-                # Look for lines like "card 1: UACDemoV10 [UACDemoV1.0], device 0: USB Audio [USB Audio]"
-                if "USB" in line or "UAC" in line or "Jabra" in line:
-                    # Extract card number
-                    parts = line.split(':')
-                    if len(parts) > 1 and "card" in parts[0]:
-                        card_part = parts[0].strip() # "card 1"
-                        card_num = card_part.split(' ')[1]
-                        device_str = f"plughw:{card_num},0"
-                        logger.info(f"Found USB Audio Device: {line.strip()} -> {device_str}")
-                        return device_str
-        except Exception as e:
-            logger.warning(f"Error finding audio device: {e}")
-        
-        logger.warning("No USB Audio Device found. Using default.")
-        return "default"
-
     def play(self, filename, stop_event=None, duck=True):
+        """Play a WAV file through the pygame mixer.
+
+        Blocks until playback finishes or *stop_event* is set.
         """
-        Play a WAV file using aplay.
-        If stop_event is provided, we monitor it to terminate the process.
-        """
-        device = self._get_device_string()
-        cmd = ['aplay', '-D', device, filename]
-        
-        logger.info(f"Playing {filename} on {device}...")
-        
+        if not os.path.isfile(filename):
+            logger.warning(f"Audio file not found: {filename}")
+            return
+
+        if not _ensure_mixer():
+            logger.error("Cannot play — pygame mixer not available.")
+            return
+
+        try:
+            sound = _pygame.mixer.Sound(filename)
+        except Exception as e:
+            logger.error(f"Failed to load sound {filename}: {e}")
+            return
+
+        logger.info(f"Playing {filename} via pygame mixer ({sound.get_length():.1f}s)")
+
         try:
             if duck:
                 set_ai_speaking(True)
                 self._emit_playback_signal("DUCK")
 
-            self.process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            # Monitor loop
-            while self.process.poll() is None:
+            self._channel = sound.play()
+
+            # Poll until playback ends or stop_event fires
+            while self._channel and self._channel.get_busy():
                 if stop_event and stop_event.is_set():
-                    logger.info("Playback interrupted by user.")
-                    self.process.terminate()
+                    logger.info("Playback interrupted by stop_event.")
+                    self._channel.stop()
                     break
-                time.sleep(0.1)
-                
-            self.process.wait()
+                time.sleep(0.05)
+
             logger.info("Playback finished.")
-            
+
         except Exception as e:
             logger.error(f"Playback error: {e}")
         finally:
-            self.process = None
+            self._channel = None
             if duck:
                 self._emit_playback_signal("RESTORE")
                 set_ai_speaking(False)
 
     def stop_playback(self):
         """Signal the current playback to stop."""
-        if self.process:
-            self.process.terminate()
+        if self._channel:
+            try:
+                self._channel.stop()
+            except Exception:
+                pass
 
     def terminate(self):
         self.stop_playback()
+
 
 if __name__ == "__main__":
     player = AudioPlayer()

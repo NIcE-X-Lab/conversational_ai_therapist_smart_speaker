@@ -141,8 +141,16 @@ class GlobalCommandMatcher:
     _END_CANONICAL = (
         "end session",
         "and session",
+        "end the session",
+        "and the session",
+        "and this session",
+        "end dis session",
         "stop session",
+        "stop the session",
         "finish session",
+        "finish the session",
+        "close session",
+        "close the session",
         "goodbye",
         "good bye",
     )
@@ -160,8 +168,10 @@ class GlobalCommandMatcher:
     )
     _END_PATTERNS = (
         re.compile(r"\b(?:end\s+session|stop\s+session|finish\s+session|goodbye)\b", re.IGNORECASE),
-        re.compile(r"\b(?:end|and|stop|finish|goodbye)\b(?:\s+the)?\s+session\b", re.IGNORECASE),
-        re.compile(r"^\s*(?:end|stop|finish)\s*(?:please)?\s*[.!?]*\s*$", re.IGNORECASE),
+        re.compile(r"\b(?:end|and|stop|finish|goodbye)\b(?:\s+(?:the|this|dis|da))?\s+session\b", re.IGNORECASE),
+        re.compile(r"^\s*(?:end|and|stop|finish)\s*(?:the|this|dis|da)?\s*(?:session)?\s*(?:please)?\s*[.!?]*\s*$", re.IGNORECASE),
+        # Aggressive catch-all: any phrase containing an end-word near "session"
+        re.compile(r"(?:end|and|stop|finish|goodbye|close).*session", re.IGNORECASE),
     )
 
     @staticmethod
@@ -184,14 +194,18 @@ class GlobalCommandMatcher:
         if not tokens:
             return False
 
+        # "goodbye" / "bye" alone is sufficient
         if self._token_hit(tokens, ("goodbye", "bye"), self.FUZZY_THRESHOLD):
             return True
 
-        has_session = "session" in tokens or self._token_hit(tokens, ("session",), self.FUZZY_THRESHOLD)
+        # Require "session" (or close fuzzy match) to be present
+        has_session = "session" in tokens or self._token_hit(tokens, ("session",), 0.75)
         if not has_session:
             return False
 
-        has_end_token = self._token_hit(tokens, ("end", "and", "stop", "finish"), self.FUZZY_THRESHOLD)
+        # "end" is commonly mis-heard as "and" — use a lower threshold
+        # for these short words to catch typos / STT errors.
+        has_end_token = self._token_hit(tokens, ("end", "and", "stop", "finish", "close"), 0.75)
         has_start_token = self._token_hit(tokens, ("start", "begin", "hello", "hi"), self.FUZZY_THRESHOLD)
         return has_end_token and not has_start_token
 
@@ -201,7 +215,7 @@ class GlobalCommandMatcher:
             return False
 
         has_start_token = self._token_hit(tokens, ("start", "begin", "hello", "hi"), self.FUZZY_THRESHOLD)
-        has_end_token = self._token_hit(tokens, ("end", "and", "stop", "finish", "goodbye", "bye"), self.FUZZY_THRESHOLD)
+        has_end_token = self._token_hit(tokens, ("end", "and", "stop", "finish", "goodbye", "bye", "close"), self.FUZZY_THRESHOLD)
         has_session_or_name = (
             "session" in tokens
             or "katie" in tokens
@@ -275,6 +289,7 @@ class SpeechInteractionService:
 
         self.manual_input_event = threading.Event()
         self.stop_playback_event = threading.Event()
+        self._consecutive_silence_count = 0
 
         RESOURCE_AUDIT.capture_process_inventory("speech_service_init_complete")
 
@@ -315,11 +330,16 @@ class SpeechInteractionService:
 
         prev_state = self.state
         self.state = "speaking"
-        wav_file = "service_response_temp.wav"
+        wav_file = "active_ai_response.wav"
         if self.tts.generate(text, wav_file):
             self._led_off()
             self.stop_playback_event.clear()
             self.player.play(wav_file, stop_event=self.stop_playback_event)
+        else:
+            # TTS completely failed (Piper + espeak both down).
+            # Bump the music so the user hears *something* rather than silence.
+            logger.error("[TTS FAILURE] Both engines failed. Raising music to cover silence gap.")
+            self.music_service.set_base_volume(0.15)
         self.state = prev_state
 
     def _persist_intermission_status(self, question_id: str, status: str, score=None, response_text="", reason=""):
@@ -400,7 +420,12 @@ class SpeechInteractionService:
             return ""
 
         self.state = "main_process"
-        user_wav = "service_input_temp.wav"
+        user_wav = "active_user_input.wav"
+        rms = self.recorder.compute_rms(audio_frames)
+        if rms < 0.005:
+            logger.info(f"[AUDIO HYGIENE] RMS {rms:.5f} below threshold — skipping disk write.")
+            self.state = "idle"
+            return ""
         self.recorder.save_wav(audio_frames, user_wav)
         text = self.transcribe(user_wav, apply_priority_gate=apply_priority_gate)
 
@@ -452,6 +477,18 @@ class SpeechInteractionService:
         words = clean.split()
         return not all(w in _NOT_A_NAME_WORDS for w in words)
 
+    # Keyword buffer: if the user says any of these during onboarding,
+    # skip the name loop and start the session immediately as "User".
+    _ONBOARD_BYPASS_KEYWORDS = frozenset({
+        "start", "hello", "begin", "ready", "hey", "katie", "let's go",
+        "lets go", "go", "session", "hi",
+    })
+
+    def _is_onboard_bypass(self, text: str) -> bool:
+        """Return True if the transcript is a session-trigger phrase, not a name."""
+        words = set(_normalize_transcript(text).split())
+        return bool(words & self._ONBOARD_BYPASS_KEYWORDS)
+
     def handle_onboarding(self):
         """Triggered by voice or Button 1: Ask for user name and init session."""
         self.state = "onboarding"
@@ -470,7 +507,12 @@ class SpeechInteractionService:
                     self.state = "idle"
                     return
 
-            if not self._is_valid_name(name):
+            # Keyword buffer: if the user said "start", "hello", "ready",
+            # "hey Katie" etc., skip the name loop — start as "User".
+            if self._is_onboard_bypass(name):
+                logger.info(f"[ONBOARD BYPASS] Trigger phrase detected in '{name}'. Starting as 'User'.")
+                name = "User"
+            elif not self._is_valid_name(name):
                 logger.warning(f"[NAME GUARD] Invalid name '{name}' (attempt {attempt}/{max_attempts}).")
                 if attempt < max_attempts:
                     self.say("I'm sorry, I missed that. What was your name again?")
@@ -505,7 +547,16 @@ class SpeechInteractionService:
         self.state = "idle"
 
     def handle_end_session(self):
-        """Triggered by voice or Button 2: Clean, immediate shutdown."""
+        """Triggered by voice or Button 2: Clean, immediate shutdown.
+
+        Exit sequence:
+        1. Signal session end to pipeline
+        2. Generate spoken closing reflection from clinical context
+        3. Speak reflection via Piper TTS
+        4. Save session dossier to disk
+        5. Play goodbye music (or ambient fallback)
+        6. Return to idle state
+        """
         logger.info("Ending session via hardware/voice command.")
         io_record.END_SESSION_EVENT.set()
         io_record.START_SESSION_EVENT.clear()
@@ -514,6 +565,7 @@ class SpeechInteractionService:
         # Stop any ongoing playback instantly
         self.stop_audio()
         self.music_service.stop()
+        self.post_turn_cleanup()
         # Drain stale output so it doesn't replay on next session
         while not self.output_queue.empty():
             try:
@@ -521,8 +573,53 @@ class SpeechInteractionService:
             except queue.Empty:
                 break
         self.input_queue.put("SESSION_END")
+
+        # ── Step 2: Generate closing reflection ──────────────────────
+        reflection = ""
+        try:
+            from src.core.context_manager import get_context_manager
+            reflection = get_context_manager().generate_closing_reflection()
+        except Exception as e:
+            logger.warning(f"[EXIT] Closing reflection generation failed: {e}")
+
+        # ── Step 3: Speak reflection (or fallback goodbye) ──────────
+        if reflection:
+            self.say(reflection)
         self.say("Ending our session now. Goodbye.")
+
+        # ── Step 4: Save session dossier ─────────────────────────────
+        try:
+            dossier = io_record.get_dossier()
+            if dossier:
+                # Record the closing reflection as the final dossier interaction
+                if reflection:
+                    dossier.record_interaction(
+                        llm_response=reflection,
+                        ser_metrics={"event": "closing_reflection"},
+                    )
+                dossier.save_and_close()
+        except Exception as e:
+            logger.warning(f"[EXIT] Dossier save failed: {e}")
+
+        # ── Step 5: Goodbye music → idle ambient bed ─────────────────
+        _GOODBYE_MUSIC = "assets/audio/goodbye_music.mp3"
+        if os.path.isfile(_GOODBYE_MUSIC):
+            self.music_service.start(_GOODBYE_MUSIC)
+        else:
+            self.music_service.set_base_volume(0.15)
+            self.music_service.start(_get_music_path())
+
         self.state = "idle"
+
+    @staticmethod
+    def post_turn_cleanup():
+        """Delete transient .wav files to prevent disk bloat on embedded storage."""
+        for fname in ("active_user_input.wav", "active_ai_response.wav", "wake_temp.wav"):
+            try:
+                if os.path.exists(fname):
+                    os.remove(fname)
+            except OSError as e:
+                logger.debug(f"[AUDIO HYGIENE] Could not remove {fname}: {e}")
 
     def stop_audio(self):
         """Stop any ongoing playback immediately."""
@@ -564,6 +661,11 @@ class SpeechInteractionService:
         llm_done = threading.Event()
         response_text = [None]
         intermission_was_active = False
+        # Listener lock: held True while a screening question has been asked
+        # and we are waiting for the user's answer.  The main loop must NOT
+        # break out (even if llm_done fires) until the listener completes —
+        # otherwise the user's clinical answer is lost mid-sentence.
+        _listener_active = threading.Event()
 
         def _watcher():
             try:
@@ -589,13 +691,24 @@ class SpeechInteractionService:
         )
         intermission_was_active = True
 
+        # Sync ladder state from DB once at entry — merges without
+        # regressing already-answered/skipped questions in memory.
+        self._sync_intermission_state_from_db()
+
         self._music_announced_for_turn = False
         last_heartbeat = time.monotonic()
 
-        while not llm_done.is_set():
+        while not llm_done.is_set() or _listener_active.is_set():
             if io_record.END_SESSION_EVENT.is_set():
                 logger.info("[INTERMISSION] Session ended. Aborting.")
                 break
+
+            # If LLM is done but listener is still active, wait for the
+            # user to finish answering before breaking out.
+            if llm_done.is_set() and _listener_active.is_set():
+                logger.info("[INTERMISSION] LLM ready, but listener lock held. Waiting for user to finish.")
+                time.sleep(0.3)
+                continue
 
             now = time.monotonic()
             if now - last_heartbeat >= _INTERMISSION_HEARTBEAT_SEC:
@@ -610,6 +723,11 @@ class SpeechInteractionService:
             if current_stage == IntermissionStage.SCREENING:
                 question = self.intermission_ladder.next_screening_question()
                 if question is None:
+                    # All screening questions answered/skipped but tracker
+                    # still reports SCREENING — force completion so the
+                    # ladder advances to BREATHING / MUSIC instead of
+                    # spinning here forever (the "ladder deadlock").
+                    logger.info("[INTERMISSION] No unanswered screening questions remain. Advancing ladder.")
                     continue
 
                 self.state = "intermission_screening"
@@ -619,9 +737,14 @@ class SpeechInteractionService:
                 logger.info(f"[INTERMISSION] Screening question: {question.question_id}")
                 self.say(full_prompt)
 
-                # No-interrupt lock: once a PHQ question is asked, complete one
-                # full listen/transcribe/score cycle before yielding back.
-                self._sync_intermission_state_from_db()
+                # ── Listener Lock ON ─────────────────────────────
+                # Prevents the loop from yielding to the LLM response
+                # while we are capturing the user's clinical answer.
+                _listener_active.set()
+
+                # NOTE: DB sync removed here — in-memory tracker is the
+                # authoritative source during a turn.  The old call reset
+                # state mid-cycle, causing gad_1 to repeat every turn.
 
                 try:
                     self.stt.resume_all()
@@ -638,6 +761,9 @@ class SpeechInteractionService:
                 except Exception:
                     pass
 
+                # ── Listener Lock OFF ────────────────────────────
+                _listener_active.clear()
+
                 clean = response.lower().strip()
                 if clean == "__cmd_end__":
                     break
@@ -649,6 +775,7 @@ class SpeechInteractionService:
                     logger.info("[INTERMISSION] No response to screening. Re-prompting.")
                     self.say("I didn't catch that. Could you try again?")
 
+                    _listener_active.set()
                     try:
                         self.stt.resume_all()
                     except Exception:
@@ -661,6 +788,7 @@ class SpeechInteractionService:
                         self.stt.suspend_all()
                     except Exception:
                         pass
+                    _listener_active.clear()
                     clean = response.lower().strip()
                     if clean == "__cmd_end__":
                         break
@@ -749,6 +877,30 @@ class SpeechInteractionService:
                 exercise_text = self.intermission_ladder.next_breathing_exercise()
                 logger.info("[INTERMISSION] Stage 2: breathing exercise.")
                 self.say(exercise_text)
+
+                # Brief listen for opt-out ("no", "skip", "just music")
+                try:
+                    self.stt.resume_all()
+                except Exception:
+                    pass
+                opt_response = self._listen_for_intermission_answer(
+                    timeout=6.0, min_window=3.0,
+                )
+                try:
+                    self.stt.suspend_all()
+                except Exception:
+                    pass
+
+                opt_clean = opt_response.lower().strip()
+                if opt_clean and (_is_opt_out(opt_clean) or opt_clean in ("no", "nah", "nope", "no thanks")):
+                    logger.info("[INTERMISSION] User declined breathing exercise. Switching to music bed.")
+                    self.say("I'll let the music play while I finish my thoughts.")
+                    self.music_service.set_base_volume(0.20)
+                    self.music_service.start(_get_music_path())
+                    self.intermission_ladder.mark_breathing_complete()
+                    llm_done.wait(timeout=120.0)
+                    break
+
                 self.intermission_ladder.mark_breathing_complete()
 
                 if llm_done.wait(timeout=_EXERCISE_HOLD_SEC):
@@ -766,8 +918,12 @@ class SpeechInteractionService:
                 break
 
         watcher.join(timeout=2.0)
-        self.music_service.set_base_volume(0.10)
-        if response_text[0] and not io_record.END_SESSION_EVENT.is_set():
+        self.music_service.set_base_volume(0.15)
+        if io_record.END_SESSION_EVENT.is_set():
+            self.state = "main_process"
+            return
+
+        if response_text[0]:
             logger.info("[INTERMISSION] Complete. Delivering LLM response.")
 
             if intermission_was_active:
@@ -777,6 +933,13 @@ class SpeechInteractionService:
 
             time.sleep(0.5)
             self.say(response_text[0])
+        else:
+            # LLM timed out or produced no response — never leave silence.
+            # Fall back to a breathing exercise so the user stays engaged.
+            logger.warning("[INTERMISSION] LLM produced no response. Delivering therapeutic fallback.")
+            fallback = self.intermission_ladder.next_breathing_exercise()
+            self.say(fallback)
+            self.say("I'm having a little trouble with my thoughts right now. Let me try again shortly.")
 
         self.state = "main_process"
 
@@ -866,7 +1029,15 @@ class SpeechInteractionService:
 
                             user_response = self._listen_with_retry(timeout=15.0, apply_priority_gate=True)
                             if not user_response:
+                                self._consecutive_silence_count += 1
+                                # After 2 consecutive silence rounds, reassure
+                                # the user so the device never feels "broken".
+                                if self._consecutive_silence_count >= 2:
+                                    self.say("I'm still here, just listening to the music with you. Take your time.")
+                                    self._consecutive_silence_count = 0
                                 continue
+
+                            self._consecutive_silence_count = 0
 
                             if user_response == "__CMD_END__":
                                 break
@@ -899,6 +1070,7 @@ class SpeechInteractionService:
                             self.state = "main_process"
                             self._wait_for_output_with_intermission()
 
+                            self.post_turn_cleanup()
                             logger.info(f"[VRAM HANDOFF] Post-intermission: {get_system_memory_snapshot()}")
 
                 except queue.Empty:

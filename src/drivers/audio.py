@@ -18,6 +18,7 @@ logger = get_logger("AudioRecorder")
 
 _ALSA_ERR_HANDLER_REF = None
 _AI_IS_SPEAKING = threading.Event()
+_USER_IS_SPEAKING = threading.Event()
 
 
 def set_ai_speaking(is_speaking: bool):
@@ -32,6 +33,18 @@ def is_ai_speaking() -> bool:
     return _AI_IS_SPEAKING.is_set()
 
 
+def set_user_speaking(is_speaking: bool):
+    """Global flag: duck music while the user is being recorded."""
+    if is_speaking:
+        _USER_IS_SPEAKING.set()
+    else:
+        _USER_IS_SPEAKING.clear()
+
+
+def is_user_speaking() -> bool:
+    return _USER_IS_SPEAKING.is_set()
+
+
 class BackgroundMusicThread:
     """Always-on non-blocking ambient music loop with speaking ducking."""
 
@@ -41,7 +54,7 @@ class BackgroundMusicThread:
     def __init__(
         self,
         track_path: str = "assets/audio/ambient_music.mp3",
-        base_volume: float = 0.10,
+        base_volume: float = 0.15,
         speaking_volume: float = 0.02,
     ):
         self.track_path = track_path
@@ -73,7 +86,9 @@ class BackgroundMusicThread:
             import pygame
             self._pygame = pygame
             if not pygame.mixer.get_init():
-                pygame.mixer.init()
+                # 22050 Hz stereo, 1024-sample buffer: low latency on Jetson
+                # USB audio while supporting both 16kHz WAVs and MP3 music.
+                pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
             self._mixer_ready = True
             return True
         except Exception as e:
@@ -81,7 +96,7 @@ class BackgroundMusicThread:
             return False
 
     def _target_volume(self) -> float:
-        if self._duck_override or is_ai_speaking():
+        if self._duck_override or is_ai_speaking() or is_user_speaking():
             return self.speaking_volume
         return self.base_volume
 
@@ -281,6 +296,7 @@ class AudioRecorder:
                     has_speech = True
                     frames.append(data)
                     speech_chunk_count += 1
+                    set_user_speaking(True)  # duck music while user talks
                     logger.info("Speech detected, recording started.")
                     break
             except IOError as e:
@@ -291,6 +307,7 @@ class AudioRecorder:
             logger.info("No speech detected, stopping recording window.")
             self.stop_stream()
             self._set_vad_state(False)
+            set_user_speaking(False)
             return []
 
         # Phase 2: Record until sustained silence
@@ -342,6 +359,7 @@ class AudioRecorder:
 
         self.stop_stream()
         self._set_vad_state(False)
+        set_user_speaking(False)  # restore music volume
 
         # Phase 4: Reject fragments — if total speech was shorter than
         # min_speech_sec, treat it as noise/false positive.

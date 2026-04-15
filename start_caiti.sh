@@ -95,29 +95,33 @@ ssh $SSH_OPTS "$JETSON_HOST_VALUE" bash -s << 'SANITIZE_EOF'
   sync
   echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
 
-  # Phase 5: Nuclear kill — clear ALL stale python3 processes
-  echo "  [SANITIZE] Phase 5: pkill -9 python3 (clearing all Python)"
-  sudo pkill -9 python3 2>/dev/null || true
-  sudo pkill -9 python  2>/dev/null || true
+  # Phase 5: User-scoped nuclear kill — only kill processes owned by the
+  # deploy user, not system daemons.  Also kill any gemma model processes.
+  DEPLOY_USER="${REMOTE_USER:-arth}"
+  echo "  [SANITIZE] Phase 5: pkill -9 -u $DEPLOY_USER python + gemma"
+  sudo pkill -9 -u "$DEPLOY_USER" python3 2>/dev/null || true
+  sudo pkill -9 -u "$DEPLOY_USER" python  2>/dev/null || true
+  sudo pkill -9 -f gemma 2>/dev/null || true
 
-  sleep 2
+  sleep 3
 
-  # Phase 6: Detect D-state (Uninterruptible Sleep) processes — only a hard reboot can clear these
-  d_state=$(ps aux 2>/dev/null | awk '$8 ~ /^D/ {print $2, $11}' || true)
+  # Phase 6: Detect D-state python processes owned by deploy user
+  d_state=$(ps -u "$DEPLOY_USER" -o pid=,stat=,comm= 2>/dev/null | awk '$2 ~ /^D/ && /python/ {print $1, $3}' || true)
   if [ -n "$d_state" ]; then
-    echo "  [CRITICAL] D-state (Uninterruptible Sleep) processes detected:"
+    echo "  [CRITICAL] D-state python processes owned by $DEPLOY_USER detected (unkillable):"
     echo "$d_state" | while read -r line; do echo "    PID $line"; done
-    echo "  [CRITICAL] These processes CANNOT be killed. A HARD REBOOT of the Jetson is required."
-    echo "  [CRITICAL] Run: sudo reboot"
+    echo "  [CRITICAL] A HARD REBOOT is required: sudo reboot"
+    exit 1
   fi
 
-  # Phase 7: Verify clean state — count surviving python processes
-  remaining=$(pgrep -c python 2>/dev/null || echo 0)
-  if [ "$remaining" -gt 0 ]; then
-    echo "  [WARN] $remaining python processes survived sanitization."
-    echo "  [WARN] They may be D-state or owned by root. Check: ps aux | grep python"
+  # Phase 7: Count surviving user-owned python processes (system daemons excluded)
+  remaining=$(pgrep -u "$DEPLOY_USER" -c python 2>/dev/null || echo 0)
+  if [ "$remaining" -gt 1 ]; then
+    echo "  [WARN] $remaining python processes still owned by $DEPLOY_USER:"
+    pgrep -u "$DEPLOY_USER" -a python 2>/dev/null || true
+    echo "  [WARN] Proceeding — these may be transient."
   else
-    echo "  [SANITIZE] Complete. All python processes cleared."
+    echo "  [SANITIZE] Complete. Clean state for $DEPLOY_USER."
   fi
 SANITIZE_EOF
 echo "[OK] Aggressive sanitization complete"
@@ -135,12 +139,28 @@ if ! rsync -az --delete -e "ssh $SSH_OPTS" \
   --include='/main.py' \
   --include='/config.yaml' \
   --include='/requirements.txt' \
+  --include='/start_caiti.sh' \
+  --include='/start_headless.sh' \
+  --include='/start_jetson_sync.sh' \
+  --include='/start_jetson' \
+  --include='/stop_system.sh' \
   --exclude='*' \
   "$PROJECT_ROOT/" "$JETSON_HOST_VALUE:$REMOTE_PROJECT_DIR/"; then
   echo "[ERROR] rsync failed. Sync aborted."
   exit 1
 fi
 echo "[OK] Code and model synchronized"
+
+# Ensure launchers are executable and discoverable from common Jetson paths.
+ssh $SSH_OPTS "$JETSON_HOST_VALUE" "set -e; \
+  chmod +x '$REMOTE_PROJECT_DIR/start_jetson' '$REMOTE_PROJECT_DIR/start_jetson_sync.sh' '$REMOTE_PROJECT_DIR/start_headless.sh' 2>/dev/null || true; \
+  mkdir -p ~/.local/bin ~/project; \
+  ln -sfn '$REMOTE_PROJECT_DIR/start_jetson' ~/.local/bin/start_jetson; \
+  ln -sfn '$REMOTE_PROJECT_DIR/start_jetson_sync.sh' ~/.local/bin/start_jetson_sync; \
+  ln -sfn '$REMOTE_PROJECT_DIR/start_jetson' ~/project/start_jetson; \
+  ln -sfn '$REMOTE_PROJECT_DIR/start_jetson_sync.sh' ~/project/start_jetson_sync.sh; \
+  grep -q '^export PATH=\$HOME/.local/bin:\$PATH$' ~/.bashrc || echo 'export PATH=\$HOME/.local/bin:\$PATH' >> ~/.bashrc"
+echo "[OK] Jetson launcher symlinks refreshed (~/.local/bin and ~/project)"
 
 echo "[Stage 3/4] Remote environment setup"
 
@@ -258,7 +278,7 @@ for pkg in $BLOCKLIST_PKGS; do
 done
 
 # ── Auto-install dependencies ─────────────────────────────────────────────
-for _dep in psutil setproctitle; do
+for _dep in psutil setproctitle pygame; do
   if ! python3 -c "import $_dep" 2>/dev/null; then
     echo "[AUTO-INSTALL] Installing missing dependency: $_dep"
     pip install --quiet "$_dep" || echo "[WARN] Failed to install $_dep"

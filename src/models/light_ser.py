@@ -166,15 +166,22 @@ class LightweightRandomForestSER:
 
         audio = _resample_linear(audio, sample_rate, self.sample_rate)
 
-        # ── Auto-gain normalization (RMS-based) ───────────────────────────
-        # Peak normalization alone is insufficient on Jetson where mic gain
-        # varies.  RMS normalization ensures consistent feature magnitudes
-        # regardless of input gain, preventing the "always angry" bias.
+        # ── Stage 1: Peak normalization to -3dB (0.707 linear) ───────────
+        # Standardises the amplitude ceiling before RMS normalization so
+        # microphone sensitivity variations don't inflate feature magnitudes.
+        peak = float(np.max(np.abs(audio)))
+        _TARGET_PEAK = 0.707  # -3 dB
+        if peak > 1e-6:
+            audio = audio * (_TARGET_PEAK / peak)
+
+        # ── Stage 2: RMS normalization ───────────────────────────────────
+        # Further normalises energy distribution so feature magnitudes are
+        # consistent regardless of input gain.
         rms_level = np.sqrt(np.mean(audio ** 2) + 1e-9)
         target_rms = 0.1  # target RMS for normalized speech
         if rms_level > 1e-6:
             audio = audio * (target_rms / rms_level)
-        # Clip to [-1, 1] after RMS normalization
+        # Clip to [-1, 1] after normalization
         audio = np.clip(audio, -1.0, 1.0)
 
         # Simple pre-emphasis to retain high-frequency cues.

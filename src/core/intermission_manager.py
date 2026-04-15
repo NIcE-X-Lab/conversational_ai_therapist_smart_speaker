@@ -72,13 +72,22 @@ class IntermissionTracker:
         self._state[question_id]["reason"] = str(reason or "")
 
     def restore_from_status_map(self, status_map: Dict[str, dict] | None):
-        """Load persisted question checkpoints from DB for this session."""
-        self.reset()
+        """Load persisted question checkpoints from DB for this session.
+
+        Only overwrites slots that are still PENDING in memory — answered /
+        skipped entries that already exist in memory are never regressed.
+        This prevents a stale DB read from resetting in-flight state.
+        """
         if not status_map:
             return
 
         for q in self._questions:
             qid = q["id"]
+            # Never regress an already-resolved in-memory slot
+            current = self._state.get(qid, {})
+            if current.get("status") in (self.STATUS_ANSWERED, self.STATUS_SKIPPED):
+                continue
+
             row = status_map.get(qid)
             if not row:
                 continue
@@ -131,7 +140,11 @@ class IntermissionLadderManager:
         self._tracker.restore_from_status_map(status_map)
 
     def current_stage(self) -> IntermissionStage:
-        if not self._tracker.is_complete():
+        # Use next_unanswered() as the single source of truth so that
+        # current_stage() and next_screening_question() can never disagree
+        # (the old is_complete() check could diverge, causing a deadlock
+        # where SCREENING was selected but no question was available).
+        if self._tracker.next_unanswered() is not None:
             return IntermissionStage.SCREENING
         if self._breathing_count <= 0:
             return IntermissionStage.BREATHING_EXERCISE
