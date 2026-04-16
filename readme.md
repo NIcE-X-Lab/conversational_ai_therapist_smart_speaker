@@ -100,7 +100,7 @@ The architecture is built on three pillars:
           |                |                  |
    +------v------+  +-----v-------+  +-------v--------+
    |  Questioner  |  | Response    |  |   CBT Module   |
-   |  ask_question|  | Analyzer    |  | (3-stage proto)|
+   |  ask_question|  | Analyzer    |  | (4-stage proto)|
    +--------------+  | classify/   |  +----------------+
           |          | score       |          |
           |          +------+------+          |
@@ -149,7 +149,9 @@ src/
 │   ├── response_analyzer.py   # LLM-based dimension/score classification
 │   ├── reflection_validation.py  # Follow-up relevance validation (RV)
 │   ├── CBT.py                 # 4-stage CBT protocol (Stage 0-3)
-│   └── therapy_content.py     # PHQ-4 / GAD-2 screening & meditation content
+│   ├── therapy_content.py     # PHQ-4 / GAD-2 screening & meditation content
+│   ├── context_manager.py     # Rolling clinical takeaway engine (survives context trimming)
+│   └── intermission_manager.py # Intermission ladder state machine (screening → breathing → music)
 │
 ├── models/                    # AI model wrappers
 │   ├── llm_client.py          # LiteRT-LM in-process inference + interstitial engine
@@ -165,7 +167,8 @@ src/
 │   ├── audio.py               # PyAudio + WebRTC-VAD microphone driver
 │   ├── player.py              # ALSA aplay subprocess for WAV playback
 │   ├── gpio_manager.py        # Jetson GPIO buttons & LED (graceful degradation)
-│   └── db_manager.py          # SQLite schema, CRUD, and clinical persistence
+│   ├── db_manager.py          # SQLite schema, CRUD, and clinical persistence
+│   └── music_player.py        # Background music loop with pygame ducking
 │
 └── utils/                     # Shared utilities
     ├── config_loader.py       # YAML + .env config aggregator
@@ -202,6 +205,22 @@ Both results are packaged as `{"transcript": "...", "detected_emotion": "..."}` 
 **VRAM Shielding**: On 8GB Jetson, Whisper and the LLM cannot coexist in VRAM. `STTGenerator` exposes `suspend_all()` / `resume_all()` methods that fully unload both the Whisper model and SER classifier before the LLM inference, then reload them afterward. RSS deltas are logged at each transition.
 
 **Environment Verification**: On import, `stt.py` checks for the heavy `openai-whisper` package (which pulls ~2GB PyTorch). If detected, the process exits immediately with `[ENVIRONMENT ERROR]` and instructions to uninstall.
+
+### 1b. Clinical Context Manager (`src/core/context_manager.py`)
+
+The `ClinicalContextManager` maintains a rolling clinical summary that survives LLM context trimming:
+- Every 4 turns, a background LLM call extracts screening scores, RL focus areas, key behavioral facts, and emotional trend into a concise bulleted summary
+- The summary is auto-prepended to the LLM system prompt via `inject_into_prompt()`, so the model always has a clinical snapshot regardless of how aggressively the context window is trimmed
+- Provides `generate_closing_reflection()` — an LLM-generated 2-3 sentence spoken summary referencing specific session topics, scores, and feelings, delivered before the goodbye sequence
+- Thread-safe singleton with explicit `reset()` on session end
+
+### 1c. Intermission Ladder Manager (`src/core/intermission_manager.py`)
+
+The `IntermissionLadderManager` provides a strict stage progression used by the speech service when the LLM is thinking:
+
+- **`IntermissionTracker`**: Manages PHQ-4 screening question state (PENDING / ANSWERED / SKIPPED) with no-repeat guarantees. Supports checkpoint restore from DB to survive mid-session restarts
+- **`IntermissionLadderManager`**: Strict `SCREENING → BREATHING_EXERCISE → MUSIC` stage progression. Screening advances when all 4 PHQ-4 questions are resolved; breathing exercises are drawn from a no-repeat pool (5 meditations)
+- Decoupled from `speech_service.py` so the state machine logic is independently testable
 
 ### 2. Speech Interaction Service (`src/services/speech_service.py`)
 
@@ -365,6 +384,13 @@ Singleton manager for Jetson GPIO with graceful degradation to no-op stubs on no
 
 Supports **per-pin active-low/active-high** configuration (via `PIN_BTN_*_ACTIVE_LOW` env vars), interrupt-based detection with fallback level polling, and thread-safe event queue. The LED polarity is also configurable via `PIN_LISTENING_LED_ACTIVE_LOW`.
 
+### 10a. Background Music Service (`src/drivers/music_player.py`)
+
+The `BackgroundMusicService` provides ambient therapeutic music during the music fallback intermission stage:
+- Non-blocking loop thread using `pygame.mixer` with automatic fallback to `assets/audio/waiting_music.wav` if the primary track is unavailable
+- **Volume ducking**: When the agent speaks, `duck()` drops volume to 5% (configurable); `restore()` returns to 25% base volume. This allows music to continue under speech without masking it
+- Thread-safe start/stop lifecycle with lazy mixer initialization (pygame is only loaded when music is actually needed)
+
 ### 11. Configuration System (`src/utils/config_loader.py`)
 
 Two-tier configuration:
@@ -427,9 +453,15 @@ Central hub for session state and inter-process communication:
 │   ├── deploy_and_run.sh      # Deploy + start + tail logs (one command)
 │   ├── board_scan.py          # Jetson board pin scanning utility
 │   ├── find_pins.py           # GPIO pin discovery helper
-│   └── gpio_probe.py          # GPIO probe/debug tool
+│   ├── gpio_probe.py          # GPIO probe/debug tool
+│   ├── runtime_resource_probe.py    # STT/SER/LLM probe for resource audit measurements
+│   ├── dependency_delta_audit.py    # Compare installed packages against environment manifests
+│   └── linux_resource_forensics.py  # Linux forensic evidence for memory crashes / process duplication
 │
 ├── start_caiti.sh             # One-command deploy + run (sanitize, sync, launch)
+├── start_jetson_sync.sh       # Jetson full start with laptop sync + sanitization
+├── start_headless.sh          # Quick local start (wrapper)
+├── stop_system.sh             # Process cleanup (wrapper)
 └── readme.md                  # This file
 ```
 
@@ -511,7 +543,7 @@ IDLE ──[wake-word / GPIO Button 1 / API /login]──> ONBOARDING
 * **Hardware**: NVIDIA Jetson (Orin series) or Linux PC with Mic/Speaker
 * **Software**: Python 3.10+, `portaudio19-dev`
 * **Models**: Gemma 4 E2B LiteRT (auto-downloaded via `scripts/model_fetch.py`), Piper TTS model, Whisper base.en
-* **Python Packages**: `litert-lm-api` (LLM inference), `faster-whisper` (STT), `piper-tts` (TTS)
+* **Python Packages**: `litert-lm-api` (LLM inference), `faster-whisper` (STT), `piper-tts` (TTS), `pygame` (background music)
 
 ### Local Installation
 
@@ -582,6 +614,9 @@ rl:
 | `./scripts/deploy_to_jetson.sh` | **Deploy** | Syncs codebase to Jetson device |
 | `./scripts/deploy_and_run.sh` | **Deploy + Run** | Syncs code to Jetson, starts services, tails live logs |
 | `python scripts/model_fetch.py` | **Model Download** | Downloads Gemma 4 E2B LiteRT model from HuggingFace |
+| `python scripts/runtime_resource_probe.py` | **Resource Probe** | Runs minimal STT/SER/LLM probe to collect resource audit measurements |
+| `python scripts/dependency_delta_audit.py` | **Dependency Audit** | Compares installed packages against `requirements.txt` and `environment.yml` manifests |
+| `python scripts/linux_resource_forensics.py` | **Crash Forensics** | Collects Linux forensic evidence (dmesg, journalctl, top RSS) for memory crash diagnosis |
 | `tail -f backend_session.log` | **Monitor** | View real-time AI reasoning and transcriptions |
 
 ### Startup Checklist
@@ -621,3 +656,4 @@ If the LiteRT model file is missing, `scripts/model_fetch.py` runs automatically
 | Database | SQLite | Session persistence, clinical audit trail |
 | Hardware | Jetson.GPIO | Physical button/LED interface |
 | Audio | PyAudio + ALSA (aplay) | Microphone capture and speaker playback |
+| Music | pygame.mixer | Background ambient music with volume ducking |
