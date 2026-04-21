@@ -47,15 +47,6 @@ SSH_OPTS="-o ConnectTimeout=10"
 echo "[INFO] Target Jetson: $JETSON_HOST_VALUE"
 echo "[INFO] Remote project path: $REMOTE_PROJECT_DIR"
 
-# ── Local model download (if needed) ─────────────────────────────────────
-LITERT_MODEL_DIR="models/litert"
-if [[ ! -f "$LITERT_MODEL_DIR/.download_complete" ]]; then
-  echo "[INFO] LiteRT model not found locally. Downloading..."
-  python3 scripts/model_fetch.py
-else
-  echo "[OK] LiteRT model present locally."
-fi
-
 echo "[Stage 2/4] Remote sanitization and code synchronization"
 SSH_READY=0
 for attempt in $(seq 1 24); do
@@ -128,7 +119,6 @@ if ! rsync -az --delete -e "ssh $SSH_OPTS" \
   --include='/src/***' \
   --include='/assets/***' \
   --include='/data/libs/***' \
-  --include='/models/litert/***' \
   --include='/models/piper/***' \
   --include='/scripts/***' \
   --include='/.env' \
@@ -166,8 +156,19 @@ elif [[ -f "$HOME/project/.venv/bin/activate" ]]; then
   source "$HOME/project/.venv/bin/activate"
   echo "[WARN] Using fallback venv at $HOME/project/.venv"
 else
-  echo "[ERROR] Remote virtual environment missing at .venv/bin/activate and $HOME/project/.venv/bin/activate"
-  exit 1
+  echo "[WARN] Remote virtual environment missing. Creating .venv in project root..."
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install --upgrade pip >/dev/null 2>&1 || true
+    if [[ -f requirements.txt ]]; then
+      echo "[INFO] Installing remote dependencies from requirements.txt"
+      pip install -r requirements.txt || echo "[WARN] Some requirements failed to install; continuing with runtime auto-installs."
+    fi
+  else
+    echo "[ERROR] python3 is not available on Jetson; cannot create virtual environment"
+    exit 1
+  fi
 fi
 
 mkdir -p data/logs
@@ -235,17 +236,20 @@ if [[ ! -s "$VOICE_JSON" ]]; then
   done
 fi
 
-if ! is_valid_voice_pair "$VOICE_ONNX" "$VOICE_JSON"; then
+PIPER_READY=0
+if is_valid_voice_pair "$VOICE_ONNX" "$VOICE_JSON"; then
+  PIPER_READY=1
+else
   echo "[WARN] Piper voice/model config missing or invalid. Attempting repair..."
   rm -f "$VOICE_ONNX" "$VOICE_JSON"
-  repair_voice_pair || true
-fi
-
-if ! is_valid_voice_pair "$VOICE_ONNX" "$VOICE_JSON"; then
-  echo "[ERROR] Piper voice pair is still invalid. Expected non-empty files at:"
-  echo "        $VOICE_ONNX"
-  echo "        $VOICE_JSON"
-  exit 1
+  if repair_voice_pair; then
+    PIPER_READY=1
+  else
+    echo "[WARN] Piper voice pair is still invalid. Continuing with espeak-ng fallback."
+    echo "[WARN] Expected non-empty files at:"
+    echo "        $VOICE_ONNX"
+    echo "        $VOICE_JSON"
+  fi
 fi
 
 # ── Dependency drift cleanup (remove known memory-risk packages) ──────────

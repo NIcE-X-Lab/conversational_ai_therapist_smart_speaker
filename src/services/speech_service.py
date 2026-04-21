@@ -275,6 +275,7 @@ class SpeechInteractionService:
 
         self.manual_input_event = threading.Event()
         self.stop_playback_event = threading.Event()
+        self._latency_trace = None
 
         RESOURCE_AUDIT.capture_process_inventory("speech_service_init_complete")
 
@@ -290,6 +291,70 @@ class SpeechInteractionService:
 
     def _led_off(self):
         self.gpio.set_led(False)
+
+    def _start_latency_trace(self, user_text: str = ""):
+        self._latency_trace = {
+            "started_at": time.monotonic(),
+            "audio_capture_started_at": None,
+            "audio_capture_ended_at": None,
+            "stt_started_at": None,
+            "stt_ended_at": None,
+            "llm_wait_started_at": None,
+            "llm_ready_at": None,
+            "tts_started_at": None,
+            "tts_generate_sec": None,
+            "tts_ended_at": None,
+            "intermission_used": False,
+            "user_text": str(user_text or "")[:160],
+        }
+
+    def _mark_latency_event(self, key: str, *, value: float | None = None):
+        if self._latency_trace is None:
+            return
+        if self._latency_trace.get(key) is None:
+            self._latency_trace[key] = time.monotonic() if value is None else value
+
+    def _flush_latency_trace(self, *, reason: str = "turn_complete"):
+        trace = self._latency_trace
+        if not trace:
+            return
+
+        metrics = {
+            "reason": reason,
+            "user_text": trace.get("user_text", ""),
+            "intermission_used": bool(trace.get("intermission_used", False)),
+        }
+
+        audio_capture_started_at = trace.get("audio_capture_started_at")
+        audio_capture_ended_at = trace.get("audio_capture_ended_at")
+        stt_started_at = trace.get("stt_started_at")
+        stt_ended_at = trace.get("stt_ended_at")
+        llm_wait_started_at = trace.get("llm_wait_started_at")
+        llm_ready_at = trace.get("llm_ready_at")
+        tts_started_at = trace.get("tts_started_at")
+        tts_ended_at = trace.get("tts_ended_at")
+
+        if audio_capture_started_at is not None and audio_capture_ended_at is not None:
+            metrics["audio_capture_sec"] = round(audio_capture_ended_at - audio_capture_started_at, 3)
+        if stt_started_at is not None and stt_ended_at is not None:
+            metrics["stt_sec"] = round(stt_ended_at - stt_started_at, 3)
+        if trace.get("tts_generate_sec") is not None:
+            metrics["tts_generate_sec"] = round(float(trace["tts_generate_sec"]), 3)
+        if llm_wait_started_at is not None and llm_ready_at is not None:
+            metrics["llm_wait_sec"] = round(llm_ready_at - llm_wait_started_at, 3)
+        if tts_started_at is not None and tts_ended_at is not None:
+            metrics["tts_playback_sec"] = round(tts_ended_at - tts_started_at, 3)
+        if audio_capture_ended_at is not None and tts_started_at is not None:
+            metrics["user_stop_to_tts_start_sec"] = round(tts_started_at - audio_capture_ended_at, 3)
+        if audio_capture_started_at is not None and tts_started_at is not None:
+            metrics["capture_start_to_tts_start_sec"] = round(tts_started_at - audio_capture_started_at, 3)
+        if trace.get("started_at") is not None and tts_started_at is not None:
+            metrics["turn_start_to_tts_start_sec"] = round(tts_started_at - trace["started_at"], 3)
+
+        logger.info("[TURN_LATENCY] %s", metrics)
+        io_record.log_json_event("turn_latency", metrics)
+        RESOURCE_AUDIT.capture_point("turn_latency", extra=metrics)
+        self._latency_trace = None
 
     def _poll_gpio(self):
         return self.gpio.poll_event()
@@ -316,10 +381,15 @@ class SpeechInteractionService:
         prev_state = self.state
         self.state = "speaking"
         wav_file = "service_response_temp.wav"
+        tts_generate_started_at = time.monotonic()
         if self.tts.generate(text, wav_file):
+            if self._latency_trace is not None and self._latency_trace.get("tts_generate_sec") is None:
+                self._latency_trace["tts_generate_sec"] = time.monotonic() - tts_generate_started_at
             self._led_off()
             self.stop_playback_event.clear()
+            self._mark_latency_event("tts_started_at")
             self.player.play(wav_file, stop_event=self.stop_playback_event)
+        self._mark_latency_event("tts_ended_at")
         self.state = prev_state
 
     def _persist_intermission_status(self, question_id: str, status: str, score=None, response_text="", reason=""):
@@ -357,7 +427,9 @@ class SpeechInteractionService:
 
     def transcribe(self, wav_path: str, apply_priority_gate: bool = False) -> str:
         """Transcribe audio and optionally intercept global start/end commands first."""
+        self._mark_latency_event("stt_started_at")
         stt_payload = self.stt.transcribe(wav_path)
+        self._mark_latency_event("stt_ended_at")
 
         try:
             text = json.loads(stt_payload).get("transcript", "").strip()
@@ -391,9 +463,11 @@ class SpeechInteractionService:
     def listen(self, timeout=15.0, apply_priority_gate: bool = False):
         """Record and transcribe with LED feedback."""
         self.state = "main_listen"
+        self._mark_latency_event("audio_capture_started_at")
         self._led_on()
         audio_frames = self.recorder.record_until_silence(max_duration=timeout)
         self._led_off()
+        self._mark_latency_event("audio_capture_ended_at")
 
         if not audio_frames:
             self.state = "idle"
@@ -509,6 +583,7 @@ class SpeechInteractionService:
         logger.info("Ending session via hardware/voice command.")
         io_record.END_SESSION_EVENT.set()
         io_record.START_SESSION_EVENT.clear()
+        self._latency_trace = None
         self.intermission_ladder.reset()
         self._music_announced_for_turn = False
         # Stop any ongoing playback instantly
@@ -576,17 +651,22 @@ class SpeechInteractionService:
 
         watcher = threading.Thread(target=_watcher, daemon=True)
         watcher.start()
+        self._mark_latency_event("llm_wait_started_at")
 
         # Fast path for short LLM latency
         if llm_done.wait(timeout=_INTERMISSION_TRIGGER_SEC):
             if response_text[0]:
+                self._mark_latency_event("llm_ready_at")
                 self.say(response_text[0])
+            self._flush_latency_trace(reason="turn_response_delivered_fast_path")
             return
 
         logger.info(
             f"[INTERMISSION] LLM latency > {_INTERMISSION_TRIGGER_SEC}s. "
             "Entering intermission ladder."
         )
+        if self._latency_trace is not None:
+            self._latency_trace["intermission_used"] = True
         intermission_was_active = True
 
         self._music_announced_for_turn = False
@@ -769,6 +849,7 @@ class SpeechInteractionService:
         self.music_service.set_base_volume(0.10)
         if response_text[0] and not io_record.END_SESSION_EVENT.is_set():
             logger.info("[INTERMISSION] Complete. Delivering LLM response.")
+            self._mark_latency_event("llm_ready_at")
 
             if intermission_was_active:
                 bridge = _random.choice(_BRIDGE_PHRASES)
@@ -779,6 +860,7 @@ class SpeechInteractionService:
             self.say(response_text[0])
 
         self.state = "main_process"
+        self._flush_latency_trace(reason="turn_response_delivered")
 
     # ------------------------------------------------------------------ #
     # Main Loop                                                            #
@@ -864,6 +946,7 @@ class SpeechInteractionService:
                                 self.manual_input_event.wait()
                                 self.manual_input_event.clear()
 
+                            self._start_latency_trace()
                             user_response = self._listen_with_retry(timeout=15.0, apply_priority_gate=True)
                             if not user_response:
                                 continue
