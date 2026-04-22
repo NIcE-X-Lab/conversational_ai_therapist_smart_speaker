@@ -101,6 +101,26 @@ MEDITATIONS = [
 WAITING_MUSIC_PATH = "assets/waiting_music.wav"
 
 
+# ── Crisis override (paper's latent safety layer) ──────────────────────────────
+# If any of these dimensions is scored at 2, the standard RL loop is bypassed
+# and a Safety Guide is delivered BEFORE the usual CBT routing.  The dimensions
+# cover self-injurious behaviour, personal safety, external risk-taking, and
+# hard substance abuse — matching the paper's "hard-stop" safety valve.
+CRITICAL_DIMS = frozenset({"sib", "safe", "risk", "drug", "alcohol"})
+
+SAFETY_RESOURCES_MESSAGE = (
+    "Thank you for trusting me with that. What you are going through sounds "
+    "really heavy, and I want to make sure you are safe right now. "
+    "If you are in the United States, you can call or text 988 any time to "
+    "reach the Suicide and Crisis Lifeline. "
+    "You can also reach the SAMHSA national helpline at 1-800-662-4357 "
+    "for free, confidential support. "
+    "If you are in immediate danger, please call 911 or go to your nearest "
+    "emergency room. "
+    "I am going to stay with you, and we will focus on this together."
+)
+
+
 def score_response(text: str) -> int:
     """
     Map a verbal Likert response to the PHQ-4 / GAD-2 integer scale (0–3).

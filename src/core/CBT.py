@@ -321,20 +321,20 @@ __all__ = [
 ]
 
 def run_cbt(question_lib):
+    """Paper-aligned 3-stage CBT clinical loop: Recognize -> Challenge -> Reframe.
+
+    Presents all Score-2 dimensions and awaits the user's selection (user
+    autonomy).  Each subsequent stage uses a Reasoner (validity/utility
+    check) and a Guide (clinical direction) with up to two retries.
     """
-    Run CBT stages 0-3 after screening is finished or user said stop.
-    Stage 0: ask user to choose a dimension with score=2 to work on.
-    Stages 1-3: unhelpful thoughts -> challenge -> reframe, with reasoning and guidance.
-    """
-    logger.info("Starting CBT flow (stages 0-3).")
-    # 0) Collect dimensions with score=2
-    # candidates: list of (idx_shown, i, j, label_internal, name_human)
+    logger.info("Starting CBT flow (3-stage: Recognize/Challenge/Reframe).")
+    # Collect dimensions with score=2
     candidates = []
     idx = 1
     for i in range(1, len(question_lib) + 1):
         for j in range(1, len(question_lib[str(i)]) + 1):
             entry = question_lib[str(i)][str(j)]
-            if any((s == 2) for s in entry.get("score", [])):
+            if any((isinstance(s, int) and s == 2) for s in entry.get("score", [])):
                 candidates.append((
                     idx,
                     i,
@@ -349,37 +349,34 @@ def run_cbt(question_lib):
         log_question("We do not have a dimension at score 2 to work on today. We will conclude here.")
         return
 
-    # Stage 0: directly ask the user to choose a dimension by the shown index
+    # Present Score-2 dimensions and await user selection.
     lines = [
         "Thank you for answering the questions.",
-        "According to your previous responses, you have issue in:",
+        "According to your previous responses, you have concerns in:",
     ]
     for k, _, _, _, name0 in candidates:
         lines.append(f"{k}) {name0}")
     lines.append(
-        "Which dimension would you like to work on today? "
-        "Tell me the dimension number. For example: 1"
+        "Which area would you like to work on today? "
+        "Tell me the number. For example: 1"
     )
-    q0_clean = " \n".join(lines)
-    log_question(q0_clean)
+    log_question(" \n".join(lines))
     resp = get_resp_log()
     if isinstance(resp, str) and "SESSION_END" in resp:
-        logger.info("Session End signal received in CBT stage 0.")
+        logger.info("Session End signal received in CBT dimension selection.")
         return
     if isinstance(resp, str) and resp.strip().lower().find("stop") != -1:
-        logger.info("User requested stop at CBT stage 0.")
+        logger.info("User requested stop at CBT dimension selection.")
         return
 
     def _pick_candidate(answer: str):
         ans = str(answer).strip().lower()
-        # Prefer selecting by the shown index (e.g., "1")
         m = re.findall(r"\d+", ans)
         if m:
             n = int(m[0])
             for (k0, i0, j0, lbl0, name0) in candidates:
                 if k0 == n:
                     return (i0, j0, lbl0, name0)
-        # Fallback: try matching by human name or internal label keyword
         for (_, i0, j0, lbl0, name0) in candidates:
             if name0.lower() in ans or lbl0.lower() in ans:
                 return (i0, j0, lbl0, name0)
@@ -387,7 +384,6 @@ def run_cbt(question_lib):
 
     chosen = _pick_candidate(resp)
     if chosen is None:
-        # one retry to clarify
         opts = "; ".join([f"{k}) {name0}" for (k, _, _, _, name0) in candidates])
         log_question(
             f"Please reply with a single number between 1 and {len(candidates)}. "
@@ -395,21 +391,21 @@ def run_cbt(question_lib):
         )
         resp = get_resp_log()
         if isinstance(resp, str) and "SESSION_END" in resp:
-            logger.info("Session End signal received in CBT stage 0 retry.")
+            logger.info("Session End signal received in CBT dimension retry.")
             return
         if isinstance(resp, str) and resp.strip().lower().find("stop") != -1:
-            logger.info("User requested stop at CBT stage 0 retry.")
+            logger.info("User requested stop at CBT dimension retry.")
             return
         chosen = _pick_candidate(resp)
         if chosen is None:
-            logger.info("Failed to parse user choice for CBT stage 0. Exit CBT.")
+            logger.info("Failed to parse user choice for CBT dimension. Exit CBT.")
             log_question("I could not determine your choice. We will stop CBT for now.")
             return
 
     i_sel, j_sel, label_sel, name_sel = chosen
     logger.info(f"CBT dimension chosen: [{label_sel}] ({name_sel}) at ({i_sel},{j_sel}).")
 
-    # Stage 1: derive statement from RV notes of the chosen dimension
+    # Stage 1 — RECOGNIZE: derive statement from RV notes of the chosen dimension.
     # Prefer the latest RV follow-up response (followup_resp_1),
     # then fallback to followup_resp, then original_resp.
     statement = ""
@@ -485,7 +481,7 @@ def run_cbt(question_lib):
         ])
         return
 
-    # Stage 2: challenge the unhelpful thoughts
+    # Stage 2 — CHALLENGE: challenge the unhelpful thoughts
     log_question("Now, how could you challenge those unhelpful thoughts? Please write a brief challenge.")
     challenge = get_resp_log()
     if isinstance(challenge, str) and "SESSION_END" in challenge:
@@ -523,7 +519,7 @@ def run_cbt(question_lib):
         ])
         return
 
-    # Stage 3: reframe the thought (prepend an LLM-rephrased recap of user's CHALLENGE)
+    # Stage 3 — REFRAME: reframe the thought (prepend an LLM-rephrased recap of user's CHALLENGE)
     recap3 = recap_stage3_challenge(statement, unhelpful, challenge)
     set_question_prefix(recap3.strip())
     log_question("Finally, can you reframe the unhelpful thought into a more balanced, constructive one?")

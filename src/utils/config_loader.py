@@ -49,6 +49,7 @@ GAMMA = float(RL["gamma"])
 ITEM_IMPORTANCE = RL["item_importance"]
 NUMBER_QUESTIONS = RL["number_questions"]
 
+
 # LLM configuration — Gemma 4 E2B via LiteRT-LM (in-process inference)
 LLM_MODEL = os.environ.get("LLM_MODEL", "gemma-4-E2B-it")
 LITERT_MODEL_PATH = os.environ.get(
@@ -56,7 +57,8 @@ LITERT_MODEL_PATH = os.environ.get(
 )
 LITERT_BACKEND = os.environ.get("LITERT_BACKEND", "cpu").strip().lower()
 LITERT_CONTEXT_LENGTH = int(os.environ.get("LITERT_CONTEXT_LENGTH", "512"))
-LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "80"))
+# LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "80"))  # original on-device limit; revert if context/memory issues arise
+LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "400"))
 
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
 LLM_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "90"))
@@ -86,10 +88,6 @@ STT_BEST_OF = int(os.environ.get("STT_BEST_OF", str(STT.get("best_of", 1))))
 STT_WITHOUT_TIMESTAMPS = os.environ.get(
     "STT_WITHOUT_TIMESTAMPS", str(STT.get("without_timestamps", True))
 ).strip().lower() in {"1", "true", "yes", "on"}
-
-# Emotion Recognition (SER)
-SER_BACKEND = os.environ.get("SER_BACKEND", "light_mfcc_rf").strip().lower()
-SER_DEVICE = os.environ.get("SER_DEVICE", "cpu")
 
 # TTS
 TTS = _CFG.get("tts", {})

@@ -39,22 +39,27 @@ def choose_action(
         mask: list,
         number_states: int,
         actions: list,
-        action_labels: dict = None
+        action_labels: dict = None,
+        epsilon: float = None,
     ) -> str:
     """
     Choose an action based on the current state and Q-table.
     Mask out unavailable actions by multiplying their Q-values by 0.
-    With probability EPSILON, choose the best action; otherwise, explore.
+    With probability `epsilon` (exploitation rate), choose the best action;
+    otherwise explore.  If `epsilon` is None, fall back to the module-level
+    `EPSILON` constant — callers driving an ε-greedy decay schedule should
+    pass the turn's effective exploitation rate explicitly.
     """
-    logger.info(f"Choosing action for state {state}")
+    eff_epsilon = EPSILON if epsilon is None else float(epsilon)
+    logger.info(f"Choosing action for state {state} (epsilon={eff_epsilon:.3f})")
     state_action = q_table.iloc[state, :].copy()
     # Apply mask to the state_action to disable unavailable actions
     logger.debug("Mask before: [{}]".format(','.join(str(m) for m in mask)))
     for i in range(1, number_states):
         state_action[str(i)] = state_action[str(i)] * mask[i]
     logger.debug("Q-values after masking: [{}]".format(','.join(str(v) for v in state_action.values)))
-    # Exploration: with probability 1-EPSILON or if all Q-values are zero, pick randomly
-    if (np.random.uniform() > EPSILON):
+    # Exploration: with probability 1-epsilon or if all Q-values are zero, pick randomly
+    if (np.random.uniform() > eff_epsilon):
         # Exploration branch: choose at random among available (not masked out) actions
         available_actions = [actions[i] for i in range(1, number_states) if mask[i] == 1]
         logger.info(f"Exploring: choosing randomly among available actions {available_actions}")

@@ -114,6 +114,20 @@ class DBManager:
                   UNIQUE(session_id, question_id),
                   FOREIGN KEY(session_id) REFERENCES sessions(id))''')
 
+        # Persistent RL state table (longitudinal Q-table per user).
+        # The q_table_json is a serialized pandas DataFrame (to_json/orient=split),
+        # item_mask_json is the screening state vector for resume, and
+        # top_score2_dims_json lists the top Score-2 dimensions from the most
+        # recent session so returning users can be greeted with a recall prompt.
+        c.execute('''CREATE TABLE IF NOT EXISTS persistent_rl_state
+                 (user_id INTEGER PRIMARY KEY,
+                  q_table_json TEXT,
+                  item_mask_json TEXT,
+                  top_score2_dims_json TEXT,
+                  last_session_id INTEGER,
+                  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY(user_id) REFERENCES users(id))''')
+
         conn.commit()
         conn.close()
         logger.info(f"Database initialized at {self.db_path}")
@@ -337,6 +351,56 @@ class DBManager:
         )
         conn.commit()
         conn.close()
+
+    # ── Persistent longitudinal RL state ──────────────────────────────
+    def save_rl_state(
+        self,
+        user_id: int,
+        q_table_json: str,
+        item_mask_json: str,
+        top_score2_dims_json: str,
+        last_session_id: int | None = None,
+    ):
+        """Upsert the persistent RL state for this user."""
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
+        c = conn.cursor()
+        c.execute(
+            """INSERT INTO persistent_rl_state
+               (user_id, q_table_json, item_mask_json, top_score2_dims_json,
+                last_session_id, updated_at)
+               VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   q_table_json=excluded.q_table_json,
+                   item_mask_json=excluded.item_mask_json,
+                   top_score2_dims_json=excluded.top_score2_dims_json,
+                   last_session_id=excluded.last_session_id,
+                   updated_at=CURRENT_TIMESTAMP""",
+            (user_id, q_table_json, item_mask_json, top_score2_dims_json, last_session_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def load_rl_state(self, user_id: int):
+        """Return the persisted RL state for this user, or None if absent."""
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
+        c = conn.cursor()
+        c.execute(
+            """SELECT q_table_json, item_mask_json, top_score2_dims_json,
+                      last_session_id, updated_at
+               FROM persistent_rl_state WHERE user_id=?""",
+            (user_id,),
+        )
+        row = c.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return {
+            "q_table_json": row[0],
+            "item_mask_json": row[1],
+            "top_score2_dims_json": row[2],
+            "last_session_id": row[3],
+            "updated_at": row[4],
+        }
 
     def get_intermission_screening_statuses(self, session_id: int):
         """Return the latest intermission status for each screening question."""

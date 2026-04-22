@@ -432,9 +432,7 @@ def get_openai_resp(user_input, original_question, dimension_label: str):
     Otherwise, attempts to return (dimension, score:int) parsed from model output.
     Fallbacks to ('NA', 99) on parse failure.
     """
-    # Strip the [Detected Emotion: ...] metadata tag before keyword analysis
-    # so it doesn't inflate the token count and bypass shortcuts.
-    _clean_input = re.sub(r"\[Detected Emotion:\s*\w+\]", "", user_input).strip()
+    _clean_input = user_input.strip()
 
     # Preprocess: get first 10 lowercased tokens after removing some punctuation for basic pattern catches
     tokens = _clean_input.replace(".", " ").replace(",", " ").replace("?", " ").split()

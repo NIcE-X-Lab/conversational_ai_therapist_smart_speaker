@@ -13,16 +13,30 @@ paths:
 
 rl:
   item_n_states: 38
-  epsilon: 1 # exploitation rate
-  alpha: 0.5 # learning rate
+  epsilon: 1 # exploitation rate (fixed, paper/legacy aligned)
+  alpha: 0.5 # learning rate (paper/legacy aligned)
   gamma: 0.9 # discount factor
-  # item_importance: [0, 5, 4, 4, 2, 5, 2, 2, 1, 3, 4, 3, 1, 4, 2, 4, 3, 1, 4, 4]
-  # number_questions: [0, 4, 1, 2, 2, 5, 1, 1, 1, 2, 3, 2, 1, 1, 3, 2, 1, 3, 1, 1]
-  # item_importance: [0, 5, 5, 5, 5, 4, 4, 4, 2, 2, 5, 5, 5, 5, 5, 2, 2, 1, 3, 3, 4, 4, 4, 3, 3, 1, 4, 2, 2, 2, 4, 4, 3, 1, 1, 1, 4, 4]
-  # number_questions: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-  
-  # changed for stable re-creation of test runs
-  item_importance: [0, 5, 98, 99, 5, 4, 4, 4, 2, 2, 5, 97, 5, 5, 5, 2, 2, 1, 3, 3, 4, 4, 4, 3, 3, 1, 4, 2, 2, 2, 4, 4, 3, 1, 1, 1, 4, 4]
+  # epsilon_start / epsilon_end / epsilon_decay_turns / top_n_dims REMOVED — not in paper/legacy
+
+  # Therapist-validated importance weights (1-10 scale):
+  #   10: sib, safe, risk  (critical safety dimensions)
+  #    8: mood, drug, alcohol  (severe clinical indicators)
+  #    7: medication, care, coping  (treatment adherence / resilience)
+  #    6: sleep, eat, nutrition  (physiological essentials)
+  #    5: weight, talk, emo, support, family  (functional wellbeing)
+  #    4: work, finance, problem, ciga  (daily functioning)
+  #    3: house, work_dayoff, showup, social, comfortable, protection,
+  #       productivity, motivation  (moderate functioning)
+  #    2: hobbies, creativity, community, arrest, legal, hygiene, sports
+  #       (lower-priority lifestyle)
+  # Index: 0(INIT) 1(weight) 2(mood) 3(med) 4(care) 5(house) 6(talk)
+  #        7(emo) 8(safe) 9(risk) 10(sleep) 11(eat) 12(work) 13(dayoff)
+  #        14(showup) 15(finance) 16(nutrition) 17(problem) 18(support)
+  #        19(family) 20(alcohol) 21(ciga) 22(drug) 23(hobbies)
+  #        24(creativity) 25(community) 26(support2) 27(social)
+  #        28(comfortable) 29(protection) 30(productivity) 31(motivation)
+  #        32(coping) 33(sib) 34(arrest) 35(legal) 36(hygiene) 37(sports)
+  item_importance: [0, 5, 8, 7, 7, 3, 5, 5, 10, 10, 6, 6, 4, 3, 3, 4, 6, 4, 5, 5, 8, 4, 8, 2, 2, 2, 3, 3, 3, 3, 3, 3, 7, 10, 2, 2, 2, 2]
   number_questions: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
  
 # openai configuration block is now managed via the .env file

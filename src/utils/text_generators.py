@@ -28,9 +28,25 @@ def generate_prompt_synonymous_sentences(user_input):
 
 def generate_synonymous_sentences(question_text):
     """
-    (OPTIMIZED) Directly return the question text to avoid LLM latency.
+    Use LLM to generate a synonymous sentence for the given question_text.
+    Paper describes 95% synonym rephrasing probability to reduce repetition.
     """
-    return question_text
+    user_input = question_text
+    raw = llm_complete(
+        "You generate synonymous sentences for a given text. Return only the rewritten sentence, without any prefixes.",
+        generate_prompt_synonymous_sentences(user_input)
+    )
+    results = raw.strip()
+    lower = results.lower()
+    if "answer:" in lower:
+        idx = lower.rfind("answer:")
+        results = results[idx+7:].strip()
+    elif results.startswith("User:"):
+        parts = [ln for ln in results.splitlines() if ln.strip().lower().startswith("answer:")]
+        if parts:
+            results = parts[-1].split(":", 1)[1].strip()
+    logger.info(f"generate_synonymous_sentences: {results}")
+    return results
 
 def generate_prompt_therapist(user_input):
     """
@@ -83,9 +99,14 @@ def generate_prompt_change(user_input):
 
 def generate_change(user_input):
     """
-    (OPTIMIZED) Directly return input to avoid LLM latency.
+    Use LLM to convert a first-person sentence to a second-person sentence.
     """
-    return user_input
+    resp = llm_complete(
+        "Convert first-person to second-person statements.",
+        generate_prompt_change(user_input)
+    )
+    logger.debug(resp)
+    return resp
 
 def generate_prompt_change_positive(user_input):
     """

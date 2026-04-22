@@ -19,6 +19,72 @@ from src.utils.io_record import get_answer, get_resp_log, log_question, set_ques
 logger = get_logger("Questioner")
 
 from src.core.reflection_validation import rv_consolidated
+from src.core.response_analyzer import classify_multi_dimensions
+
+
+def _apply_multi_dim_updates(
+    question_lib: Dict[str, Any],
+    user_segments: List[str],
+    original_question: str,
+    primary_label: str,
+) -> None:
+    """Map a single substantive utterance onto ALL dimensions it touches.
+
+    Implements the paper's "minimal questioning" principle: one user turn
+    can satisfy several dimensions simultaneously.  Scores for the PRIMARY
+    dimension are already handled by `_if_valid_response`; this function
+    only back-fills OTHER dimensions mentioned in the utterance so the RL
+    item_mask can disable them later.
+    """
+    joined = " ".join(s for s in user_segments if s).strip()
+    # Skip very short utterances — the primary path + Yes/No shortcuts are
+    # accurate enough and the multi-dim LLM call would be pure overhead.
+    if len(joined.split()) < 6:
+        return
+
+    try:
+        pairs = classify_multi_dimensions(joined, original_question)
+    except Exception as e:
+        logger.debug(f"multi-dim classification failed (non-fatal): {e}")
+        return
+
+    if not pairs:
+        return
+
+    # Build a lookup from label -> (i, j) so we can back-fill scores quickly.
+    label_to_entry = {}
+    for i_key in question_lib.keys():
+        for j_key in question_lib[i_key].keys():
+            entry = question_lib[i_key][j_key]
+            label_to_entry[str(entry.get("label", "")).lower()] = (i_key, j_key, entry)
+
+    applied = []
+    for dim, score in pairs:
+        if dim == primary_label.lower():
+            continue  # primary handled separately
+        target = label_to_entry.get(dim)
+        if not target:
+            continue
+        i_key, j_key, entry = target
+        # Do not overwrite an already-recorded score for this entry;
+        # multi-dim is opportunistic back-fill only.
+        if entry.get("score"):
+            continue
+        entry.setdefault("score", []).append(score)
+        entry.setdefault("notes", []).append([
+            "multi_dim_backfill: true",
+            f"source_question: {original_question}",
+            f"original_resp: {joined}",
+            f"inferred_score: {score}",
+        ])
+        applied.append((dim, score))
+
+    if applied:
+        logger.info(f"multi-dim back-fill applied: {applied}")
+        log_reasoning("multi_dim_backfill", {
+            "primary": primary_label,
+            "applied": [{"dim": d, "score": s} for d, s in applied],
+        })
 
 # System prompt for generating a retry guide when re-asking the same question.
 RETRY_GUIDE_SYSTEM_PROMPT = '''You are a concise and supportive therapist-assistant.
@@ -207,6 +273,11 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         rv_decision_token, rv_text = rv_consolidated(topic, original_question_asked, original_resp, user_response)
         
         logger.info(f"RV Decision: {rv_decision_token}")
+        log_reasoning("reasoner_decision", {
+            "component": "rv",
+            "decision": "related" if rv_decision_token == "0" else "unrelated",
+            "topic": topic,
+        })
         log_reasoning("validation_flag", {"decision_token": rv_decision_token, "text": rv_text, "topic": topic})
 
         rv_guide_text = ""
@@ -300,7 +371,20 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
             valid, DLA_terminate, previous_question, question_lib = evaluate_result(
                 question_lib, DLA_result, S, question_A, user_input, question_text
             )
-            # If the answer is invalid (valid == 0) and the process has not been terminated (DLA_terminate == 0), 
+
+            # Multi-dimension back-fill (paper's minimal-questioning principle):
+            # if the user's substantive utterance also touches OTHER dimensions,
+            # opportunistically record scores for them so the RL loop does not
+            # re-ask questions we already have answers for.
+            if valid == 1 and DLA_terminate == 0:
+                _apply_multi_dim_updates(
+                    question_lib,
+                    user_input,
+                    question_text,
+                    dimension_label,
+                )
+
+            # If the answer is invalid (valid == 0) and the process has not been terminated (DLA_terminate == 0),
             # we may want to give the user a chance to clarify their response.
             # Only retry if DLA_result is empty or every (label, score) pair suggests NA or an unclassified response (score==99 or label=="NA").
             if valid == 0 and DLA_terminate == 0:
@@ -328,13 +412,20 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                     question_lib, DLA_result, S, question_A, user_input, question_text
                 )
         
-        # Retrieve all scores for this question after answering
+        # Hybrid reward signal: average of max and mean across segment scores.
+        # Paper uses mean (faithful to overall tone); max preserves sensitivity
+        # to high-severity signals (e.g. one mention of self-harm in an otherwise
+        # calm response). The blend (max + mean) / 2 prevents both dilution of
+        # critical signals and overweighting of single outlier segments.
         all_score = question_lib[str(S)][str(question_A)]["score"]
-        # Calculate the mean score if available, otherwise set to 0.0
-        question_openai_res = np.mean(all_score) if all_score else 0.0
-        # Append the result to the question reward list
-        question_reward.append(question_openai_res)
+        int_scores = [s for s in all_score if isinstance(s, int) and 0 <= s <= 2]
+        if int_scores:
+            question_reward_value = (float(max(int_scores)) + float(sum(int_scores)) / len(int_scores)) / 2.0
+        else:
+            question_reward_value = 0.0
 
-        # Return the total reward, termination flag, and last question
-        logger.info(f"Finished question RL loop for item S={S}. Total reward: {float(sum(question_reward))}, DLA_terminate: {int(DLA_terminate)}")
-        return float(sum(question_reward)), int(DLA_terminate), previous_question
+        logger.info(
+            f"Finished question RL loop for item S={S}. "
+            f"Reward (max+mean)/2: {question_reward_value}, DLA_terminate: {int(DLA_terminate)}"
+        )
+        return question_reward_value, int(DLA_terminate), previous_question

@@ -8,9 +8,13 @@ import threading
 import pandas as pd
 from typing import List, Tuple
 
+import pysbd
+
 from src.utils.log_util import get_logger
 from src.drivers.db_manager import DBManager
 from src.utils.config_loader import DB_PATH, SUBJECT_ID, RECORD_CSV
+
+_SENTENCE_SEGMENTER = pysbd.Segmenter(language="en", clean=False)
 
 logger = get_logger("IORecord")
 
@@ -318,17 +322,7 @@ def get_answer() -> Tuple[List, List[str]]:
     except Exception:
         pass
 
-    user_input_text = user_input_text.replace(", and", ".").replace("but", ".")
-    raw_segments = user_input_text.split(".")
-    
-    segments = []
-    for i, seg in enumerate(raw_segments):
-        seg = seg.strip()
-        if seg:
-            # Append emotion auxiliary context to the last valid segment
-            if i == len(raw_segments) - 1 or len([s for s in raw_segments[i+1:] if s.strip()]) == 0:
-                seg = f"{seg} [Detected Emotion: {emotion_str}]"
-            segments.append(seg)
+    segments = [s.strip() for s in _SENTENCE_SEGMENTER.segment(user_input_text) if s.strip()]
             
     DLA_result = []
     log_json_event("user_turn", {"transcript": user_input_text, "emotion": emotion_str, "segments": segments})
@@ -357,7 +351,7 @@ def get_resp_log() -> str:
         parsed = json.loads(str(user_response_raw))
         transcript = parsed.get("transcript", "")
         emotion = parsed.get("detected_emotion", "Neutral")
-        user_response = f"{transcript} [Detected Emotion: {emotion}]"
+        user_response = transcript
         set_last_user_signal(transcript, emotion)
     except Exception:
         user_response = str(user_response_raw)
@@ -373,10 +367,7 @@ def get_resp_log() -> str:
     # Feed the rolling clinical takeaway engine
     try:
         from src.core.context_manager import get_context_manager
-        # Strip emotion metadata before recording
-        import re as _re
-        _clean = _re.sub(r"\[Detected Emotion:\s*\w+\]", "", user_response).strip()
-        get_context_manager().record_turn("user", _clean or user_response)
+        get_context_manager().record_turn("user", user_response)
     except Exception:
         pass
 

@@ -1,6 +1,8 @@
 """Domain logic managing Reiforcement Learning (RL) conversational flows."""
+import io
+import json
 import time
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import numpy as np
 import os
@@ -10,14 +12,18 @@ from src.core.questioner import ask_question
 from src.core.CBT import run_cbt
 from src.core.therapy_content import (
     CLINICAL_SCREENING,
+    CRITICAL_DIMS,
     GAD2_THRESHOLD,
     PHQ4_THRESHOLD,
+    SAFETY_RESOURCES_MESSAGE,
     score_response,
 )
 from src.utils.config_loader import (
     ITEM_N_STATES,
     GAMMA,
     ALPHA,
+    EPSILON,
+    ITEM_IMPORTANCE,
     QUESTION_LIB_FILENAME,
     SUBJECT_ID,
     DATA_DIR,
@@ -56,6 +62,13 @@ class HandlerRL:
         self.item_q_table = None
         # Action id -> label mapping for logging readability
         self.item_action_labels = {}
+        # Crisis override state
+        self._crisis_triggered: bool = False
+        self._crisis_dim: str = ""
+        # Longitudinal memory: top Score-2 dimensions from previous session,
+        # loaded in setup() for warm-start + recall greeting.
+        self._prior_score2_dims: List[str] = []
+        self._is_returning_user: bool = False
 
     def setup(self):
         """
@@ -86,8 +99,90 @@ class HandlerRL:
             logger.info(f"Loaded item Q table for subject {SUBJECT_ID} from {qfile}.")
         else:
             logger.info(f"Item Q table for subject {SUBJECT_ID} not found at {qfile}. ")
-        
+
+        # Longitudinal memory: load persistent RL state from DB and warm-start
+        # the Q-table by boosting dimensions that were scored at 2 in the most
+        # recent session.  This implements the paper's "Recall and Resume"
+        # protocol — returning users start with their prior problematic areas
+        # pre-weighted so the RL agent revisits them first.
+        self._load_longitudinal_state()
+
         logger.info("RL handler setup complete.")
+
+    def _load_longitudinal_state(self):
+        """Warm-start Q-table from persistent per-user DB state."""
+        if not io_rec.DB:
+            logger.info("No DB available; skipping longitudinal warm-start.")
+            return
+        try:
+            user_id = io_rec.DB.get_user_id(SUBJECT_ID)
+            state = io_rec.DB.load_rl_state(user_id)
+        except Exception as e:
+            logger.warning(f"Longitudinal state load failed: {e}")
+            return
+
+        if not state:
+            logger.info(f"Subject {SUBJECT_ID}: first-time user, no longitudinal state.")
+            return
+
+        self._is_returning_user = True
+        logger.info(f"Subject {SUBJECT_ID}: returning user — applying warm-start.")
+
+        # 1. Restore persisted Q-table if present.  This takes precedence over
+        # the CSV (CSV is still written for backwards compatibility).
+        q_json = state.get("q_table_json")
+        if q_json:
+            try:
+                # Newer pandas requires a file-like wrapper for read_json.
+                restored = pd.read_json(io.StringIO(q_json), orient="split")
+                # Ensure column/index shapes match the current item space.
+                if restored.shape == self.item_q_table.shape:
+                    restored.columns = restored.columns.astype(str)
+                    self.item_q_table = restored
+                    logger.info("Warm-started Q-table from persistent DB state.")
+                else:
+                    logger.warning(
+                        f"Persisted Q-table shape {restored.shape} does not match "
+                        f"current {self.item_q_table.shape}; ignoring."
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to restore Q-table from DB: {e}")
+
+        # 2. Load top Score-2 dimensions from last session.  The saved format
+        # is a list of {"label": ..., "name": ...} dicts; we flatten to just
+        # the lower-cased label strings here.
+        dims_json = state.get("top_score2_dims_json")
+        if dims_json:
+            try:
+                dims = json.loads(dims_json)
+                if isinstance(dims, list):
+                    labels: List[str] = []
+                    for d in dims:
+                        if isinstance(d, dict):
+                            lbl = str(d.get("label", "")).strip().lower()
+                            if lbl:
+                                labels.append(lbl)
+                        elif isinstance(d, str) and d.strip():
+                            labels.append(d.strip().lower())
+                    self._prior_score2_dims = labels
+            except Exception as e:
+                logger.warning(f"Failed to parse top_score2_dims_json: {e}")
+
+        # 3. Dimensional weighting bonus: boost Q-values for state indices
+        # whose label matches a prior Score-2 dimension so choose_action
+        # prefers them early in the session.
+        if self._prior_score2_dims:
+            boost = 3.0  # additive bonus on top of ITEM_IMPORTANCE base weight
+            for i_key in self.question_lib.keys():
+                try:
+                    label = str(self.question_lib[i_key]["1"].get("label", "")).lower()
+                except Exception:
+                    continue
+                if label in self._prior_score2_dims and i_key in self.item_q_table.columns:
+                    self.item_q_table[i_key] = self.item_q_table[i_key] + boost
+            logger.info(
+                f"Boosted Q-values for prior Score-2 dimensions: {self._prior_score2_dims}"
+            )
 
     def run(self):
         """
@@ -110,14 +205,44 @@ class HandlerRL:
                 "- Never confuse the two identities.\n"
             )
             
-            if user_ctx:
+            # Reasoner decision: determine if this is a returning user with
+            # sufficient prior context for a recall-and-resume greeting.
+            is_returning = bool(user_ctx and len(user_ctx) > 50)
+            io_rec.log_reasoning("reasoner_decision", {
+                "component": "greeting",
+                "decision": "returning_user" if is_returning else "new_user",
+                "user_ctx_length": len(user_ctx) if user_ctx else 0,
+                "prior_score2_dims": self._prior_score2_dims,
+            })
+
+            if is_returning:
+                # Recall-and-Resume protocol: if the user had Score-2 dimensions
+                # last session, name the top one (human-friendly label) so the
+                # greeting signals continuity of care.
+                recall_hint = ""
+                if self._prior_score2_dims:
+                    top_label = self._prior_score2_dims[0]
+                    top_human = top_label
+                    for i_key in self.question_lib.keys():
+                        entry = self.question_lib[i_key].get("1", {})
+                        if str(entry.get("label", "")).lower() == top_label:
+                            top_human = entry.get("name", top_label)
+                            break
+                    recall_hint = (
+                        f"\nRecall hint: last session the user struggled most with "
+                        f"'{top_human}'. Naturally ask how that has been since you "
+                        f"last spoke.\n"
+                    )
+
                 rewrite_system_prompt = (
                     "You are a warm, concise, and professional therapist-assistant.\n\n"
                     f"{identity_guard}\n"
                     "Task: Generate a welcoming opening greeting for a returning user. Transition into starting a new session.\n"
-                    f"Here is the context from their previous sessions:\n{user_ctx}\n\n"
+                    f"Here is the context from their previous sessions:\n{user_ctx}\n"
+                    f"{recall_hint}\n"
                     "Rules:\n"
                     "- Briefly and naturally acknowledge a detail from their past session summary to show you remember them.\n"
+                    "- If a 'Recall hint' is provided, gently check in on that topic in ONE short sentence.\n"
                     "- Do not list out their preferences mechanically. Just weave it into the 'Welcome back' if relevant.\n"
                     "- 2–3 short sentences maximum.\n- Friendly, non-judgmental tone.\n"
                     "- No extra headers or labels; output the final greeting directly.\n"
@@ -167,6 +292,8 @@ class HandlerRL:
         is_terminated = False
         # Mask for available items (first item is always available)
         item_mask = [0] + [1] * (ITEM_N_STATES - 1)
+        turn_idx = 0
+
         while not is_terminated:
             if io_rec.END_SESSION_EVENT.is_set():
                 logger.info("Session Interrupted (End Session Event). Committing Q-Tables early.")
@@ -178,12 +305,57 @@ class HandlerRL:
                 is_terminated = True
                 logger.info("All items have been asked. Proceeding to CBT.")
                 break
-            # Select an item to ask about using RL policy
-            A = choose_action(S, self.item_q_table, item_mask, ITEM_N_STATES, self.item_actions, self.item_action_labels)
-            
+
+            # Immediate re-screening for returning users: the paper requires
+            # bypassing the standard epsilon-greedy exploration for the first
+            # 1-2 turns and force-targeting previously problematic dimensions
+            # (Score 2 last session) to see if they have improved.
+            A = None
+            if (
+                self._is_returning_user
+                and turn_idx < 2
+                and self._prior_score2_dims
+            ):
+                for prior_dim in self._prior_score2_dims:
+                    for i_key in self.question_lib.keys():
+                        try:
+                            label = str(self.question_lib[i_key]["1"].get("label", "")).lower()
+                        except Exception:
+                            continue
+                        if label != prior_dim:
+                            continue
+                        try:
+                            idx = int(i_key)
+                        except ValueError:
+                            continue
+                        if 0 < idx < ITEM_N_STATES and item_mask[idx] == 1:
+                            A = str(idx)
+                            logger.info(
+                                f"[RESUME] Force-targeting prior Score-2 dim '{prior_dim}' "
+                                f"on turn {turn_idx} (bypassing epsilon-greedy)."
+                            )
+                            break
+                    if A is not None:
+                        break
+
+            if A is None:
+                # Select an item to ask about using fixed epsilon (paper/legacy aligned)
+                A = choose_action(
+                    S, self.item_q_table, item_mask, ITEM_N_STATES,
+                    self.item_actions, self.item_action_labels,
+                    epsilon=EPSILON,
+                )
+
             # Log the RL's internal logical state to the backend database before proceeding
             q_vals = self.item_q_table.loc[S].to_dict()
-            io_rec.log_reasoning("rl_decision", {"state": S, "action_chosen": A, "available_mask": item_mask, "q_values": q_vals})
+            io_rec.log_reasoning("rl_decision", {
+                "state": S,
+                "action_chosen": A,
+                "available_mask": item_mask,
+                "q_values": q_vals,
+                "epsilon": EPSILON,
+                "turn_idx": turn_idx,
+            })
             io_rec.set_rl_context({"state": S, "action_chosen": A, "available_mask": item_mask, "q_values": q_vals})
             
             # Mark this item as used
@@ -205,6 +377,24 @@ class HandlerRL:
                 f"Q update applied at action: Q(S={S},A={A}) {q_predict} -> {new_q_table.loc[S, A]} (target={q_target})"
             )
             S = S_
+            turn_idx += 1
+
+            # Crisis override: if ANY dimension is now scored at 2 AND that
+            # dimension is clinically critical, deliver the safety message
+            # immediately and pre-select that dimension as the CBT focus.
+            # Re-checks every turn because multi-dim back-fill can record a
+            # Score 2 on a critical dimension that was not the primary ask.
+            if self._crisis_scan() and not self._crisis_triggered:
+                self._crisis_triggered = True
+                logger.warning("[CRISIS OVERRIDE] Critical-dim Score 2 detected. Delivering safety resources.")
+                io_rec.log_reasoning("crisis_override", {
+                    "triggered_at_turn": turn_idx,
+                    "critical_dim": self._crisis_dim,
+                })
+                log_question(SAFETY_RESOURCES_MESSAGE)
+                # Short-circuit to CBT so the session focuses on the safety topic.
+                is_terminated = True
+                break
             # If the DLA process signals termination, end the loop and save results
             if DLA_terminate == 1:
                 # DLA process signaled termination; proceed to save artifacts
@@ -235,8 +425,23 @@ class HandlerRL:
             else:
                 logger.info(f"Created new item Q table for subject {SUBJECT_ID} at {qfile}.")
 
-        # Run CBT after the screening loop concludes if not interrupted
+            # Longitudinal persistence: authoritative per-user RL snapshot so
+            # future sessions can recall prior Score-2 dimensions and warm-start
+            # the Q-table with dimensional weighting.
+            self._save_longitudinal_state(item_mask)
+
+        # Run CBT after the screening loop concludes if not interrupted.
+        # When a crisis override fired during the screening loop, surface the
+        # critical dimension to the CBT selector as the default focus.
         if not io_rec.END_SESSION_EVENT.is_set():
+            if self._crisis_triggered and self._crisis_dim:
+                logger.info(
+                    f"[CRISIS] Routing CBT to crisis dimension '{self._crisis_dim}'."
+                )
+                try:
+                    io_rec.log_reasoning("cbt_crisis_routing", {"dim": self._crisis_dim})
+                except Exception:
+                    pass
             run_cbt(self.question_lib)
             logger.info("Completed CBT flow.")
             # Persist question_lib again to capture CBT notes
@@ -398,8 +603,16 @@ class HandlerRL:
 
     def _generate_clinical_summary(self):
         """
-        Generate a structured, clinician-friendly reflection summary at session end.
-        Includes key emotional trends, average screening profile, and next-session focus.
+        Generate a SOAP-formatted clinical session report at session end.
+
+        SOAP is the standard format used in licensed-therapist session notes:
+            Subjective   — the client's reported experience in their own words.
+            Objective    — observable / measured data (PHQ-4, GAD-2, dimensional
+                           scores 0-2 flagged as problematic).
+            Assessment   — clinician's interpretation of problematic dimensions,
+                           patterns, and risk status.
+            Intervention — what was delivered this session (R-V validations,
+                           CBT stages reached, crisis routing, next-session focus).
         """
         if not io_rec.DB or not io_rec.SESSION_ID:
             logger.warning("DB or Session ID not available for clinical summary.")
@@ -415,19 +628,49 @@ class HandlerRL:
         depression = screening.get("depression")
         total = screening.get("total")
 
+        # Collect per-dimension objective scores from the session's question_lib.
+        dim_rows = []
+        for i_key in self.question_lib.keys():
+            entry = self.question_lib[i_key].get("1", {})
+            label = entry.get("label", "")
+            name = entry.get("name", label)
+            scores = [s for s in entry.get("score", []) if isinstance(s, int) and 0 <= s <= 2]
+            if scores:
+                dim_rows.append(f"- {name} ({label}): score={max(scores)}")
+        dim_block = "\n".join(dim_rows) if dim_rows else "- (no dimensional scores recorded)"
+
+        cbt_used, cbt_notes = self._detect_cbt_summary()
+        crisis_line = (
+            f"Crisis override triggered on dimension '{self._crisis_dim}'."
+            if self._crisis_triggered else "No crisis override triggered."
+        )
+
         prompt = (
-            "Create a structured clinical session summary for therapist handoff.\n"
-            "Output exactly in this format with these headers:\n"
-            "KEY_EMOTIONAL_HIGHLIGHTS:\n"
-            "- ...\n"
-            "AVERAGE_SCREENING_SCORES:\n"
-            "- GAD2: ...\n"
-            "- PHQ2: ...\n"
-            "- PHQ4: ...\n"
-            "RECOMMENDED_NEXT_SESSION_FOCUS:\n"
-            "- ...\n"
-            "Keep concise, specific, and clinically neutral.\n\n"
-            f"Screening Snapshot => GAD2:{anxiety}, PHQ2:{depression}, PHQ4:{total}\n\n"
+            "Create a SOAP-format clinical session note for therapist handoff.\n"
+            "Output EXACTLY with these four headers and no others:\n\n"
+            "SUBJECTIVE:\n"
+            "- <client's reported experience in their own phrasing, 2-4 bullets>\n\n"
+            "OBJECTIVE:\n"
+            "- PHQ-4 total: <value>\n"
+            "- GAD-2 sub-total: <value>\n"
+            "- PHQ-2 sub-total: <value>\n"
+            "- Dimensional scores 0-2 (problematic only):\n"
+            "  <one bullet per dimension with a non-zero score>\n\n"
+            "ASSESSMENT:\n"
+            "- <clinician interpretation of the most clinically significant "
+            "findings, 2-3 bullets>\n"
+            "- <risk status line, e.g. 'No self-harm indicators' or 'Crisis override fired'>\n\n"
+            "INTERVENTION:\n"
+            "- <Reflection-Validation moments used>\n"
+            "- <CBT stages reached: Recognize / Challenge / Reframe>\n"
+            "- <Recommended focus for the next session>\n\n"
+            "Keep it concise, specific, and clinically neutral.\n"
+            "Use ASCII characters only.\n\n"
+            f"Screening snapshot => GAD-2:{anxiety}, PHQ-2:{depression}, PHQ-4:{total}\n"
+            f"Problematic dimensional scores:\n{dim_block}\n"
+            f"CBT used this session: {cbt_used}\n"
+            f"CBT notes:\n{cbt_notes or '(none)'}\n"
+            f"Safety: {crisis_line}\n\n"
             f"Session History:\n{hist_text}"
         )
 
@@ -435,7 +678,82 @@ class HandlerRL:
         if summary:
             io_rec.DB.add_summary(io_rec.SESSION_ID, summary)
             log_question(summary)
-            logger.info("Structured clinical summary generated and stored.")
+            logger.info("SOAP-format clinical report generated and stored.")
+
+    def _save_longitudinal_state(self, item_mask: list) -> None:
+        """Persist Q-table, item_mask and top Score-2 dims for this session."""
+        if not io_rec.DB:
+            return
+        try:
+            user_id = io_rec.DB.get_user_id(SUBJECT_ID)
+            # Collect labels of dimensions that hit Score 2 this session,
+            # ordered by importance weight (descending) so the top-3 most
+            # clinically important problematic dims are surfaced first in
+            # the next session's recall greeting.
+            score2_entries = []
+            for i_key in self.question_lib.keys():
+                try:
+                    i_int = int(i_key)
+                except ValueError:
+                    continue
+                entry = self.question_lib[i_key].get("1", {})
+                label = str(entry.get("label", "")).lower()
+                if not label:
+                    continue
+                if any((isinstance(s, int) and s == 2) for s in entry.get("score", [])):
+                    imp = ITEM_IMPORTANCE[i_int] if i_int < len(ITEM_IMPORTANCE) else 0
+                    score2_entries.append((imp, label, entry.get("name", label)))
+            score2_entries.sort(reverse=True)
+            top_dims = [{"label": lbl, "name": nm} for (_, lbl, nm) in score2_entries[:5]]
+
+            q_json = self.item_q_table.to_json(orient="split")
+            mask_json = json.dumps(item_mask)
+            dims_json = json.dumps(top_dims)
+
+            io_rec.DB.save_rl_state(
+                user_id=user_id,
+                q_table_json=q_json,
+                item_mask_json=mask_json,
+                top_score2_dims_json=dims_json,
+                last_session_id=io_rec.SESSION_ID,
+            )
+            logger.info(
+                f"Persisted longitudinal RL state for user_id={user_id}: "
+                f"{len(top_dims)} Score-2 dimensions recorded."
+            )
+        except Exception as e:
+            logger.warning(f"Longitudinal state save failed: {e}")
+
+    def _crisis_scan(self) -> bool:
+        """Return True if any CRITICAL_DIMS entry now has a score of 2.
+
+        Side-effect: records the first matching dimension label in
+        `self._crisis_dim` so the caller can prioritise it for CBT and
+        persist a safety flag.
+        """
+        try:
+            for i_key in self.question_lib.keys():
+                entry = self.question_lib[i_key].get("1", {})
+                label = str(entry.get("label", "")).lower()
+                if label not in CRITICAL_DIMS:
+                    continue
+                if any((isinstance(s, int) and s == 2) for s in entry.get("score", [])):
+                    self._crisis_dim = label
+                    # Best-effort safety flag persistence
+                    if io_rec.DB and io_rec.SESSION_ID:
+                        try:
+                            io_rec.DB.log_safety_flag(
+                                io_rec.SESSION_ID,
+                                flag_type=f"CRITICAL_DIM:{label}",
+                                raw_text=f"Score 2 detected on critical dimension '{label}'",
+                                severity=5,
+                            )
+                        except Exception as e:
+                            logger.warning(f"Could not persist safety flag: {e}")
+                    return True
+        except Exception as e:
+            logger.warning(f"crisis scan failed: {e}")
+        return False
 
     def _detect_cbt_summary(self) -> tuple:
         """Return (cbt_used, summary_str) by scanning question_lib notes for CBT markers."""
@@ -498,9 +816,7 @@ class HandlerRL:
                 logger.info("[PHQ-4] Session ended during screening.")
                 return None
 
-            # Strip emotion metadata if present
-            import re
-            clean_resp = re.sub(r"\[Detected Emotion:\s*\w+\]", "", user_response).strip()
+            clean_resp = user_response.strip()
 
             # Check for opt-out
             if any(kw in clean_resp.lower() for kw in ("skip", "don't want", "opt out", "no thanks", "stop")):

@@ -1,4 +1,4 @@
-"""AI model wrapper abstracting Speech-to-Text and lightweight emotion parsing."""
+"""AI model wrapper for Speech-to-Text (SER removed per research alignment)."""
 
 import gc
 import json
@@ -10,7 +10,6 @@ import sys
 # with the 8GB Jetson memory budget.  Detect it early and fail fast.
 try:
     import whisper as _heavy_whisper  # noqa: F401
-    # If this succeeds, the heavy package is installed
     _has_heavy_whisper = hasattr(_heavy_whisper, "load_model")
 except ImportError:
     _has_heavy_whisper = False
@@ -26,9 +25,7 @@ if _has_heavy_whisper:
 
 from faster_whisper import WhisperModel
 
-from src.models.light_ser import LightweightRandomForestSER
 from src.utils.config_loader import (
-    SER_BACKEND,
     STT_BEST_OF,
     STT_BEAM_SIZE,
     STT_COMPUTE_TYPE,
@@ -78,23 +75,6 @@ class STTGenerator:
             logger.error(f"Failed to load Faster-Whisper model: {e}")
             self.model = None
 
-        # Lightweight SER model (MFCC-based random-forest-style voting).
-        self.emotion_model = None
-        try:
-            if SER_BACKEND in {"light_mfcc_rf", "mfcc_rf", "lightweight"}:
-                rss_pre_ser = _rss_mb()
-                with RESOURCE_AUDIT.track_module_init("SER/LightMFCCRFInit"):
-                    self.emotion_model = LightweightRandomForestSER()
-                rss_post_ser = _rss_mb()
-                logger.info(
-                    f"Lightweight SER model loaded successfully. "
-                    f"RSS delta: +{rss_post_ser - rss_pre_ser:.1f}MB (now {rss_post_ser:.1f}MB)"
-                )
-            else:
-                logger.info(f"SER backend '{SER_BACKEND}' disabled; using neutral fallback.")
-        except Exception as e:
-            logger.info(f"Lightweight SER unavailable; using neutral fallback. Reason: {e}")
-
     def suspend(self):
         """Release the Whisper model from memory to free VRAM for the LLM.
         Call resume() before next transcription to re-load."""
@@ -114,22 +94,9 @@ class STTGenerator:
             rss_post = _rss_mb()
             logger.info(f"STT model suspended. RSS freed: {rss_pre - rss_post:.1f}MB")
 
-    def suspend_ser(self):
-        """Release the SER model from memory alongside Whisper.
-        The lightweight MFCC-RF model is small but every MB counts on 8GB Jetson."""
-        if self.emotion_model is not None:
-            rss_pre = _rss_mb()
-            del self.emotion_model
-            self.emotion_model = None
-            gc.collect()
-            clear_inference_cache("SER model suspended for LLM VRAM headroom")
-            rss_post = _rss_mb()
-            logger.info(f"SER model suspended. RSS freed: {rss_pre - rss_post:.1f}MB")
-
     def suspend_all(self):
-        """Full sequential handoff: unload both Whisper and SER."""
+        """Compat alias — SER removed, so this just suspends STT."""
         self.suspend()
-        self.suspend_ser()
 
     def resume(self):
         """Re-load the Whisper model after an LLM call."""
@@ -147,33 +114,9 @@ class STTGenerator:
             except Exception as e:
                 logger.error(f"Failed to resume STT model: {e}")
 
-    def resume_ser(self):
-        """Re-load the SER model after an LLM call."""
-        if self.emotion_model is None:
-            try:
-                if SER_BACKEND in {"light_mfcc_rf", "mfcc_rf", "lightweight"}:
-                    rss_pre = _rss_mb()
-                    self.emotion_model = LightweightRandomForestSER()
-                    rss_post = _rss_mb()
-                    logger.info(f"SER model resumed. RSS delta: +{rss_post - rss_pre:.1f}MB")
-            except Exception as e:
-                logger.info(f"SER resume failed; using neutral fallback. Reason: {e}")
-
     def resume_all(self):
-        """Full sequential handoff: reload both Whisper and SER."""
+        """Compat alias — SER removed, so this just resumes STT."""
         self.resume()
-        self.resume_ser()
-
-    def _classify_emotion(self, audio_path: str) -> str:
-        if not self.emotion_model:
-            return "neu"
-        try:
-            with RESOURCE_AUDIT.track_peak("SER/MFCC-RF"):
-                with heavy_stage("SER/MFCC-RF"):
-                    return self.emotion_model.classify_file(audio_path)
-        except Exception as e:
-            logger.error(f"SER Error: {e}")
-            return "neu"
 
     def transcribe(self, audio_path):
         """
@@ -181,7 +124,9 @@ class STTGenerator:
         Args:
             audio_path: Path to the .wav file.
         Returns:
-            text: Transcribed text string.
+            JSON string: {"transcript": str, "detected_emotion": "neu"}.
+            The emotion field is retained as "neu" for backwards compatibility
+            with downstream consumers but is no longer classified.
         """
         if not self.model:
             logger.error("Model not loaded, cannot transcribe.")
@@ -204,16 +149,12 @@ class STTGenerator:
                     text = " ".join([segment.text for segment in segments]).strip()
 
             clear_inference_cache("After STT phase")
-            emotion = self._classify_emotion(audio_path)
-            clear_inference_cache("After SER phase")
 
-            logger.info(f"Transcription: {text} | Emotion: {emotion}")
-            return json.dumps({"transcript": text, "detected_emotion": emotion})
+            logger.info(f"Transcription: {text}")
+            return json.dumps({"transcript": text, "detected_emotion": "neu"})
         except Exception as e:
-            logger.error(f"Transcription/SER error: {e}")
+            logger.error(f"Transcription error: {e}")
             return json.dumps({"transcript": "", "detected_emotion": "neu"})
 
 if __name__ == "__main__":
     stt = STTGenerator()
-    # Test transcription
-    # print(stt.transcribe("test_recording.wav"))

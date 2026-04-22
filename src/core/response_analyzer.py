@@ -1,5 +1,9 @@
 """Domain logic evaluating user answers to guide therapy state."""
 # src/response_analyzer.py
+import json
+import re
+from typing import List, Tuple
+
 from src.models.llm_client import llm_complete
 
 # Set up logger for this module
@@ -132,16 +136,29 @@ Example 4:
 REFLECTIVE_SUMMERIZER: You mentioned that your weight increased a lot recently.
 '''
 
-# Prompt for rephrasing a question as a therapist
-REPHRASER_PROMPT = ''' You are an intelligent agent who have strong reasoning capability and psychology and mental health commonsense knowledge. 
+# Prompt for STRUCTURAL rephrasing of a therapist-validated question.
+# The rephraser must preserve the clinical intent and the screening dimension
+# being probed — only sentence structure and vocabulary may vary.
+REPHRASER_PROMPT = '''You are a therapist-assistant with strong psychology and mental-health knowledge.
 
-You will be provide with:
-The original question in the format of {"Original Question": XXXXX}. 
-And you need to act as a therapist to rephrase the question to client.
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
 
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
 
 Response format:
-REPHRASER: XXXXX
+REPHRASER: <rephrased question>
 
 Example 1:
 {"Original Question": "Do you have coping skills to help you calm down?"}
@@ -153,9 +170,9 @@ REPHRASER: Are you dealing with any legal issues right now?
 
 Example 3:
 {"Original Question": "How's your mood recently?"}
-REPHRASER: How would you describe your mood recently?.
+REPHRASER: How would you describe your mood recently?
 
-Example 3:
+Example 4:
 {"Original Question": "Have your weight changed significantly recently?"}
 REPHRASER: Have you noticed any significant changes in your weight lately?
 '''
@@ -179,6 +196,98 @@ def classify_dimension_and_score(user_input: str, original_question: str) -> str
     # Provide both the question and the answer to improve contextual classification
     payload = f"Question: {original_question}\nAnswer: {user_input}"
     return llm_complete(INIT_ASKER_SYSTEM_PROMPT_V2, payload, inject_context=False)
+
+
+# Prompt for multi-dimension mapping (paper's "minimal questioning" principle):
+# a single user utterance may touch multiple clinical dimensions.
+MULTI_DIM_SYSTEM_PROMPT = '''You are a clinical classifier.
+Extract EVERY dimension the user discusses in a single utterance, along
+with its score (0, 1, or 2).  The user's utterance may map to one OR many
+dimensions.
+
+Valid dimensions:
+weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat,
+work, work_dayoff, showup, finance, nutrition, problem, support, family,
+drug, ciga, alcohol, hobbies, creativity, community, social, comfortable,
+protection, productivity, work_motivation, coping, sib, arrest, legal,
+hygiene, sports.
+
+Score scale:
+- 0: user performs well on this dimension
+- 1: some concern, no immediate action needed
+- 2: heightened clinical attention needed
+
+Input format:
+Question: <original question>
+Answer: <user utterance>
+
+Output format (STRICT JSON array, one line, no prose):
+[{"dim": "<dim>", "score": <0|1|2>}, {"dim": "<dim>", "score": <0|1|2>}]
+
+Rules:
+- If the utterance covers ONE dimension, return a one-element array.
+- If it covers MULTIPLE dimensions, include each with its own score.
+- If none of the above dimensions apply, return: [{"dim": "Other", "score": 0}]
+- Output ONLY the JSON array.  No markdown fences, no commentary.
+
+Example 1:
+Question: How is your eating?
+Answer: I haven't been eating regularly because work is crushing me.
+[{"dim": "eat", "score": 2}, {"dim": "work", "score": 2}]
+
+Example 2:
+Question: How is your mood?
+Answer: I feel sad and I have stopped exercising.
+[{"dim": "mood", "score": 2}, {"dim": "sports", "score": 2}]
+
+Example 3:
+Question: Have you been sleeping enough?
+Answer: Yes, I sleep fine.
+[{"dim": "sleep", "score": 0}]
+'''
+
+
+def classify_multi_dimensions(user_input: str, original_question: str) -> List[Tuple[str, int]]:
+    """Return every (dimension, score) pair the user's utterance covers.
+
+    Returns an empty list if the model output cannot be parsed.  Callers
+    should always also validate with the existing Yes/No/Stop shortcuts
+    first — this path is only used when the utterance is substantive.
+    """
+    payload = f"Question: {original_question}\nAnswer: {user_input}"
+    raw = llm_complete(MULTI_DIM_SYSTEM_PROMPT, payload, inject_context=False)
+    if not raw:
+        return []
+
+    # Extract the first JSON array found in the output — handles both
+    # well-behaved outputs and ones with stray prose.
+    m = re.search(r"\[[^\[\]]*\]", raw, flags=re.DOTALL)
+    if not m:
+        logger.debug(f"multi-dim: no JSON array found in output: {raw!r}")
+        return []
+
+    try:
+        data = json.loads(m.group(0))
+    except Exception as e:
+        logger.debug(f"multi-dim: JSON parse failed: {e}; raw={m.group(0)!r}")
+        return []
+
+    if not isinstance(data, list):
+        return []
+
+    out: List[Tuple[str, int]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        dim = str(item.get("dim", "")).strip().lower()
+        try:
+            score = int(item.get("score"))
+        except (TypeError, ValueError):
+            continue
+        if not dim or score not in (0, 1, 2):
+            continue
+        out.append((dim, score))
+    return out
 
 def reflective_summarizer(original_question: str, user_response: str) -> str:
     """
