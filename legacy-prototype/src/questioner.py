@@ -1,9 +1,8 @@
-"""Domain logic responsible for generating dynamic therapy questions."""
 from typing import List, Tuple, Dict, Any
 
 import numpy as np
 
-from src.services.response_bridge import get_openai_resp
+from src.utils.response_bridge import get_openai_resp
 from src.utils.text_generators import (
     generate_change,
     generate_change_positive,
@@ -11,80 +10,14 @@ from src.utils.text_generators import (
     generate_synonymous_sentences,
     generate_therapist_chat,
 )
-from src.models.llm_client import llm_complete
+from src.utils.llm_client import llm_complete
 
 # Set up logger for this module
 from src.utils.log_util import get_logger
-from src.utils.io_record import get_answer, get_resp_log, log_question, set_question_prefix, log_reasoning
+from src.utils.io_record import get_answer, get_resp_log, log_question, set_question_prefix
 logger = get_logger("Questioner")
 
-from src.core.reflection_validation import rv_consolidated, rv_validator_mi
-from src.core.response_analyzer import classify_multi_dimensions, reflective_summarizer
-
-
-def _apply_multi_dim_updates(
-    question_lib: Dict[str, Any],
-    user_segments: List[str],
-    original_question: str,
-    primary_label: str,
-) -> None:
-    """Map a single substantive utterance onto ALL dimensions it touches.
-
-    Implements the paper's "minimal questioning" principle: one user turn
-    can satisfy several dimensions simultaneously.  Scores for the PRIMARY
-    dimension are already handled by `_if_valid_response`; this function
-    only back-fills OTHER dimensions mentioned in the utterance so the RL
-    item_mask can disable them later.
-    """
-    joined = " ".join(s for s in user_segments if s).strip()
-    # Skip very short utterances — the primary path + Yes/No shortcuts are
-    # accurate enough and the multi-dim LLM call would be pure overhead.
-    if len(joined.split()) < 6:
-        return
-
-    try:
-        pairs = classify_multi_dimensions(joined, original_question)
-    except Exception as e:
-        logger.debug(f"multi-dim classification failed (non-fatal): {e}")
-        return
-
-    if not pairs:
-        return
-
-    # Build a lookup from label -> (i, j) so we can back-fill scores quickly.
-    label_to_entry = {}
-    for i_key in question_lib.keys():
-        for j_key in question_lib[i_key].keys():
-            entry = question_lib[i_key][j_key]
-            label_to_entry[str(entry.get("label", "")).lower()] = (i_key, j_key, entry)
-
-    applied = []
-    for dim, score in pairs:
-        if dim == primary_label.lower():
-            continue  # primary handled separately
-        target = label_to_entry.get(dim)
-        if not target:
-            continue
-        i_key, j_key, entry = target
-        # Do not overwrite an already-recorded score for this entry;
-        # multi-dim is opportunistic back-fill only.
-        if entry.get("score"):
-            continue
-        entry.setdefault("score", []).append(score)
-        entry.setdefault("notes", []).append([
-            "multi_dim_backfill: true",
-            f"source_question: {original_question}",
-            f"original_resp: {joined}",
-            f"inferred_score: {score}",
-        ])
-        applied.append((dim, score))
-
-    if applied:
-        logger.info(f"multi-dim back-fill applied: {applied}")
-        log_reasoning("multi_dim_backfill", {
-            "primary": primary_label,
-            "applied": [{"dim": d, "score": s} for d, s in applied],
-        })
+from src.reflection_validation import rv_reasoner, rv_guide, rv_validation
 
 # System prompt for generating a retry guide when re-asking the same question.
 RETRY_GUIDE_SYSTEM_PROMPT = '''You are a concise and supportive therapist-assistant.
@@ -116,11 +49,11 @@ Example C (neither):
 GUIDE: Let us focus on sleeping time: in the past week, have you generally slept enough hours most nights?
 '''
 
-def _chat_complete(system_content: str, user_content: str, **kwargs):
+def _chat_complete(system_content: str, user_content: str):
     """
     Unified LLM entry that delegates to llm_complete.
     """
-    return llm_complete(system_content, user_content, **kwargs)
+    return llm_complete(system_content, user_content)
 
 def retry_guide(topic: str, original_question: str, original_answer: str) -> str:
     """
@@ -131,10 +64,7 @@ def retry_guide(topic: str, original_question: str, original_answer: str) -> str
     """
     logger.info("Generating retry guide for re-ask.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Answer": {original_answer!r}}}'
-    raw_resp = _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload, inject_context=False)
-    if "GUIDE:" in raw_resp:
-        return raw_resp.split("GUIDE:")[1].strip()
-    return raw_resp
+    return _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload)
 
 def classify_segments(user_segments: List[str], original_question: str, dimension_label: str) -> List[Tuple[str, int]]:
     """
@@ -202,8 +132,7 @@ def _if_valid_response(
                 followup_to_RV = "It seems that " + text + " " + followup
 
             # Prepare note for follow-up, to be appended by caller after collecting follow-up
-            _seg = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
-            original_resp = "original_resp: " + _seg
+            original_resp = "original_resp: " + (user_segments[i] if i < len(user_segments) else user_segments[0])
             note_resp = [
                 "original_question: " + original_question,
                 original_resp,
@@ -217,36 +146,10 @@ def _if_valid_response(
             logger.info("Valid response: label matches and score is in [0,1,2]")
             question_lib[str(item_index)][str(question_index)]["score"].append(score_norm)
             if score_norm > 1:
-                # Paper p.13: follow-up uses the ReflectiveSummarizer to restate
-                # the client's response in third person ("You mentioned that...")
-                # as an MI simple-reflection before the "tell me more" prompt.
-                # This replaces the ad-hoc generate_change() concatenation.
-                seg = user_segments[i] if i < len(user_segments) else ""
-                reflected = ""
-                if seg:
-                    try:
-                        raw = reflective_summarizer(original_question, seg)
-                        # Strip any "REFLECTIVE_SUMMERIZER:" label the prompt
-                        # template specifies, keeping only the prose tail.
-                        for line in (raw or "").splitlines():
-                            stripped = line.strip()
-                            if stripped.upper().startswith("REFLECTIVE_SUMMERIZER:"):
-                                reflected = stripped.split(":", 1)[1].strip()
-                                break
-                        if not reflected:
-                            reflected = (raw or "").strip()
-                    except Exception as e:
-                        logger.warning(f"reflective_summarizer failed, falling back: {e}")
-                if reflected:
-                    followup_to_RV = f"{reflected} Can you tell me more about it?"
-                else:
-                    # Fallback path preserves legacy behaviour when the LLM
-                    # returns nothing usable.
-                    fallback = generate_change(seg).lower() if seg else ""
-                    followup_to_RV = f"You mentioned that {fallback} Can you tell me more?"
+                text = generate_change(user_segments[i]).lower() if i < len(user_segments) else ''
+                followup_to_RV = "You mentioned that " + text + " Can you tell me more?"
             # Prepare note
-            _seg = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
-            original_resp = "original_resp: " + _seg
+            original_resp = "original_resp: " + (user_segments[i] if i < len(user_segments) else user_segments[0])
             note_resp = [
                 "original_question: " + original_question,
                 original_resp,
@@ -261,16 +164,8 @@ def _if_valid_response(
             # return 0, 0, followup_to_RV, question_lib
             continue
 
-    # If nothing matched, fallback: invalid response.
-    # Paper/legacy: when the only labels are ambiguous ("Maybe"/"Question"),
-    # the caller will hit its existing retry_guide() branch and re-ask from a
-    # different angle — this preserves the paper's clarification sub-loop
-    # without a separate code path.
-    had_ambiguous = any(str(sc) in ("Maybe", "Question") for _, sc in dla_result)
-    if had_ambiguous:
-        logger.info("Ambiguous response (Maybe/Question only). Deferring to retry_guide clarification.")
-    else:
-        logger.info("No valid, yes, no, or stop label found in results. Marking as invalid response.")
+    # If nothing matched, fallback: invalid response
+    logger.info("No valid, yes, no, or stop label found in results. Marking as invalid response.")
     return 0, 0, followup_to_RV, question_lib
 
 def evaluate_result(question_lib, DLA_result, S, question_A, user_input, original_question_asked):
@@ -293,67 +188,48 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         # Log the last AI question and get a user response
         log_question(followup_to_RV)
         user_response = get_resp_log()
-        if user_response == "SESSION_END":
-            logger.info("Session End signal received during follow-up.")
-            return 1, 1, previous_question, question_lib
 
-        # ReflectionValidation three steps (topic = dimension label)
+        # ReflectionValidation three steps（topic = the dimension label of the current question）
         topic = question_lib[str(S)][str(question_A)]["label"]
         original_resp = user_input[0] if user_input else ""
 
-        logger.info(f"Running RV Reasoner for topic '{topic}'.")
-        rv_decision_token, rv_guide_text, rv_validation_text = rv_consolidated(
-            topic, original_question_asked, original_resp, user_response
-        )
+        logger.info(f"Running ReflectionValidation reasoner for topic '{topic}'.")
+        rv_decision_raw = rv_reasoner(topic, original_question_asked, original_resp, user_response)
+        # Simple parsing: extract '0/1', 0 means related, 1 means not related
+        rv_decision_token = "0" if "0" in rv_decision_raw else "1"
+        logger.info(f"ReflectionValidation decision: {rv_decision_token}")
 
-        logger.info(f"RV Decision: {rv_decision_token}")
-        log_reasoning("reasoner_decision", {
-            "component": "rv",
-            "decision": "related" if rv_decision_token == "0" else "unrelated",
-            "topic": topic,
-        })
-
+        # If not related (1), give guidance, recollect follow-up
+        rv_guide_text = ""
         user_response_0 = ""
-
         if rv_decision_token == "1":
-            # Unrelated: speak the Guide, re-collect a new follow-up response
-            logger.info("Follow-up unrelated. Using Guide text and recollecting.")
+            logger.info("Follow-up not related, generating guidance and recollecting follow-up.")
             user_response_0 = user_response
+            rv_guide_text = rv_guide(topic, original_question_asked, original_resp, user_response)
             log_question(rv_guide_text)
             user_response = get_resp_log()
-            if user_response == "SESSION_END":
-                logger.info("Session End signal received during RV guide.")
-                return 1, 1, previous_question, question_lib
 
-        # Empathic validation always runs — even after a Guide redirect,
-        # the user's (new) response still gets validated per paper/legacy.
-        logger.info("Running RV Validator (empathic validation).")
-        rv_validation_text = rv_validator_mi(
-            topic, original_question_asked, original_resp, user_response
-        )
+        # Empathic validation
+        logger.info("Running ReflectionValidation empathic validation.")
+        rv_validation_text = rv_validation(topic, original_question_asked, original_resp, user_response)
+        # Set validation text to be prepended to the next user-facing question
         set_question_prefix(rv_validation_text)
         logger.info("Queued RV validation to prepend before next question output.")
-
-        log_reasoning("validation_flag", {
-            "decision_token": rv_decision_token,
-            "guide": rv_guide_text,
-            "validation": rv_validation_text,
-            "topic": topic,
-        })
-
+        
+        # Skip generating therapist response to avoid unnecessary LLM calls
         therapist_resp = ""
-
-        # Record notes
+        
+        # Record notes (expand RV fields)
         logger.info("Recording notes for this question/response.")
         note_resp = [
             "original_question: " + original_question_asked,
             "original_resp: " + (user_input[0] if user_input else ""),
-            "followup_resp: " + (user_response_0 if user_response_0 else user_response),
+            "followup_resp: " + user_response_0 if user_response_0 else "followup_resp: " + user_response,
             "rv_decision: " + rv_decision_token,
-            "rv_guide: " + rv_guide_text,
-            "followup_resp_1: " + (user_response if user_response_0 else ""),
+            ("rv_guide: " + rv_guide_text) if rv_guide_text else "rv_guide: ",
+            "followup_resp_1: " + user_response if user_response_0 else "followup_resp_1: "
             "rv_validation: " + rv_validation_text,
-            "therapist_resp: " + therapist_resp,
+            "therapist_resp: " + therapist_resp
         ]
         question_lib[str(S)][str(question_A)]["notes"].append(note_resp)
         
@@ -375,33 +251,12 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
         # Check if the score list for this item is empty (i.e., not answered yet)
         if len(question_lib[str(S)][str(question_A)]["score"]) == 0:
             # if the item is not answered yet, ask it directly
-
-            # Build the variant pool.  Paper p.11 specifies 7-11 variants per
-            # dimension for the Rephraser to draw from; the active lib combines
-            # the therapist-authored `question` array with any post-hoc
-            # `question_synthetic` rephrases added by scripts/expand_question_lib.py.
-            # Therapist-authored questions are preferred for clinical fidelity.
-            # We allocate 60% of selection probability to the legacy pool and
-            # 40% to synthetic regardless of their sizes — so a dimension with
-            # 1 legacy question still has that question drawn 60% of the time.
-            entry = question_lib[str(S)][str(question_A)]
-            legacy_qs = list(entry.get("question", []))
-            synth_qs = list(entry.get("question_synthetic", []))
-            if legacy_qs and synth_qs:
-                weights = (
-                    [0.6 / len(legacy_qs)] * len(legacy_qs)
-                    + [0.4 / len(synth_qs)] * len(synth_qs)
-                )
-                pool = legacy_qs + synth_qs
-                question_text = str(np.random.choice(pool, p=weights))
-            elif legacy_qs:
-                question_text = legacy_qs[np.random.randint(len(legacy_qs))]
-            elif synth_qs:
-                question_text = synth_qs[np.random.randint(len(synth_qs))]
-            else:
-                # Defensive: no questions at all.  Fall back to the legacy
-                # pool so ask_question's historic error path still fires.
-                question_text = legacy_qs[0]
+            
+            # Get the number of available question variants for this item
+            number_of_questions = len(question_lib[str(S)][str(question_A)]["question"])
+            # Randomly select one question variant to ask
+            choice_of_question = np.random.randint(number_of_questions)
+            question_text = question_lib[str(S)][str(question_A)]["question"][choice_of_question]
             # With probability, generate a synonymous version of the question
             if np.random.uniform() < 0.95:
                 question_text = generate_synonymous_sentences(question_text)
@@ -411,35 +266,14 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
             log_question(question_text_ask)
             # Get user input for the question
             _ , user_input = get_answer()
-            if user_input and "SESSION_END" in user_input:
-                logger.info("Session End signal received in ask_question.")
-                return 0.0, 1, ""
-
             # Classify the user response into DLA result segments
             dimension_label = question_lib[str(S)][str(question_A)]["label"]
             DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]
-            
-            # Log Semantic Scores to DB
-            log_reasoning("semantic_scores", {"DLA_result": DLA_result, "dimension_label": dimension_label, "user_input": user_input})
-            
             # Evaluate the result and update state
             valid, DLA_terminate, previous_question, question_lib = evaluate_result(
                 question_lib, DLA_result, S, question_A, user_input, question_text
             )
-
-            # Multi-dimension back-fill (paper's minimal-questioning principle):
-            # if the user's substantive utterance also touches OTHER dimensions,
-            # opportunistically record scores for them so the RL loop does not
-            # re-ask questions we already have answers for.
-            if valid == 1 and DLA_terminate == 0:
-                _apply_multi_dim_updates(
-                    question_lib,
-                    user_input,
-                    question_text,
-                    dimension_label,
-                )
-
-            # If the answer is invalid (valid == 0) and the process has not been terminated (DLA_terminate == 0),
+            # If the answer is invalid (valid == 0) and the process has not been terminated (DLA_terminate == 0), 
             # we may want to give the user a chance to clarify their response.
             # Only retry if DLA_result is empty or every (label, score) pair suggests NA or an unclassified response (score==99 or label=="NA").
             if valid == 0 and DLA_terminate == 0:
@@ -448,39 +282,23 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                 original_answer_text = " ".join(user_input) if user_input else ""
                 guide_text = retry_guide(topic, question_text, original_answer_text)
                 # Show the guide to the user and collect a new response
-                # Show the guide to the user and collect a new response
                 log_question(guide_text)
                 _ , user_input = get_answer()
-                if user_input and "SESSION_END" in user_input:
-                    logger.info("Session End signal received in retry.")
-                    return 0.0, 1, ""
-
                 # Classify the new user response
                 dimension_label = question_lib[str(S)][str(question_A)]["label"]
                 DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]
-                
-                # Log Semantic Scores to DB
-                log_reasoning("semantic_scores", {"DLA_result": DLA_result, "dimension_label": dimension_label, "user_input": user_input, "is_retry": True})
-                
                 # Re-evaluate the new answer and update state accordingly
                 valid, DLA_terminate, previous_question, question_lib = evaluate_result(
                     question_lib, DLA_result, S, question_A, user_input, question_text
                 )
         
-        # Hybrid reward signal: average of max and mean across segment scores.
-        # Paper uses mean (faithful to overall tone); max preserves sensitivity
-        # to high-severity signals (e.g. one mention of self-harm in an otherwise
-        # calm response). The blend (max + mean) / 2 prevents both dilution of
-        # critical signals and overweighting of single outlier segments.
+        # Retrieve all scores for this question after answering
         all_score = question_lib[str(S)][str(question_A)]["score"]
-        int_scores = [s for s in all_score if isinstance(s, int) and 0 <= s <= 2]
-        if int_scores:
-            question_reward_value = (float(max(int_scores)) + float(sum(int_scores)) / len(int_scores)) / 2.0
-        else:
-            question_reward_value = 0.0
+        # Calculate the mean score if available, otherwise set to 0.0
+        question_openai_res = np.mean(all_score) if all_score else 0.0
+        # Append the result to the question reward list
+        question_reward.append(question_openai_res)
 
-        logger.info(
-            f"Finished question RL loop for item S={S}. "
-            f"Reward (max+mean)/2: {question_reward_value}, DLA_terminate: {int(DLA_terminate)}"
-        )
-        return question_reward_value, int(DLA_terminate), previous_question
+        # Return the total reward, termination flag, and last question
+        logger.info(f"Finished question RL loop for item S={S}. Total reward: {float(sum(question_reward))}, DLA_terminate: {int(DLA_terminate)}")
+        return float(sum(question_reward)), int(DLA_terminate), previous_question

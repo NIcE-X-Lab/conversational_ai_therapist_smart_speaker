@@ -292,6 +292,14 @@ class HandlerRL:
         is_terminated = False
         # Mask for available items (first item is always available)
         item_mask = [0] + [1] * (ITEM_N_STATES - 1)
+
+        # Paper appendix: users can opt out of sensitive dimensions
+        # (e.g. "arrest"/"legal" for non-applicable populations).  We
+        # apply these opt-outs at mask-init time so the RL policy never
+        # selects a disabled dimension.  Reserved preference key is
+        # `disabled_dim:<label>` with value "1".
+        self._apply_dimension_optouts(item_mask)
+
         turn_idx = 0
 
         while not is_terminated:
@@ -645,6 +653,31 @@ class HandlerRL:
             if self._crisis_triggered else "No crisis override triggered."
         )
 
+        # Paper p.21: longitudinal trend across recent sessions.  The current
+        # session's score is included at the head so the TREND block reads
+        # newest-first when the DB has not yet committed this session's row
+        # (it commits on log_screening_scores but ordering depends on
+        # start_time, so we prepend the in-memory snapshot defensively).
+        trend_block = ""
+        try:
+            user_id = io_rec.DB.get_user_id(SUBJECT_ID)
+            recent = io_rec.DB.get_recent_screening_scores(user_id, limit=5)
+            if recent and len(recent) > 1:
+                # Drop duplicate of the just-logged session, keep the rest in
+                # chronological order (oldest -> newest) for readability.
+                prior = list(reversed(recent))
+                phq4_series = [r["total"] for r in prior if r["total"] is not None]
+                gad2_series = [r["anxiety"] for r in prior if r["anxiety"] is not None]
+                phq2_series = [r["depression"] for r in prior if r["depression"] is not None]
+                trend_block = (
+                    f"Trend (oldest -> newest, last {len(prior)} sessions):\n"
+                    f"  PHQ-4 totals: {phq4_series}\n"
+                    f"  GAD-2 totals: {gad2_series}\n"
+                    f"  PHQ-2 totals: {phq2_series}\n"
+                )
+        except Exception as e:
+            logger.warning(f"Could not compute PHQ-4 trend block: {e}")
+
         prompt = (
             "Create a SOAP-format clinical session note for therapist handoff.\n"
             "Output EXACTLY with these four headers and no others:\n\n"
@@ -654,6 +687,8 @@ class HandlerRL:
             "- PHQ-4 total: <value>\n"
             "- GAD-2 sub-total: <value>\n"
             "- PHQ-2 sub-total: <value>\n"
+            "- Trend across recent sessions (if data available): "
+            "<one-line description, e.g. 'PHQ-4 down from 9 to 6 over last 3 sessions'>\n"
             "- Dimensional scores 0-2 (problematic only):\n"
             "  <one bullet per dimension with a non-zero score>\n\n"
             "ASSESSMENT:\n"
@@ -667,6 +702,7 @@ class HandlerRL:
             "Keep it concise, specific, and clinically neutral.\n"
             "Use ASCII characters only.\n\n"
             f"Screening snapshot => GAD-2:{anxiety}, PHQ-2:{depression}, PHQ-4:{total}\n"
+            f"{trend_block}"
             f"Problematic dimensional scores:\n{dim_block}\n"
             f"CBT used this session: {cbt_used}\n"
             f"CBT notes:\n{cbt_notes or '(none)'}\n"
@@ -679,6 +715,53 @@ class HandlerRL:
             io_rec.DB.add_summary(io_rec.SESSION_ID, summary)
             log_question(summary)
             logger.info("SOAP-format clinical report generated and stored.")
+
+    def _apply_dimension_optouts(self, item_mask: list) -> None:
+        """Mask out dimensions the user has opted out of via preferences.
+
+        Paper (appendix): users can decline entire dimensions (e.g. the
+        "law-abiding / arrest" family) if they are not applicable.  The
+        preference key format is `disabled_dim:<label>` with value "1".
+        This is a purely additive mask update — existing zeros (e.g. the
+        INIT slot at index 0) are left alone; enabled entries are cleared
+        to 0 only when a matching opt-out exists.
+        """
+        if not io_rec.DB:
+            return
+        try:
+            user_id = io_rec.DB.get_user_id(SUBJECT_ID)
+            prefs = io_rec.DB.get_all_preferences(user_id) or {}
+        except Exception as e:
+            logger.warning(f"Could not read user preferences for opt-out: {e}")
+            return
+
+        disabled_labels = {
+            k.split(":", 1)[1].strip().lower()
+            for k, v in prefs.items()
+            if k.startswith("disabled_dim:") and str(v).strip() == "1"
+        }
+        if not disabled_labels:
+            return
+
+        masked = []
+        for i_key in self.question_lib.keys():
+            try:
+                idx = int(i_key)
+            except ValueError:
+                continue
+            if not (0 < idx < ITEM_N_STATES):
+                continue
+            label = str(self.question_lib[i_key]["1"].get("label", "")).lower()
+            if label in disabled_labels and item_mask[idx] == 1:
+                item_mask[idx] = 0
+                masked.append(label)
+
+        if masked:
+            logger.info(f"[OPT-OUT] Masked {len(masked)} dimensions: {masked}")
+            try:
+                io_rec.log_reasoning("dimension_optout", {"masked": masked})
+            except Exception:
+                pass
 
     def _save_longitudinal_state(self, item_mask: list) -> None:
         """Persist Q-table, item_mask and top Score-2 dims for this session."""

@@ -13,9 +13,9 @@ paths:
 
 rl:
   item_n_states: 38
-  epsilon: 1 # exploitation rate (fixed, paper/legacy aligned)
-  alpha: 0.5 # learning rate (paper/legacy aligned)
-  gamma: 0.9 # discount factor
+  epsilon: 0.9 # exploitation rate (fixed, paper p.11: ε=0.9)
+  alpha: 0.1   # learning rate (paper p.11: α=0.1)
+  gamma: 0.9   # discount factor (paper p.11: γ=0.9)
   # epsilon_start / epsilon_end / epsilon_decay_turns / top_n_dims REMOVED — not in paper/legacy
 
   # Therapist-validated importance weights (1-10 scale):

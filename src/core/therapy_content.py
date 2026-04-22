@@ -121,6 +121,20 @@ SAFETY_RESOURCES_MESSAGE = (
 )
 
 
+# Paper p.15: after 3 invalid attempts at any CBT stage, the user should be
+# "directed to seek professional help".  This is spoken before the standard
+# "pause and revisit later" line whenever a stage exhausts its retry budget.
+CBT_ESCALATION_MESSAGE = (
+    "This kind of work can be difficult, and it is completely okay to find it "
+    "hard today. A trained therapist can offer the kind of support that goes "
+    "beyond what I can provide. "
+    "If you are in the United States, the SAMHSA national helpline at "
+    "1-800-662-4357 can connect you with local mental-health services, and "
+    "calling or texting 988 reaches the Suicide and Crisis Lifeline any time. "
+    "Please consider reaching out to a licensed professional when you are ready."
+)
+
+
 def score_response(text: str) -> int:
     """
     Map a verbal Likert response to the PHQ-4 / GAD-2 integer scale (0–3).

@@ -213,6 +213,19 @@ class DBManager:
         conn.close()
         return result[0] if result else None
 
+    def get_all_preferences(self, user_id):
+        """Return ALL preferences for a user as a {key: value} dict.
+
+        Used by handler_rl.setup() to discover dimensions the user has
+        opted out of (reserved key prefix `disabled_dim:<label>` = "1").
+        """
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
+        c = conn.cursor()
+        c.execute("SELECT key, value FROM user_preferences WHERE user_id=?", (user_id,))
+        rows = c.fetchall()
+        conn.close()
+        return {k: v for k, v in rows}
+
     def log_feedback(self, session_id, rating, comments, turn_index=None):
         """Log user feedback."""
         conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
@@ -292,6 +305,45 @@ class DBManager:
             f"depression={depression_score}, PHQ-4={phq4_total}, "
             f"GAD2_pos={bool(gad2_pos)}, PHQ4_risk={bool(phq4_risk)}"
         )
+
+    def get_recent_screening_scores(self, user_id: int, limit: int = 5):
+        """Return the most recent N sessions' PHQ-4 snapshots for this user.
+
+        Paper (p.21): the 24-week study tracked PHQ-9/GAD-7 trends — the
+        clinical narrative is longitudinal.  This helper powers the TREND
+        block in the SOAP report so therapists see change over time.
+
+        Returns a list of dicts (newest first):
+            {"session_id", "anxiety", "depression", "total",
+             "gad2_positive", "phq4_high_risk", "created_at"}
+        """
+        conn = sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
+        c = conn.cursor()
+        c.execute(
+            """SELECT cs.session_id, cs.anxiety_score, cs.depression_score,
+                      cs.phq4_total, cs.gad2_positive, cs.phq4_high_risk,
+                      cs.created_at
+               FROM clinical_screening cs
+               JOIN sessions s ON cs.session_id = s.id
+               WHERE s.user_id = ?
+               ORDER BY s.start_time DESC, cs.created_at DESC, cs.id DESC
+               LIMIT ?""",
+            (user_id, limit),
+        )
+        rows = c.fetchall()
+        conn.close()
+        return [
+            {
+                "session_id": r[0],
+                "anxiety": r[1],
+                "depression": r[2],
+                "total": r[3],
+                "gad2_positive": bool(r[4]),
+                "phq4_high_risk": bool(r[5]),
+                "created_at": r[6],
+            }
+            for r in rows
+        ]
 
     def get_screening_scores(self, session_id: int):
         """Fetch the latest screening scores for a session."""
