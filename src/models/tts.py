@@ -11,6 +11,15 @@ logger = get_logger("TTSGenerator")
 # espeak-ng is a lightweight fallback TTS available on most Linux/Jetson systems.
 _ESPEAK_FALLBACK = "espeak-ng"
 
+# M5: pre-generated cached WAV shipped with the repo. Played as a LAST-RESORT
+# when both Piper and espeak-ng fail — ensures the device is never silent
+# during a clinical trial, especially for safety messages. Expected at
+# `assets/audio/tts_fallback.wav`. Content is a generic "I'm having trouble
+# speaking, please check the device" prompt that alerts the participant.
+_CACHED_FALLBACK_WAV = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "assets", "audio", "tts_fallback.wav")
+)
+
 
 class TTSGenerator:
     def __init__(self):
@@ -116,8 +125,22 @@ class TTSGenerator:
         if not self._piper_available:
             logger.warning("[TTS Failure] Piper not available. Attempting espeak-ng fallback.")
             if self._espeak_available:
-                return self._generate_espeak(text, output_file)
-            logger.error("[TTS Failure] No TTS engine available. Skipping audio generation.")
+                espeak_result = self._generate_espeak(text, output_file)
+                if espeak_result:
+                    return espeak_result
+            # M5: both engines dead — copy the cached fallback WAV so at
+            # least SOMETHING is audible (clinical-trial safety rule).
+            if os.path.isfile(_CACHED_FALLBACK_WAV):
+                try:
+                    shutil.copyfile(_CACHED_FALLBACK_WAV, output_file)
+                    logger.error(
+                        "[TTS Failure] Both engines unavailable. "
+                        f"Using cached fallback WAV: {_CACHED_FALLBACK_WAV}"
+                    )
+                    return output_file
+                except Exception as e:
+                    logger.error(f"[TTS Failure] Cached fallback copy failed: {e}")
+            logger.error("[TTS Failure] No TTS engine or cached fallback available.")
             return None
 
         cmd = [
@@ -167,13 +190,31 @@ class TTSGenerator:
             logger.error(f"Piper executable not found at {self.executable}")
             self._piper_available = False
             if self._espeak_available:
-                return self._generate_espeak(text, output_file)
-            return None
+                r = self._generate_espeak(text, output_file)
+                if r:
+                    return r
+            return self._use_cached_fallback(output_file)
         except Exception as e:
             logger.error(f"TTS error: {e}")
             if self._espeak_available:
-                return self._generate_espeak(text, output_file)
-            return None
+                r = self._generate_espeak(text, output_file)
+                if r:
+                    return r
+            return self._use_cached_fallback(output_file)
+
+    def _use_cached_fallback(self, output_file: str):
+        """M5: copy cached WAV so the device is never silent during a trial."""
+        if os.path.isfile(_CACHED_FALLBACK_WAV):
+            try:
+                shutil.copyfile(_CACHED_FALLBACK_WAV, output_file)
+                logger.error(
+                    "[TTS Failure] Used cached fallback WAV "
+                    f"({_CACHED_FALLBACK_WAV})"
+                )
+                return output_file
+            except Exception as e:
+                logger.error(f"[TTS Failure] Cached fallback copy failed: {e}")
+        return None
 
 if __name__ == "__main__":
     tts = TTSGenerator()

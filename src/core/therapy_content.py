@@ -135,17 +135,34 @@ CBT_ESCALATION_MESSAGE = (
 )
 
 
+# C5: sentinels returned by score_response. Callers MUST distinguish between
+# UNRESOLVED (empty STT -> re-prompt) and OPT_OUT (user explicitly declined ->
+# persist SKIPPED). Scoring empty STT as 0 would be a clinical measurement
+# error (false negative on anxiety/depression screening).
+SCORE_UNRESOLVED = -2
+SCORE_OPT_OUT = -1
+
+
 def score_response(text: str) -> int:
     """
-    Map a verbal Likert response to the PHQ-4 / GAD-2 integer scale (0–3).
+    Map a verbal Likert response to the PHQ-4 / GAD-2 integer scale (0-3).
     Accepts free-form speech like 'several days', 'almost every day', etc.
-    Returns -1 if the user refuses or opts out.
+
+    Returns:
+        0-3  — valid Likert score
+        SCORE_OPT_OUT    (-1) — user explicitly refused / opted out
+        SCORE_UNRESOLVED (-2) — empty input or no Likert anchor detected;
+                                caller should re-prompt, NOT record as 0.
     """
+    if text is None:
+        return SCORE_UNRESOLVED
     t = text.lower().strip()
+    if not t:
+        return SCORE_UNRESOLVED
 
     # Opt-out / refusal
     if any(kw in t for kw in ("skip", "don't want", "opt out", "[opt_out]", "refuse", "pass")):
-        return -1
+        return SCORE_OPT_OUT
 
     # Scale anchors (most-specific first)
     if any(k in t for k in ("nearly every day", "almost every day", "every day", "always", "3")):
@@ -154,4 +171,12 @@ def score_response(text: str) -> int:
         return 2
     if any(k in t for k in ("several days", "several", "sometimes", "a few", "some days", "1")):
         return 1
-    return 0   # "not at all", "never", "no", or unmatched → 0
+
+    # Explicit "no / not at all / never" → 0 (well-scored)
+    if any(k in t for k in ("not at all", "never", "no ", "none", " no", "0", "fine", "good")):
+        return 0
+
+    # Unmatched free-form text: ambiguous — caller re-prompts.
+    # (Legacy behaviour silently scored this as 0. Matches paper intent:
+    # PHQ-4 is a standardised instrument; only validated anchors score.)
+    return SCORE_UNRESOLVED

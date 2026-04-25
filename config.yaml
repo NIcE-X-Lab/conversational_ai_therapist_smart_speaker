@@ -12,6 +12,13 @@ paths:
   record_csv: "data/record.csv"
 
 rl:
+  # Paper §5.1 (p.11) specifies 39 Q-learning states: 37 dimension questions
+  # + 1 START + 1 END. We use 38 (index 0 = START/INIT, indices 1..37 = the
+  # 37 dimensions) and drive termination via a sentinel ('terminal') in
+  # get_env_feedback rather than a 39th absorbing row. This is mathematically
+  # equivalent: when S_ == 'terminal' the Q-update skips bootstrapping
+  # (q_target = R, not R + γ·max Q(END,·)), which matches an explicit END
+  # row whose Q-values are all 0. See src/utils/rl_qtables.py::get_env_feedback.
   item_n_states: 38
   epsilon: 0.9 # exploitation rate (fixed, paper p.11: ε=0.9)
   alpha: 0.1   # learning rate (paper p.11: α=0.1)
@@ -38,6 +45,38 @@ rl:
   #        32(coping) 33(sib) 34(arrest) 35(legal) 36(hygiene) 37(sports)
   item_importance: [0, 5, 8, 7, 7, 3, 5, 5, 10, 10, 6, 6, 4, 3, 3, 4, 6, 4, 5, 5, 8, 4, 8, 2, 2, 2, 3, 3, 3, 3, 3, 3, 7, 10, 2, 2, 2, 2]
   number_questions: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+
+  # Paper §5.1: after picking one of the therapist-authored 7-11 sample
+  # questions, CaiTI runs a GPT-4-based Rephraser (structural rewrite,
+  # temp 0.7) on the chosen variant so every turn speaks a fresh wording.
+  # We keep this ON so the paper's "varied rephrasings" behaviour is
+  # reproduced at the cost of one extra LLM round-trip per screening turn.
+  # Set false to trust the pre-generated question_synthetic[] pool alone
+  # (zero runtime LLM cost, repeats after pool is exhausted) — useful
+  # for latency-sensitive Jetson deployments.
+  rephrase_at_runtime: true
+  # Legacy prototype used np.random.uniform() < 0.95 to skip rephrase 5%
+  # of the time. Set to 1.0 for paper-strict "always rephrase", or lower
+  # to mix pre-authored and rephrased variants.
+  rephrase_probability: 0.95
+
+  # ── Per-dimension reward aggregation (paper §5.1) ──────────────────
+  # Paper p.11: "The Score, based on the analysis of the user's response,
+  # represents the reward earned in that state." When a reply spans
+  # multiple segments, the legacy prototype aggregated via np.mean.
+  # Default: "mean" — paper-strict + legacy-faithful.
+  #
+  # Options:
+  #   "mean"   — paper-strict (default). mean over all per-segment scores
+  #              recorded for the dim. Matches legacy np.mean(all_score).
+  #   "hybrid" — (max + mean) / 2. Operator override when a dim's
+  #              revisit priority should be biased by any single severe
+  #              segment even in a long mostly-neutral utterance. NOT
+  #              paper-aligned — use only for research deployments that
+  #              explicitly want this behaviour. Within-session clinical
+  #              response (RV pipeline, CRITICAL_DIMS override) is
+  #              unaffected by either choice.
+  reward_mode: mean
  
 # openai configuration block is now managed via the .env file
 

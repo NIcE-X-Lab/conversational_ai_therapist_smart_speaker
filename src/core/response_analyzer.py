@@ -4,7 +4,7 @@ import json
 import re
 from typing import List, Tuple
 
-from src.models.llm_client import llm_complete
+from src.models.llm_client import llm_complete, LLMRole
 
 # Set up logger for this module
 from src.utils.log_util import get_logger
@@ -177,11 +177,11 @@ Example 4:
 REPHRASER: Have you noticed any significant changes in your weight lately?
 '''
 
-def _chat_complete(system_content: str, user_content: str):
+def _chat_complete(system_content: str, user_content: str, role: LLMRole = LLMRole.GENERAL):
     """
     Unified LLM entry that delegates to llm_complete.
     """
-    return llm_complete(system_content, user_content)
+    return llm_complete(system_content, user_content, role=role)
 
 def classify_dimension_and_score(user_input: str, original_question: str) -> str:
     """
@@ -189,13 +189,15 @@ def classify_dimension_and_score(user_input: str, original_question: str) -> str
     Input: user_input (str) - any user response string.
            original_question (str) - the original question being answered.
     Output: Raw model text, e.g., 'weight, 2' or 'Yes, 0'.
+
+    Paper role: ANALYZER (fine-tuned GPT-3.5-Turbo in paper).
     """
     logger.info("Classifying user input for dimension and score.")
     logger.debug(f"Original question: {original_question}")
     logger.debug(f"User input: {user_input}")
     # Provide both the question and the answer to improve contextual classification
     payload = f"Question: {original_question}\nAnswer: {user_input}"
-    return llm_complete(INIT_ASKER_SYSTEM_PROMPT_V2, payload, inject_context=False)
+    return llm_complete(INIT_ASKER_SYSTEM_PROMPT_V2, payload, role=LLMRole.ANALYZER)
 
 
 # Prompt for multi-dimension mapping (paper's "minimal questioning" principle):
@@ -255,7 +257,8 @@ def classify_multi_dimensions(user_input: str, original_question: str) -> List[T
     first — this path is only used when the utterance is substantive.
     """
     payload = f"Question: {original_question}\nAnswer: {user_input}"
-    raw = llm_complete(MULTI_DIM_SYSTEM_PROMPT, payload, inject_context=False)
+    # Paper role: ANALYZER (multi-dimension extension of Response Analyzer).
+    raw = llm_complete(MULTI_DIM_SYSTEM_PROMPT, payload, role=LLMRole.ANALYZER)
     if not raw:
         return []
 
@@ -294,19 +297,46 @@ def reflective_summarizer(original_question: str, user_response: str) -> str:
     Summarize the user's response in a reflective, third-person style.
     Input: original_question (str), user_response (str)
     Output: Reflective summary string.
+
+    Paper role: REFLECTIVE_SUMMARIZER (GPT-4 in paper).
     """
     logger.info("Generating reflective summary for user response.")
     logger.debug(f"Original question: {original_question}, User response: {user_response}")
     payload = f'{{"Original Question": "{original_question}", "User Response": "{user_response}"}}'
-    return llm_complete(REFLECTIVE_SUMMERIZER_PROMPT, payload, inject_context=False)
+    return llm_complete(REFLECTIVE_SUMMERIZER_PROMPT, payload, role=LLMRole.REFLECTIVE_SUMMARIZER)
 
 def rephrase_question(original_question: str) -> str:
     """
     Rephrase the original question as a therapist would.
     Input: original_question (str)
-    Output: Rephrased question string.
+    Output: Rephrased question string (label stripped, trimmed).
+
+    Paper role: REPHRASER (GPT-4 in paper, structural rewrite only).
+
+    On any empty / unparseable model output, returns the `original_question`
+    unchanged so the screening hot path never breaks due to an LLM quirk.
     """
     logger.info("Rephrasing question for therapist style.")
     logger.debug(f"Original question: {original_question}")
     payload = f'{{"Original Question": "{original_question}"}}'
-    return llm_complete(REPHRASER_PROMPT, payload, inject_context=False)
+    raw = llm_complete(REPHRASER_PROMPT, payload, role=LLMRole.REPHRASER)
+
+    if not raw:
+        return original_question
+
+    # Extract the REPHRASER: ... line; tolerate stray preamble / code-fence.
+    text = raw.strip()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith("REPHRASER:"):
+            candidate = stripped.split(":", 1)[1].strip()
+            if candidate:
+                return candidate
+
+    # Fallback: first non-empty line if no labelled output was produced.
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("```"):
+            return stripped
+
+    return original_question

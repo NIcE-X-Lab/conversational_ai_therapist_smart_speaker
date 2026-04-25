@@ -29,6 +29,8 @@ default.profraw
 backend_session.log
 data/q_tables/item_qtable_*.csv
 assets/waiting_music.wav
+assets/audio/*.mp3
+assets/audio/*.wav
 
 # Local model artifacts (large binaries)
 models/litert/*.litertlm

@@ -8,10 +8,8 @@ from src.utils.text_generators import (
     generate_change,
     generate_change_positive,
     generate_change_negative,
-    generate_synonymous_sentences,
-    generate_therapist_chat,
 )
-from src.models.llm_client import llm_complete
+from src.models.llm_client import llm_complete, LLMRole, LLMError
 
 # Set up logger for this module
 from src.utils.log_util import get_logger
@@ -19,7 +17,122 @@ from src.utils.io_record import get_answer, get_resp_log, log_question, set_ques
 logger = get_logger("Questioner")
 
 from src.core.reflection_validation import rv_consolidated, rv_validator_mi
-from src.core.response_analyzer import classify_multi_dimensions, reflective_summarizer
+from src.core.response_analyzer import (
+    classify_multi_dimensions,
+    reflective_summarizer,
+    rephrase_question,
+)
+from src.utils.config_loader import REPHRASE_AT_RUNTIME, REPHRASE_PROBABILITY, REWARD_MODE
+
+
+_RESERVED_LABELS = frozenset({"yes", "no", "maybe", "question", "stop", "na", "other", ""})
+
+
+def _record_clinical_score(
+    question_lib: Dict[str, Any],
+    i_key: str,
+    score: int,
+    *,
+    evidence_text: str | None = None,
+    source: str = "response_analyzer",
+) -> None:
+    """Phase B: mirror a `question_lib` score append into clinical_scores /
+    clinical_score_attempts. Best-effort — DB write must never block the
+    clinical pipeline on its own failure.
+    """
+    try:
+        import src.utils.io_record as io_rec
+        db = getattr(io_rec, "DB", None)
+        session_id = getattr(io_rec, "SESSION_ID", None)
+        if db is None or not session_id:
+            return
+        entry = question_lib.get(i_key, {}).get("1", {})
+        dim_label = str(entry.get("label", "")).lower()
+        dim_name = entry.get("name", dim_label)
+        scores_so_far = entry.get("score", [])
+        attempt_index = len(scores_so_far)
+        db.record_clinical_score(
+            session_id=session_id,
+            dim_index=int(i_key),
+            dim_label=dim_label,
+            score=int(score),
+            dim_name=dim_name,
+            evidence_text=evidence_text,
+            source=source,
+            attempt_index=attempt_index,
+        )
+    except Exception as e:
+        logger.warning(f"clinical_score persist failed (non-fatal): {e}")
+
+
+def _build_label_index(question_lib: Dict[str, Any]) -> Dict[str, tuple]:
+    """Label → (i_key, j_key, entry) index for O(1) back-fill lookups."""
+    idx = {}
+    for i_key in question_lib.keys():
+        for j_key in question_lib[i_key].keys():
+            entry = question_lib[i_key][j_key]
+            idx[str(entry.get("label", "")).lower()] = (i_key, j_key, entry)
+    return idx
+
+
+def _apply_segment_level_backfill(
+    question_lib: Dict[str, Any],
+    dla_result: List[Tuple[str, Any]],
+    primary_label: str,
+    user_segments: List[str],
+    original_question: str,
+) -> List[Tuple[str, int]]:
+    """Opportunistic catch-all back-fill using already-classified DLA_result.
+
+    Paper §4.1 "minimal questioning": one user utterance can satisfy multiple
+    dimensions simultaneously.  `classify_segments` has already run per-segment
+    LLM classification and produced (label, score) pairs — for any pair whose
+    label is a valid NON-primary dimension with an integer score in [0,1,2],
+    record the score opportunistically.  No additional LLM call.
+
+    Always runs, regardless of whether the primary answered the asked
+    dimension.  Returns the list of (label, score) pairs that were applied.
+    """
+    if not dla_result:
+        return []
+
+    label_to_entry = _build_label_index(question_lib)
+    primary_lower = str(primary_label).strip().lower()
+    applied: List[Tuple[str, int]] = []
+
+    for seg_idx, (label, score) in enumerate(dla_result):
+        label_l = str(label).strip().lower()
+        if label_l == primary_lower or label_l in _RESERVED_LABELS:
+            continue
+        if not isinstance(score, int) or score not in (0, 1, 2):
+            continue
+        target = label_to_entry.get(label_l)
+        if not target:
+            continue
+        i_key_matched, _, entry = target
+        if entry.get("score"):
+            continue  # already scored; never overwrite
+        entry.setdefault("score", []).append(score)
+        seg_text = user_segments[seg_idx] if seg_idx < len(user_segments) else ""
+        entry.setdefault("notes", []).append([
+            "segment_backfill: true",
+            f"source_question: {original_question}",
+            f"original_resp: {seg_text}",
+            f"inferred_score: {score}",
+        ])
+        _record_clinical_score(
+            question_lib, i_key_matched, score,
+            evidence_text=seg_text, source="segment_backfill",
+        )
+        applied.append((label_l, score))
+
+    if applied:
+        logger.info(f"segment-level back-fill applied: {applied}")
+        log_reasoning("segment_level_backfill", {
+            "primary": primary_label,
+            "applied": [{"dim": d, "score": s} for d, s in applied],
+        })
+    return applied
 
 
 def _apply_multi_dim_updates(
@@ -28,18 +141,17 @@ def _apply_multi_dim_updates(
     original_question: str,
     primary_label: str,
 ) -> None:
-    """Map a single substantive utterance onto ALL dimensions it touches.
+    """LLM-based multi-dimension coverage for substantive utterances.
 
-    Implements the paper's "minimal questioning" principle: one user turn
-    can satisfy several dimensions simultaneously.  Scores for the PRIMARY
-    dimension are already handled by `_if_valid_response`; this function
-    only back-fills OTHER dimensions mentioned in the utterance so the RL
-    item_mask can disable them later.
+    Complements `_apply_segment_level_backfill`: when a single long segment
+    implicitly covers multiple dimensions without the per-segment classifier
+    picking them up, this extra LLM pass (on the joined utterance) back-fills
+    them.  Gated by length (≥20 tokens, ≥2 segments) to amortise the extra
+    LLM round-trip.
     """
     joined = " ".join(s for s in user_segments if s).strip()
-    # Skip very short utterances — the primary path + Yes/No shortcuts are
-    # accurate enough and the multi-dim LLM call would be pure overhead.
-    if len(joined.split()) < 6:
+    tokens = joined.split()
+    if len(tokens) < 20 or len(user_segments) < 2:
         return
 
     try:
@@ -51,12 +163,7 @@ def _apply_multi_dim_updates(
     if not pairs:
         return
 
-    # Build a lookup from label -> (i, j) so we can back-fill scores quickly.
-    label_to_entry = {}
-    for i_key in question_lib.keys():
-        for j_key in question_lib[i_key].keys():
-            entry = question_lib[i_key][j_key]
-            label_to_entry[str(entry.get("label", "")).lower()] = (i_key, j_key, entry)
+    label_to_entry = _build_label_index(question_lib)
 
     applied = []
     for dim, score in pairs:
@@ -65,9 +172,8 @@ def _apply_multi_dim_updates(
         target = label_to_entry.get(dim)
         if not target:
             continue
-        i_key, j_key, entry = target
-        # Do not overwrite an already-recorded score for this entry;
-        # multi-dim is opportunistic back-fill only.
+        i_key_matched, _, entry = target
+        # Respect prior scores — segment-level back-fill may have already run.
         if entry.get("score"):
             continue
         entry.setdefault("score", []).append(score)
@@ -77,6 +183,10 @@ def _apply_multi_dim_updates(
             f"original_resp: {joined}",
             f"inferred_score: {score}",
         ])
+        _record_clinical_score(
+            question_lib, i_key_matched, score,
+            evidence_text=joined, source="multi_dim_backfill",
+        )
         applied.append((dim, score))
 
     if applied:
@@ -116,11 +226,11 @@ Example C (neither):
 GUIDE: Let us focus on sleeping time: in the past week, have you generally slept enough hours most nights?
 '''
 
-def _chat_complete(system_content: str, user_content: str, **kwargs):
+def _chat_complete(system_content: str, user_content: str, role: LLMRole = LLMRole.GENERAL):
     """
     Unified LLM entry that delegates to llm_complete.
     """
-    return llm_complete(system_content, user_content, **kwargs)
+    return llm_complete(system_content, user_content, role=role)
 
 def retry_guide(topic: str, original_question: str, original_answer: str) -> str:
     """
@@ -128,10 +238,13 @@ def retry_guide(topic: str, original_question: str, original_answer: str) -> str
     - Clarify if the user did not understand
     - Ask from a different angle if user is unsure/maybe/doubt
     - Otherwise, restate essence and invite concise answer
+
+    Paper role: RV_GUIDE (same clarify-and-redirect semantics as R-V Guide;
+    paper uses GPT-3.5-Turbo for this guidance style).
     """
     logger.info("Generating retry guide for re-ask.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Answer": {original_answer!r}}}'
-    raw_resp = _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload, inject_context=False)
+    raw_resp = _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload, role=LLMRole.RV_GUIDE)
     if "GUIDE:" in raw_resp:
         return raw_resp.split("GUIDE:")[1].strip()
     return raw_resp
@@ -162,16 +275,22 @@ def _if_valid_response(
     user_segments: List[str],
     original_question: str,
     question_lib: Dict[str, Any],
-    ) -> Tuple[int, int, str, Dict[str, Any]]:
+    ) -> Tuple[int, int, str, Dict[str, Any], bool]:
     """
-    Unified logic: iterate over all labels in dla_result, 
+    Unified logic: iterate over all labels in dla_result,
     return as soon as an identifiable valid or command-like label is found.
+
+    Returns (valid, terminate, followup_to_RV, question_lib, had_ambiguous).
+    `had_ambiguous` is True only when every segment was Maybe/Question and no
+    primary-valid token was found; callers use this to decide between
+    re-asking Dimension_N (paper §4.2 "understand user input better") and
+    the clarifying retry_guide path.
     """
     # Default to no follow-up; only set when we truly have a follow-up to ask
     followup_to_RV = ""
     if not dla_result:
         logger.info("No DLA result provided. Returning default values.")
-        return 0, 0, followup_to_RV, question_lib
+        return 0, 0, followup_to_RV, question_lib, False
 
     question_label = question_lib[str(item_index)][str(question_index)]["label"]
 
@@ -186,10 +305,15 @@ def _if_valid_response(
             logger.info(f"Match special token: {score_norm}")
             if str(score_norm) == "Stop":
                 logger.info("Received 'Stop' label. Terminating evaluation.")
-                return 1, 1, followup_to_RV, question_lib
+                return 1, 1, followup_to_RV, question_lib, False
 
             score = question_lib[str(item_index)][str(question_index)].get(str(score_norm), 99)
             question_lib[str(item_index)][str(question_index)]["score"].append(score)
+            _seg_primary = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
+            _record_clinical_score(
+                question_lib, str(item_index), score,
+                evidence_text=_seg_primary, source=f"yes_no_{str(score_norm).lower()}",
+            )
             logger.info("Appended score %s for keyword %s to question_lib[%s][%s].", str(score), str(score_norm), str(item_index), str(question_index))
 
             if score > 1:
@@ -198,8 +322,8 @@ def _if_valid_response(
                     text = generate_change_positive(text)
                 else:
                     text = generate_change_negative(text)
-                followup = generate_synonymous_sentences(" Can you tell me more about it?")
-                followup_to_RV = "It seems that " + text + " " + followup
+                # Fixed prompt — no LLM call needed for boilerplate paraphrase.
+                followup_to_RV = "It seems that " + text + " Can you tell me more about it?"
 
             # Prepare note for follow-up, to be appended by caller after collecting follow-up
             _seg = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
@@ -210,12 +334,17 @@ def _if_valid_response(
             ]
             question_lib[str(item_index)][str(question_index)]["notes"].append(note_resp)
             logger.debug("Appended note to question_lib[%s][%s]['notes'].", str(item_index), str(question_index))
-            return 1, 0, followup_to_RV, question_lib
+            return 1, 0, followup_to_RV, question_lib, False
 
         # Valid response: Label matches question label & score in [0,1,2]
         if label_norm.lower() == str(question_label).lower() and score_norm in [0, 1, 2]:
             logger.info("Valid response: label matches and score is in [0,1,2]")
             question_lib[str(item_index)][str(question_index)]["score"].append(score_norm)
+            _seg_primary = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
+            _record_clinical_score(
+                question_lib, str(item_index), int(score_norm),
+                evidence_text=_seg_primary, source="response_analyzer",
+            )
             if score_norm > 1:
                 # Paper p.13: follow-up uses the ReflectiveSummarizer to restate
                 # the client's response in third person ("You mentioned that...")
@@ -253,35 +382,38 @@ def _if_valid_response(
             ]
             question_lib[str(item_index)][str(question_index)]["notes"].append(note_resp)
             logger.debug("Appended note to question_lib[%s][%s]['notes'].", str(item_index), str(question_index))
-            return 1, 0, followup_to_RV, question_lib
+            return 1, 0, followup_to_RV, question_lib, False
 
         # Skip Maybe or Question, follow-up will be collected by caller
         if str(score_norm) in ["Maybe", "Question"]:
             logger.info("Processing 'Maybe' or 'Question' token.")
-            # return 0, 0, followup_to_RV, question_lib
+            # return 0, 0, followup_to_RV, question_lib, False
             continue
 
-    # If nothing matched, fallback: invalid response.
-    # Paper/legacy: when the only labels are ambiguous ("Maybe"/"Question"),
-    # the caller will hit its existing retry_guide() branch and re-ask from a
-    # different angle — this preserves the paper's clarification sub-loop
-    # without a separate code path.
+    # No primary match. Distinguish ambiguous (user confused/uncertain) from
+    # off-topic (user talked about a different dimension entirely). Paper
+    # §4.2 routes these differently: ambiguous → clarify via retry_guide;
+    # off-topic → re-ask the original Dimension_N question once.
     had_ambiguous = any(str(sc) in ("Maybe", "Question") for _, sc in dla_result)
     if had_ambiguous:
-        logger.info("Ambiguous response (Maybe/Question only). Deferring to retry_guide clarification.")
+        logger.info("Ambiguous response (Maybe/Question only). Caller will clarify via retry_guide.")
     else:
-        logger.info("No valid, yes, no, or stop label found in results. Marking as invalid response.")
-    return 0, 0, followup_to_RV, question_lib
+        logger.info("No primary match. Caller will re-ask Dimension_N per paper §4.2.")
+    return 0, 0, followup_to_RV, question_lib, had_ambiguous
 
 def evaluate_result(question_lib, DLA_result, S, question_A, user_input, original_question_asked):
     """
     Evaluate the result of a user's response to a question.
     Updates the question library and last question as needed.
     ReflectionValidation three steps（topic = the dimension label of the current question）
+
+    Returns (valid, terminate, previous_question, question_lib, had_ambiguous).
+    `had_ambiguous` lets the caller decide between re-asking Dimension_N
+    (off-topic user) and calling retry_guide (confused/uncertain user).
     """
     logger.info(f"Evaluating result for item {S}, question {question_A}.")
     # If valid user response, update the question library and last question
-    valid, terminate, followup_to_RV, updated = _if_valid_response(
+    valid, terminate, followup_to_RV, updated, had_ambiguous = _if_valid_response(
         [(lbl, sc) for lbl, sc in DLA_result], S, question_A, user_input, original_question_asked, question_lib
     )
     question_lib = updated
@@ -295,7 +427,9 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         user_response = get_resp_log()
         if user_response == "SESSION_END":
             logger.info("Session End signal received during follow-up.")
-            return 1, 1, previous_question, question_lib
+            # Contract: evaluate_result returns a 5-tuple. Early-return paths
+            # MUST preserve arity or callers in ask_question crash on unpack.
+            return 1, 1, previous_question, question_lib, had_ambiguous
 
         # ReflectionValidation three steps (topic = dimension label)
         topic = question_lib[str(S)][str(question_A)]["label"]
@@ -323,7 +457,7 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
             user_response = get_resp_log()
             if user_response == "SESSION_END":
                 logger.info("Session End signal received during RV guide.")
-                return 1, 1, previous_question, question_lib
+                return 1, 1, previous_question, question_lib, had_ambiguous
 
         # Empathic validation always runs — even after a Guide redirect,
         # the user's (new) response still gets validated per paper/legacy.
@@ -356,8 +490,8 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
             "therapist_resp: " + therapist_resp,
         ]
         question_lib[str(S)][str(question_A)]["notes"].append(note_resp)
-        
-    return valid, terminate, previous_question, question_lib
+
+    return valid, terminate, previous_question, question_lib, had_ambiguous
 
 def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
         """
@@ -402,11 +536,30 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                 # Defensive: no questions at all.  Fall back to the legacy
                 # pool so ask_question's historic error path still fires.
                 question_text = legacy_qs[0]
-            # With probability, generate a synonymous version of the question
-            if np.random.uniform() < 0.95:
-                question_text = generate_synonymous_sentences(question_text)
-            # Concatenate the last question (context) with the current question
+            # ── Paper §5.1 Rephraser ────────────────────────────────────────
+            # After picking one of the therapist-authored variants, paper
+            # §5.1 runs a GPT-4-based Rephraser at temp 0.7 to structurally
+            # rewrite it before speaking — guaranteeing a fresh wording every
+            # turn. Two config flags gate this to let deployments trade the
+            # extra inference call for latency:
+            #   rl.rephrase_at_runtime  — master switch (default true)
+            #   rl.rephrase_probability — per-turn coin flip (default 0.95,
+            #                              matching the legacy prototype)
+            # With both at defaults, behaviour mirrors the paper: every turn
+            # is rephrased ~95% of the time. On failure, the Rephraser is
+            # designed to return the original string so the hot path never
+            # breaks.
             question_text_ask = question_text
+            if REPHRASE_AT_RUNTIME and np.random.uniform() < REPHRASE_PROBABILITY:
+                try:
+                    rephrased = rephrase_question(question_text)
+                    if rephrased and rephrased.strip():
+                        question_text_ask = rephrased.strip()
+                        logger.info(
+                            f"[REPHRASER] '{question_text}' -> '{question_text_ask}'"
+                        )
+                except Exception as e:
+                    logger.warning(f"Rephraser failed, using original: {e}")
             # Log the question being asked
             log_question(question_text_ask)
             # Get user input for the question
@@ -415,72 +568,187 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                 logger.info("Session End signal received in ask_question.")
                 return 0.0, 1, ""
 
-            # Classify the user response into DLA result segments
+            # Classify against the question the user actually heard (possibly
+            # rephrased). Rephraser is structural-only so this preserves
+            # clinical meaning while keeping analyzer context consistent
+            # with what was asked out loud.
+            #
+            # If the Analyzer LLM is dead (LLMError), treat the turn as
+            # SKIPPED rather than silently letting downstream ("NA", 99)
+            # classifications corrupt the score distribution — the paper's
+            # Response Analyzer is load-bearing for (Dim, Score), and
+            # guessing 0 would be a clinical false-negative.
             dimension_label = question_lib[str(S)][str(question_A)]["label"]
-            DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]
-            
+            try:
+                DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text_ask, dimension_label)]
+            except LLMError as e:
+                logger.error(f"[ANALYZER_DEAD] Skipping turn for dim '{dimension_label}': {e}")
+                log_reasoning("analyzer_skipped", {
+                    "dimension": dimension_label,
+                    "reason": "llm_error",
+                    "error": str(e),
+                })
+                return 0.0, 0, ""
+
             # Log Semantic Scores to DB
             log_reasoning("semantic_scores", {"DLA_result": DLA_result, "dimension_label": dimension_label, "user_input": user_input})
-            
-            # Evaluate the result and update state
-            valid, DLA_terminate, previous_question, question_lib = evaluate_result(
-                question_lib, DLA_result, S, question_A, user_input, question_text
+
+            # ── Opportunistic back-fill (paper §4.1 "minimal questioning") ───
+            # Runs on RAW DLA_result BEFORE primary evaluation so that other
+            # dimensions the user actually talked about are credited even if
+            # the primary dimension ends up unanswered and we re-ask below.
+            # Segment-level back-fill is free (uses classifications we already
+            # have). Multi-dim is LLM-gated on utterance length.
+            _apply_segment_level_backfill(
+                question_lib, DLA_result, dimension_label, user_input, question_text_ask
+            )
+            _apply_multi_dim_updates(
+                question_lib, user_input, question_text_ask, dimension_label
             )
 
-            # Multi-dimension back-fill (paper's minimal-questioning principle):
-            # if the user's substantive utterance also touches OTHER dimensions,
-            # opportunistically record scores for them so the RL loop does not
-            # re-ask questions we already have answers for.
-            if valid == 1 and DLA_terminate == 0:
-                _apply_multi_dim_updates(
-                    question_lib,
-                    user_input,
-                    question_text,
-                    dimension_label,
-                )
+            # Evaluate primary dimension
+            valid, DLA_terminate, previous_question, question_lib, had_ambiguous = evaluate_result(
+                question_lib, DLA_result, S, question_A, user_input, question_text_ask
+            )
 
-            # If the answer is invalid (valid == 0) and the process has not been terminated (DLA_terminate == 0),
-            # we may want to give the user a chance to clarify their response.
-            # Only retry if DLA_result is empty or every (label, score) pair suggests NA or an unclassified response (score==99 or label=="NA").
-            if valid == 0 and DLA_terminate == 0:
-                # Generate a concise retry guide based on topic, original question, and original answer
-                topic = question_lib[str(S)][str(question_A)]["label"]
-                original_answer_text = " ".join(user_input) if user_input else ""
-                guide_text = retry_guide(topic, question_text, original_answer_text)
-                # Show the guide to the user and collect a new response
-                # Show the guide to the user and collect a new response
-                log_question(guide_text)
-                _ , user_input = get_answer()
+            # ── Paper §4.2: "Understand user input better" ────────────────────
+            # If the primary dimension got no score AND the user wasn't
+            # confused/uncertain (no Maybe/Question tokens), they talked about
+            # something else entirely. Re-ask the SAME Dimension_N question
+            # once before falling back to retry_guide. Back-fill above already
+            # captured whatever other dimensions they covered.
+            if valid == 0 and DLA_terminate == 0 and not had_ambiguous:
+                logger.info(
+                    f"[RE-ASK] Primary dim '{dimension_label}' unscored after back-fill. "
+                    f"Re-asking Dimension_N per paper §4.2."
+                )
+                log_reasoning("reask_dimension_n", {
+                    "dimension": dimension_label,
+                    "reason": "primary_unscored_no_ambiguity",
+                })
+                log_question(question_text_ask)
+                _, user_input = get_answer()
                 if user_input and "SESSION_END" in user_input:
-                    logger.info("Session End signal received in retry.")
+                    logger.info("Session End signal received in Dimension_N re-ask.")
                     return 0.0, 1, ""
 
-                # Classify the new user response
-                dimension_label = question_lib[str(S)][str(question_A)]["label"]
-                DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text, dimension_label)]
-                
-                # Log Semantic Scores to DB
-                log_reasoning("semantic_scores", {"DLA_result": DLA_result, "dimension_label": dimension_label, "user_input": user_input, "is_retry": True})
-                
-                # Re-evaluate the new answer and update state accordingly
-                valid, DLA_terminate, previous_question, question_lib = evaluate_result(
-                    question_lib, DLA_result, S, question_A, user_input, question_text
+                try:
+                    DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text_ask, dimension_label)]
+                except LLMError as e:
+                    logger.error(f"[ANALYZER_DEAD] Re-ask branch skipped for dim '{dimension_label}': {e}")
+                    log_reasoning("analyzer_skipped", {
+                        "dimension": dimension_label,
+                        "reason": "llm_error_reask",
+                        "error": str(e),
+                    })
+                    return 0.0, 0, ""
+                log_reasoning("semantic_scores", {
+                    "DLA_result": DLA_result,
+                    "dimension_label": dimension_label,
+                    "user_input": user_input,
+                    "is_reask": True,
+                })
+
+                # Back-fill again on the re-ask response — the user may have
+                # answered the primary AND touched new dimensions.
+                _apply_segment_level_backfill(
+                    question_lib, DLA_result, dimension_label, user_input, question_text_ask
+                )
+                _apply_multi_dim_updates(
+                    question_lib, user_input, question_text_ask, dimension_label
+                )
+
+                valid, DLA_terminate, previous_question, question_lib, had_ambiguous = evaluate_result(
+                    question_lib, DLA_result, S, question_A, user_input, question_text_ask
+                )
+
+            # ── retry_guide fallback (ambiguous or still-invalid after re-ask) ─
+            # Triggers when the user was confused/uncertain from the start OR
+            # when the Dimension_N re-ask also failed to produce a valid
+            # primary score. retry_guide clarifies / asks from a different
+            # angle rather than repeating the same question verbatim.
+            if valid == 0 and DLA_terminate == 0:
+                topic = question_lib[str(S)][str(question_A)]["label"]
+                original_answer_text = " ".join(user_input) if user_input else ""
+                guide_text = retry_guide(topic, question_text_ask, original_answer_text)
+                log_question(guide_text)
+                _, user_input = get_answer()
+                if user_input and "SESSION_END" in user_input:
+                    logger.info("Session End signal received in retry_guide.")
+                    return 0.0, 1, ""
+
+                try:
+                    DLA_result = [[label, score] for (label, score) in classify_segments(user_input, question_text_ask, dimension_label)]
+                except LLMError as e:
+                    logger.error(f"[ANALYZER_DEAD] Retry-guide branch skipped for dim '{dimension_label}': {e}")
+                    log_reasoning("analyzer_skipped", {
+                        "dimension": dimension_label,
+                        "reason": "llm_error_retry",
+                        "error": str(e),
+                    })
+                    return 0.0, 0, ""
+                log_reasoning("semantic_scores", {
+                    "DLA_result": DLA_result,
+                    "dimension_label": dimension_label,
+                    "user_input": user_input,
+                    "is_retry": True,
+                })
+
+                # Back-fill on retry response as well.
+                _apply_segment_level_backfill(
+                    question_lib, DLA_result, dimension_label, user_input, question_text_ask
+                )
+                _apply_multi_dim_updates(
+                    question_lib, user_input, question_text_ask, dimension_label
+                )
+
+                valid, DLA_terminate, previous_question, question_lib, had_ambiguous = evaluate_result(
+                    question_lib, DLA_result, S, question_A, user_input, question_text_ask
                 )
         
-        # Hybrid reward signal: average of max and mean across segment scores.
-        # Paper uses mean (faithful to overall tone); max preserves sensitivity
-        # to high-severity signals (e.g. one mention of self-harm in an otherwise
-        # calm response). The blend (max + mean) / 2 prevents both dilution of
-        # critical signals and overweighting of single outlier segments.
+        # ── Reward aggregation (paper §5.1 divergence) ──────────────────────
+        # Paper p.11: "The Score, based on the analysis of the user's
+        # response, represents the reward earned in that state." Legacy
+        # aggregates multi-segment answers via np.mean:
+        #     all_score = question_lib[S][Q]["score"]
+        #     question_openai_res = np.mean(all_score) if all_score else 0.0
+        # That's REWARD_MODE == "mean" (paper-strict).
+        #
+        # REWARD_MODE == "hybrid" (default) uses (max + mean) / 2 because
+        # pure mean has a failure mode: scores like [2, 0, 0, 0] average
+        # to 0.5 and barely move the Q-value, so a user turn containing
+        # ONE severe segment and several benign ones does not bias the
+        # RL agent toward revisiting that dimension next session.
+        # Hybrid promotes it to 1.25 — still short of max, but enough to
+        # shift revisit priority.
+        #
+        # Why this is safer than paper's mean (and still defensible):
+        #   • Within-session clinical response is unchanged — the R-V
+        #     pipeline already triggers on any single Score-2 segment.
+        #   • Critical dims (sib/safe/risk/drug/alcohol) are routed to
+        #     the crisis flow in handler_rl.py irrespective of reward.
+        #   • Multi-dim back-fill writes scores for off-topic dims into
+        #     the SAME score[] list; pure mean would dilute the asked
+        #     dimension's signal even more, hybrid resists that.
+        # Switch via config.yaml rl.reward_mode: mean to reproduce paper
+        # numbers exactly.
         all_score = question_lib[str(S)][str(question_A)]["score"]
         int_scores = [s for s in all_score if isinstance(s, int) and 0 <= s <= 2]
-        if int_scores:
-            question_reward_value = (float(max(int_scores)) + float(sum(int_scores)) / len(int_scores)) / 2.0
-        else:
+        if not int_scores:
             question_reward_value = 0.0
+            reward_desc = "empty"
+        elif REWARD_MODE == "mean":
+            question_reward_value = float(sum(int_scores)) / len(int_scores)
+            reward_desc = "mean (paper §5.1 / legacy)"
+        else:  # "hybrid" (default)
+            mean_r = float(sum(int_scores)) / len(int_scores)
+            max_r = float(max(int_scores))
+            question_reward_value = (max_r + mean_r) / 2.0
+            reward_desc = "(max+mean)/2 hybrid"
 
         logger.info(
             f"Finished question RL loop for item S={S}. "
-            f"Reward (max+mean)/2: {question_reward_value}, DLA_terminate: {int(DLA_terminate)}"
+            f"Reward [{reward_desc}]: {question_reward_value}, "
+            f"DLA_terminate: {int(DLA_terminate)}"
         )
         return question_reward_value, int(DLA_terminate), previous_question

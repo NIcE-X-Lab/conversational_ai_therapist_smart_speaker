@@ -1,4 +1,56 @@
-"""Domain logic managing Reiforcement Learning (RL) conversational flows."""
+"""Domain logic managing Reiforcement Learning (RL) conversational flows.
+
+Q-table persistence contract (paper §5.1 vs. current deployment)
+----------------------------------------------------------------
+Paper/legacy: per-subject Q-table is persisted to a CSV on the user's
+device at session end — `data/q_tables/item_qtable_<subject_id>.csv` —
+and reloaded at the next session's start. That's the full extent of
+longitudinal state in the paper.
+
+This deployment writes TWO persistence layers in parallel, by design:
+
+  1. CSV  (`data/q_tables/item_qtable_<subject_id>.csv`)
+     - Written unconditionally at session end via `DataFrame.to_csv`.
+     - Same filename scheme and format as the paper/legacy prototype.
+     - Kept authoritative for tooling, inspection, and paper-parity
+       artifact comparisons (e.g. `data/q_tables/item_qtable_8080.csv`
+       matches the legacy prototype's dumps byte-for-byte in shape).
+     - Loaded into `self.item_q_table` in `setup()` BEFORE
+       `_load_longitudinal_state()` runs, so it acts as the baseline
+       state before the DB warm-start overlay.
+
+  2. SQLite `rl_state` row (via `DBManager.save_rl_state`)
+     - Stores a JSON-serialised copy of the Q-table PLUS:
+         • `item_mask_json`        — which dimensions were asked this
+                                      session (supports resume-partial
+                                      sessions without re-asking).
+         • `top_score2_dims_json`  — top-5 Score-2 dimensions ordered by
+                                      importance, used for the recall-
+                                      and-resume greeting and for
+                                      force-targeting in the first two
+                                      turns of the next session.
+         • `last_session_id`       — provenance.
+     - The CSV format can't cleanly express mask/top-dims, so the DB
+       is authoritative for "pick up where we left off" semantics.
+     - At load time, `_load_longitudinal_state()` reads the DB row and,
+       if the Q-table shape matches, OVERWRITES the CSV-loaded baseline
+       with the DB copy. If the DB row is missing or malformed, we fall
+       through to the CSV-loaded baseline (graceful degradation).
+
+Divergence risk (documented, not mitigated)
+-------------------------------------------
+If a crash occurs between the CSV write and the DB write (or vice
+versa), the two layers can go out of sync. Because DB is authoritative
+for Q-values at load time, a newer CSV with older DB data will be
+silently overwritten at next session start. This is acceptable for the
+current research deployment but noted here so any future transactional
+dual-write can be bolted on without spelunking to find the contract.
+
+Practical implication: treat the CSV as a human-inspectable mirror of
+the DB's Q-values and DO NOT hand-edit it — edits will be overwritten.
+To force a reset, delete BOTH the CSV and the subject's `rl_state` DB
+row.
+"""
 import io
 import json
 import time
@@ -16,6 +68,8 @@ from src.core.therapy_content import (
     GAD2_THRESHOLD,
     PHQ4_THRESHOLD,
     SAFETY_RESOURCES_MESSAGE,
+    SCORE_OPT_OUT,
+    SCORE_UNRESOLVED,
     score_response,
 )
 from src.utils.config_loader import (
@@ -40,9 +94,14 @@ from src.utils.rl_qtables import (
 # Set up logger for this module
 from src.utils.log_util import get_logger
 from src.utils.resource_audit import get_resource_audit
-from src.models.llm_client import llm_complete
+from src.models.llm_client import llm_complete, LLMRole, LLMError
 logger = get_logger("HandlerRL")
 _RESOURCE_AUDIT = get_resource_audit()
+
+# M6: hard cap on session length. Paper §3 sessions are brief (minutes to
+# ~20 for CBT); a 60-minute wall guards against runaway LLM loops or stuck
+# intermissions keeping a participant on-device indefinitely.
+_SESSION_MAX_SECONDS = float(os.environ.get("SESSION_MAX_SECONDS", str(60 * 60)))
 
 class HandlerRL:
     """
@@ -54,21 +113,23 @@ class HandlerRL:
     def __init__(self):
         # Stores the last question asked to the user
         self.last_question: str = " "
-        # Stores all user responses for later result generation
-        self.new_response: list = []
         # The main question library loaded from file
         self.question_lib: Dict[str, Any] = {}
         # Q-table for item selection (top-level RL)
         self.item_q_table = None
         # Action id -> label mapping for logging readability
         self.item_action_labels = {}
-        # Crisis override state
+        # Crisis override state — tracks every critical dim that has fired
+        # so a second crisis (e.g. mid-CBT) can trigger the safety path again.
         self._crisis_triggered: bool = False
         self._crisis_dim: str = ""
+        self._crisis_dims_handled: set = set()
         # Longitudinal memory: top Score-2 dimensions from previous session,
         # loaded in setup() for warm-start + recall greeting.
         self._prior_score2_dims: List[str] = []
         self._is_returning_user: bool = False
+        # M6: session start timestamp for the hard cap.
+        self._session_started_at: float = 0.0
 
     def setup(self):
         """
@@ -91,7 +152,10 @@ class HandlerRL:
         for i in range(1, ITEM_N_STATES):
             self.item_action_labels[str(i)] = self.question_lib[str(i)]["1"]["label"]
   
-        # Load persistent Q tables (if exist)
+        # Step 1 of persistence contract (see module docstring): load the
+        # paper/legacy-compatible CSV as the baseline Q-table. This matches
+        # the legacy prototype format byte-for-byte and is what any external
+        # tooling inspecting data/q_tables/ expects to see.
         qdir = os.path.join(DATA_DIR, "q_tables")
         qfile = os.path.join(qdir, f"item_qtable_{SUBJECT_ID}.csv")
         if os.path.exists(qfile):
@@ -100,17 +164,23 @@ class HandlerRL:
         else:
             logger.info(f"Item Q table for subject {SUBJECT_ID} not found at {qfile}. ")
 
-        # Longitudinal memory: load persistent RL state from DB and warm-start
-        # the Q-table by boosting dimensions that were scored at 2 in the most
-        # recent session.  This implements the paper's "Recall and Resume"
-        # protocol — returning users start with their prior problematic areas
-        # pre-weighted so the RL agent revisits them first.
+        # Step 2 of persistence contract: overlay the DB's rl_state row,
+        # which is authoritative for resume semantics (carries the Q-table
+        # plus item_mask + top_score2_dims that CSV cannot express). If DB
+        # load fails or is missing, we keep the CSV baseline from step 1.
         self._load_longitudinal_state()
 
         logger.info("RL handler setup complete.")
 
     def _load_longitudinal_state(self):
-        """Warm-start Q-table from persistent per-user DB state."""
+        """Warm-start Q-table from persistent per-user DB state.
+
+        Authoritative read path for Q-values (see module docstring). If
+        present, the DB-stored Q-table overwrites the CSV baseline from
+        `setup()` because it's the layer that carries item_mask and
+        top_score2_dims alongside it. CSV is still the mirror that gets
+        rewritten at session end for paper/legacy tooling compatibility.
+        """
         if not io_rec.DB:
             logger.info("No DB available; skipping longitudinal warm-start.")
             return
@@ -128,8 +198,9 @@ class HandlerRL:
         self._is_returning_user = True
         logger.info(f"Subject {SUBJECT_ID}: returning user — applying warm-start.")
 
-        # 1. Restore persisted Q-table if present.  This takes precedence over
-        # the CSV (CSV is still written for backwards compatibility).
+        # 1. Restore persisted Q-table if present. Precedence order is
+        # documented in the module docstring: DB is authoritative at load
+        # time; CSV is authoritative for the written artifact format.
         q_json = state.get("q_table_json")
         if q_json:
             try:
@@ -190,6 +261,7 @@ class HandlerRL:
         Iteratively selects items and asks questions using RL, updating Q-tables and saving results.
         """
         logger.info("Starting main RL screening process.")
+        self._session_started_at = time.monotonic()
         self.setup()
 
         # Opening greeting (LLM-rewritten) delivered before the first question for all interfaces
@@ -257,22 +329,21 @@ class HandlerRL:
                     "- No extra headers or labels; output the final greeting directly.\n"
                 )
                 
-            greeting = llm_complete(rewrite_system_prompt, greeting_raw).strip()
+            # Paper role: GENERAL (greeting / session opener, not microbenchmarked).
+            greeting = llm_complete(rewrite_system_prompt, greeting_raw, role=LLMRole.GENERAL).strip()
             # Use greeting as a prefix so the first substantive question appears immediately
             set_question_prefix(greeting)
-            time.sleep(0.5)
         except Exception as e:
             # If LLM call fails, fall back to raw greeting prefix without blocking the flow
             logger.warning(f"Opening greeting rewrite failed: {e}")
             set_question_prefix("Hello, I'm CaiTI. Let's get started with a couple of questions about your recent daily life.")
-            time.sleep(0.5)
         # ── Interactive PHQ-4 / GAD-2 Clinical Screening ─────────────────
         # Run before the RL loop so scores can inform question selection.
         phq4_result = self._run_phq4_screening()
         if phq4_result is None:
             # Session was interrupted during screening
             logger.info("Session interrupted during PHQ-4 screening. Exiting.")
-            generate_results(self.question_lib, self.new_response)
+            generate_results(self.question_lib, [])
             dump_session_history_to_terminal()
             return
 
@@ -373,7 +444,10 @@ class HandlerRL:
             self.last_question = last_question_updated
             # Get next state and reward for item RL
             S_, R = get_env_feedback(S, A, openai_res, DLA_terminate, item_mask)
-            # Q-learning update for item Q-table
+            # Q-learning update for item Q-table.
+            # Paper §5.1 uses 39 states (37 dims + START + END); we model END
+            # as the sentinel S_ == 'terminal' and skip bootstrapping in that
+            # branch, which is equivalent to an absorbing END row of zeros.
             q_predict = self.item_q_table.loc[S, A]
             if S_ != 'terminal':
                 q_target = R + GAMMA * self.item_q_table.iloc[S_, :].max()
@@ -390,17 +464,23 @@ class HandlerRL:
             # Crisis override: if ANY dimension is now scored at 2 AND that
             # dimension is clinically critical, deliver the safety message
             # immediately and pre-select that dimension as the CBT focus.
-            # Re-checks every turn because multi-dim back-fill can record a
-            # Score 2 on a critical dimension that was not the primary ask.
-            if self._crisis_scan() and not self._crisis_triggered:
+            if self._crisis_scan():
                 self._crisis_triggered = True
-                logger.warning("[CRISIS OVERRIDE] Critical-dim Score 2 detected. Delivering safety resources.")
+                logger.warning(
+                    f"[CRISIS OVERRIDE] Critical-dim Score 2 detected ({self._crisis_dim}). "
+                    "Delivering safety resources via guaranteed path."
+                )
                 io_rec.log_reasoning("crisis_override", {
                     "triggered_at_turn": turn_idx,
                     "critical_dim": self._crisis_dim,
                 })
-                log_question(SAFETY_RESOURCES_MESSAGE)
+                self._deliver_safety_message(self._crisis_dim)
                 # Short-circuit to CBT so the session focuses on the safety topic.
+                is_terminated = True
+                break
+
+            # M6: hard session-length cap — graceful termination.
+            if self._session_timed_out():
                 is_terminated = True
                 break
             # If the DLA process signals termination, end the loop and save results
@@ -418,7 +498,14 @@ class HandlerRL:
             save_question_lib(save_filename, self.question_lib)
             logger.info(f"Saved question library to {save_filename} after session termination.")
             
-            # Save Q tables (in parallel with existing results)
+            # Persistence step 1 (see module docstring): write the CSV
+            # mirror in paper/legacy format. Tooling and external
+            # inspection rely on this file existing at the exact path
+            # legacy used — do NOT rename or drop it without coordinating
+            # with downstream consumers.
+            #
+            # C4: atomic tmp-file + os.replace so a process kill mid-write
+            # cannot corrupt the paper-compatible CSV artefact.
             qdir = os.path.join(DATA_DIR, "q_tables")
             qfile = os.path.join(qdir, f"item_qtable_{SUBJECT_ID}.csv")
             self.item_q_table = new_q_table
@@ -427,15 +514,27 @@ class HandlerRL:
                 os.makedirs(qdir, exist_ok=True)
                 logger.info(f"Created q_tables directory at {qdir}.")
             file_preexisted = os.path.exists(qfile)
-            self.item_q_table.to_csv(qfile)
-            if file_preexisted:
-                logger.info(f"Updated item Q table for subject {SUBJECT_ID} at {qfile}.")
-            else:
-                logger.info(f"Created new item Q table for subject {SUBJECT_ID} at {qfile}.")
+            tmp_qfile = qfile + ".tmp"
+            try:
+                self.item_q_table.to_csv(tmp_qfile)
+                os.replace(tmp_qfile, qfile)
+                if file_preexisted:
+                    logger.info(f"Updated item Q table for subject {SUBJECT_ID} at {qfile}.")
+                else:
+                    logger.info(f"Created new item Q table for subject {SUBJECT_ID} at {qfile}.")
+            except Exception as e:
+                logger.error(f"[Q-TABLE] Atomic CSV write failed: {e}")
+                try:
+                    if os.path.exists(tmp_qfile):
+                        os.remove(tmp_qfile)
+                except Exception:
+                    pass
 
-            # Longitudinal persistence: authoritative per-user RL snapshot so
-            # future sessions can recall prior Score-2 dimensions and warm-start
-            # the Q-table with dimensional weighting.
+            # Persistence step 2 (see module docstring): write the
+            # authoritative DB row. This includes the same Q-values plus
+            # item_mask and top_score2_dims needed for next-session
+            # resume + recall greeting. Divergence between CSV and DB at
+            # crash time is acknowledged; DB wins at load.
             self._save_longitudinal_state(item_mask)
 
         # Run CBT after the screening loop concludes if not interrupted.
@@ -450,7 +549,16 @@ class HandlerRL:
                     io_rec.log_reasoning("cbt_crisis_routing", {"dim": self._crisis_dim})
                 except Exception:
                     pass
-            run_cbt(self.question_lib)
+            def _cbt_crisis_hook() -> bool:
+                """Scan question_lib for new critical-dim Score 2 between CBT
+                stages; deliver safety resources if found, return True to
+                signal CBT to pause."""
+                if self._crisis_scan():
+                    self._deliver_safety_message(self._crisis_dim)
+                    return True
+                return False
+
+            run_cbt(self.question_lib, crisis_callback=_cbt_crisis_hook)
             logger.info("Completed CBT flow.")
             # Persist question_lib again to capture CBT notes
             save_filename = QUESTION_LIB_FILENAME.replace(".json", f"_{int(time.time())}.json")
@@ -460,7 +568,7 @@ class HandlerRL:
             logger.info("Session was early terminated. Skipping CBT workflow.")
 
         # Generate final results for this session
-        generate_results(self.question_lib, self.new_response)
+        generate_results(self.question_lib, [])
         logger.info("Generated final results for this session.")
 
         # Deliver concluding message — skip LLM if session was interrupted for prompt exit
@@ -487,22 +595,16 @@ class HandlerRL:
                     user_payload = (
                         f"cbt_used: {str(cbt_used).lower()}\n" + (f"session_summary:\n{cbt_summary}" if cbt_summary else "")
                     )
-                    closing = llm_complete(sys_prompt, user_payload).strip()
-                    time.sleep(0.5)
+                    # Paper role: GENERAL (closing message, not microbenchmarked).
+                    closing = llm_complete(sys_prompt, user_payload, role=LLMRole.GENERAL).strip()
                     log_question(closing)
-                    time.sleep(0.5)
-                    self._unlock_question_if_stuck()
                 else:
                     logger.info("CBT delivered its own closing; skipping RL-level closing to avoid double message.")
             except Exception as e:
                 logger.warning(f"Concluding message generation failed: {e}")
                 cbt_used, _ = self._detect_cbt_summary()
                 if not cbt_used:
-                    fallback = "Thank you for your time today. Take care, and goodbye."
-                    time.sleep(0.5)
-                    log_question(fallback)
-                    time.sleep(0.5)
-                    self._unlock_question_if_stuck()
+                    log_question("Thank you for your time today. Take care, and goodbye.")
 
         # Perform Session Analysis — skip LLM calls if session was interrupted
         if io_rec.END_SESSION_EVENT.is_set():
@@ -529,6 +631,13 @@ class HandlerRL:
         del self.item_q_table
         logger.info("Garbage collected ML DataFrame for HandlerRL Context wipe.")
 
+        # Mark the DB session row closed so crash-recovery doesn't mis-flag
+        # this as a dangling session on next boot.
+        try:
+            io_rec.mark_session_finalised()
+        except Exception as e:
+            logger.warning(f"mark_session_finalised failed: {e}")
+
     def _generate_session_analysis(self):
         """
         Analyze the session history for summary, preferences, and safety flags.
@@ -543,28 +652,33 @@ class HandlerRL:
             return
 
         # Format history string
-        hist_text = "\\n".join([f"{h['speaker']}: {h['text']}" for h in history])
-        
+        hist_text = "\n".join([f"{h['speaker']}: {h['text']}" for h in history])
+
         prompt = (
-            "Analyze the following therapy session history:\\n"
-            f"{hist_text}\\n\\n"
-            "Tasks:\\n"
-            "1. SUMMARY: Provide a brief 2-3 sentence summary of the session's key topics and user state.\\n"
-            "2. PREFERENCES: Extract any specific user preferences or facts mentioned (e.g., likes shopping, dislikes crowds). Format: KEY: VALUE\\n"
-            "3. SAFETY_FLAGS: Identify any potential safety risks (e.g., self-harm, violence). If none, say NONE.\\n"
-            "   Severity scale: 1 (mild) to 5 (critical).\\n\\n"
-            "Response Format:\\n"
-            "SUMMARY: <summary text>\\n"
-            "PREFERENCES:\\n- <key>: <value>\\n"
-            "SAFETY_FLAGS:\\n- <type>: <text>: <severity>\\n"
+            "Analyze the following therapy session history:\n"
+            f"{hist_text}\n\n"
+            "Tasks:\n"
+            "1. SUMMARY: Provide a brief 2-3 sentence summary of the session's key topics and user state.\n"
+            "2. PREFERENCES: Extract any specific user preferences or facts mentioned (e.g., likes shopping, dislikes crowds). Format: KEY: VALUE\n"
+            "3. SAFETY_FLAGS: Identify any potential safety risks (e.g., self-harm, violence). If none, say NONE.\n"
+            "   Severity scale: 1 (mild) to 5 (critical).\n\n"
+            "Response Format:\n"
+            "SUMMARY: <summary text>\n"
+            "PREFERENCES:\n- <key>: <value>\n"
+            "SAFETY_FLAGS:\n- <type>: <text>: <severity>\n"
         )
-        
+
         try:
-            analysis = llm_complete("You are a clinical supervisor analyzing session notes.", prompt)
-            
+            # Paper role: GENERAL (post-session analysis, extension beyond paper).
+            analysis = llm_complete(
+                "You are a clinical supervisor analyzing session notes.",
+                prompt,
+                role=LLMRole.GENERAL,
+            )
+
             # Parse and Store
             current_section = None
-            for line in analysis.split('\\n'):
+            for line in analysis.split('\n'):
                 line = line.strip()
                 if not line: continue
                 
@@ -710,7 +824,12 @@ class HandlerRL:
             f"Session History:\n{hist_text}"
         )
 
-        summary = llm_complete("You are a clinical documentation assistant.", prompt).strip()
+        # Paper role: GENERAL (SOAP clinical summary, extension beyond paper).
+        summary = llm_complete(
+            "You are a clinical documentation assistant.",
+            prompt,
+            role=LLMRole.GENERAL,
+        ).strip()
         if summary:
             io_rec.DB.add_summary(io_rec.SESSION_ID, summary)
             log_question(summary)
@@ -764,7 +883,14 @@ class HandlerRL:
                 pass
 
     def _save_longitudinal_state(self, item_mask: list) -> None:
-        """Persist Q-table, item_mask and top Score-2 dims for this session."""
+        """Persist Q-table, item_mask and top Score-2 dims for this session.
+
+        Authoritative write path for resume semantics (see module
+        docstring). Called in parallel with the CSV mirror write so
+        both layers stay in sync under normal termination. Failure is
+        logged and swallowed — the CSV mirror remains as a fallback if
+        the DB write fails mid-session.
+        """
         if not io_rec.DB:
             return
         try:
@@ -808,11 +934,15 @@ class HandlerRL:
             logger.warning(f"Longitudinal state save failed: {e}")
 
     def _crisis_scan(self) -> bool:
-        """Return True if any CRITICAL_DIMS entry now has a score of 2.
+        """Return True if any CRITICAL_DIMS entry now has a score of 2 that
+        hasn't already been handled this session.
 
-        Side-effect: records the first matching dimension label in
-        `self._crisis_dim` so the caller can prioritise it for CBT and
-        persist a safety flag.
+        C7: `self._crisis_dims_handled` lets the scan fire more than once per
+        session so a fresh critical dim detected mid-CBT still triggers the
+        safety path.
+
+        Side-effect: records the first NEW matching dimension label in
+        `self._crisis_dim` so the caller can prioritise it and persist flags.
         """
         try:
             for i_key in self.question_lib.keys():
@@ -820,9 +950,11 @@ class HandlerRL:
                 label = str(entry.get("label", "")).lower()
                 if label not in CRITICAL_DIMS:
                     continue
+                if label in self._crisis_dims_handled:
+                    continue
                 if any((isinstance(s, int) and s == 2) for s in entry.get("score", [])):
                     self._crisis_dim = label
-                    # Best-effort safety flag persistence
+                    # Legacy flag table (preserved for back-compat auditors).
                     if io_rec.DB and io_rec.SESSION_ID:
                         try:
                             io_rec.DB.log_safety_flag(
@@ -833,9 +965,143 @@ class HandlerRL:
                             )
                         except Exception as e:
                             logger.warning(f"Could not persist safety flag: {e}")
+                        # M3: authoritative clinical-flag log.
+                        try:
+                            io_rec.DB.log_clinical_flag(
+                                io_rec.SESSION_ID,
+                                flag_type="CRITICAL_DIM_SCORE_2",
+                                details={"critical_dim": label},
+                            )
+                        except Exception as e:
+                            logger.warning(f"Could not persist clinical flag: {e}")
                     return True
         except Exception as e:
             logger.warning(f"crisis scan failed: {e}")
+        return False
+
+    def _deliver_safety_message(self, critical_dim: str) -> bool:
+        """C2: guaranteed delivery of SAFETY_RESOURCES_MESSAGE.
+
+        Best-effort tries in this order:
+          1. Normal TTS path via OUTPUT_QUEUE (`log_question`).
+          2. Plain-text fallback written to `data/safety/` so an on-call
+             clinician monitoring the Jetson can see the message landed
+             even if speech is down.
+        Every attempt writes a row to `safety_deliveries` for audit.
+        Returns True if at least one delivery method succeeded.
+        """
+        success_any = False
+        errors = []
+
+        # Attempt 1: speak via TTS queue.
+        try:
+            log_question(SAFETY_RESOURCES_MESSAGE)
+            success_any = True
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_safety_delivery(
+                        session_id=io_rec.SESSION_ID,
+                        critical_dim=critical_dim,
+                        method="tts_queue",
+                        success=True,
+                        message_text=SAFETY_RESOURCES_MESSAGE,
+                    )
+                except Exception as e:
+                    logger.warning(f"[SAFETY] Could not audit TTS delivery: {e}")
+        except Exception as e:
+            err = f"tts_queue failed: {e}"
+            errors.append(err)
+            logger.error(f"[SAFETY] {err}")
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_safety_delivery(
+                        session_id=io_rec.SESSION_ID,
+                        critical_dim=critical_dim,
+                        method="tts_queue",
+                        success=False,
+                        message_text=SAFETY_RESOURCES_MESSAGE,
+                        error_text=str(e),
+                    )
+                except Exception:
+                    pass
+
+        # Attempt 2: always write the file fallback so a clinician sees it.
+        try:
+            import datetime
+            safety_dir = os.path.join(os.path.abspath("."), "data", "safety")
+            os.makedirs(safety_dir, exist_ok=True)
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            fallback_path = os.path.join(
+                safety_dir,
+                f"crisis_{SUBJECT_ID}_{io_rec.SESSION_ID}_{critical_dim}_{ts}.txt",
+            )
+            with open(fallback_path, "w", encoding="utf-8") as f:
+                f.write(f"[CRISIS CHECKPOINT]\n")
+                f.write(f"subject_id: {SUBJECT_ID}\n")
+                f.write(f"session_id: {io_rec.SESSION_ID}\n")
+                f.write(f"critical_dim: {critical_dim}\n")
+                f.write(f"timestamp: {datetime.datetime.now().isoformat()}\n")
+                f.write(f"tts_errors: {errors or 'none'}\n\n")
+                f.write(SAFETY_RESOURCES_MESSAGE)
+                f.write("\n")
+            logger.warning(f"[SAFETY] File fallback written: {fallback_path}")
+            success_any = True
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_safety_delivery(
+                        session_id=io_rec.SESSION_ID,
+                        critical_dim=critical_dim,
+                        method="file_fallback",
+                        success=True,
+                        message_text=fallback_path,
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            errors.append(f"file_fallback failed: {e}")
+            logger.error(f"[SAFETY] File fallback failed: {e}")
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_safety_delivery(
+                        session_id=io_rec.SESSION_ID,
+                        critical_dim=critical_dim,
+                        method="file_fallback",
+                        success=False,
+                        message_text=SAFETY_RESOURCES_MESSAGE,
+                        error_text=str(e),
+                    )
+                except Exception:
+                    pass
+
+        if not success_any:
+            logger.error(
+                f"[SAFETY] ALL DELIVERY METHODS FAILED for critical_dim={critical_dim}. "
+                f"Errors: {errors}"
+            )
+
+        self._crisis_dims_handled.add(critical_dim)
+        return success_any
+
+    def _session_timed_out(self) -> bool:
+        """M6: True once we've exceeded the hard session-length cap."""
+        if self._session_started_at <= 0:
+            return False
+        elapsed = time.monotonic() - self._session_started_at
+        if elapsed >= _SESSION_MAX_SECONDS:
+            logger.warning(
+                f"[SESSION CAP] Session exceeded {_SESSION_MAX_SECONDS:.0f}s "
+                f"(elapsed {elapsed:.0f}s). Forcing graceful termination."
+            )
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_clinical_flag(
+                        io_rec.SESSION_ID,
+                        flag_type="SESSION_CAP_REACHED",
+                        details={"elapsed_sec": elapsed, "cap_sec": _SESSION_MAX_SECONDS},
+                    )
+                except Exception:
+                    pass
+            return True
         return False
 
     def _detect_cbt_summary(self) -> tuple:
@@ -865,83 +1131,146 @@ class HandlerRL:
         except Exception:
             return False, ""
 
-    def _unlock_question_if_stuck(self) -> None:
-        """Legacy method for IPC lock. No longer needed with full transcript logging."""
-        pass
-
     def _run_phq4_screening(self) -> dict:
-        """
-        Interactive PHQ-4 / GAD-2 clinical screening loop.
-        Asks all 4 standardised questions, scores each response (0-3),
-        persists to DB immediately, and returns the score snapshot.
+        """Interactive PHQ-4 / GAD-2 clinical screening loop.
 
-        Returns dict with keys: anxiety, depression, total, phq4_high_risk, gad2_positive.
+        Returns dict with keys: anxiety, depression, total, phq4_high_risk,
+        gad2_positive, opted_out_at (str|None).
         Returns None if the session is interrupted.
+
+        C5: empty / ambiguous STT no longer scores as 0. `score_response`
+            returns SCORE_UNRESOLVED and we re-prompt up to 2 times before
+            marking the question SKIPPED (reason='stt_unresolved').
+        M7: on explicit opt-out we still run a crisis scan on the partial
+            anxiety+depression totals in case a high GAD-2 sub-score should
+            trigger the safety path despite the user declining to finish.
         """
         logger.info("[PHQ-4] Starting interactive clinical screening.")
         anxiety_scores = []
         depression_scores = []
+        opted_out_at = None
 
-        options_hint = "You can answer: Not at all, Several days, More than half the days, or Nearly every day."
+        options_hint = (
+            "You can answer: Not at all, Several days, More than half the days, "
+            "or Nearly every day."
+        )
+
+        def _mark_remaining_skipped(start_idx: int, reason: str):
+            if not (io_rec.DB and io_rec.SESSION_ID):
+                return
+            for remaining in CLINICAL_SCREENING[start_idx:]:
+                try:
+                    io_rec.DB.upsert_intermission_screening_status(
+                        session_id=io_rec.SESSION_ID,
+                        question_id=remaining["id"],
+                        status="SKIPPED",
+                        reason=reason,
+                    )
+                except Exception:
+                    pass
+
+        def _collect_scored_response(question_id: str, asked_text: str) -> tuple[int, str]:
+            """Ask-and-score with up to 2 re-prompts on SCORE_UNRESOLVED.
+
+            Returns (score, clean_response) where score is:
+              0..3            — valid
+              SCORE_OPT_OUT   — explicit refusal
+              SCORE_UNRESOLVED — still ambiguous after retries (caller marks SKIPPED)
+            """
+            last_clean = ""
+            for attempt in range(3):
+                user_response = io_rec.get_resp_log()
+                if user_response == "SESSION_END":
+                    return SCORE_UNRESOLVED, "SESSION_END"
+                clean = user_response.strip()
+                last_clean = clean
+
+                # Explicit opt-out shortcut.
+                if any(kw in clean.lower() for kw in
+                       ("skip", "don't want", "opt out", "no thanks", "stop", "refuse")):
+                    return SCORE_OPT_OUT, clean
+
+                score = score_response(clean)
+                if score in (0, 1, 2, 3):
+                    return score, clean
+                if score == SCORE_OPT_OUT:
+                    return SCORE_OPT_OUT, clean
+
+                # SCORE_UNRESOLVED — re-prompt with a clearer anchored phrasing.
+                if attempt == 0:
+                    log_question(
+                        f"I'm not sure I caught that. "
+                        f"Please answer with one of: not at all, several days, "
+                        f"more than half the days, or nearly every day."
+                    )
+                elif attempt == 1:
+                    log_question(
+                        f"Let me ask one more time. {asked_text}\n{options_hint}"
+                    )
+                # else: loop exits after 3rd attempt → unresolved
+            logger.warning(
+                f"[PHQ-4] {question_id}: unresolved after 3 attempts; marking SKIPPED."
+            )
+            return SCORE_UNRESOLVED, last_clean
 
         for i, q in enumerate(CLINICAL_SCREENING):
             if io_rec.END_SESSION_EVENT.is_set():
                 logger.info("[PHQ-4] Session interrupted during screening.")
                 return None
 
-            # Present the question with the Likert options hint
             question_text = f"{q['text']}\n{options_hint}"
             log_question(question_text)
 
-            # Wait for user response
-            user_response = io_rec.get_resp_log()
-            if user_response == "SESSION_END":
+            score, clean_resp = _collect_scored_response(q["id"], q["text"])
+
+            if clean_resp == "SESSION_END":
                 logger.info("[PHQ-4] Session ended during screening.")
                 return None
 
-            clean_resp = user_response.strip()
-
-            # Check for opt-out
-            if any(kw in clean_resp.lower() for kw in ("skip", "don't want", "opt out", "no thanks", "stop")):
+            if score == SCORE_OPT_OUT:
                 logger.info(f"[PHQ-4] User opted out at question {i+1} ({q['id']}).")
+                opted_out_at = q["id"]
                 io_rec.log_reasoning("phq4_screening", {
                     "status": "opted_out",
                     "opted_out_at": q["id"],
                     "anxiety_scores": anxiety_scores,
                     "depression_scores": depression_scores,
                 })
-                # Mark this and all remaining questions as SKIPPED in
-                # the intermission tracker so the ladder never re-asks.
+                _mark_remaining_skipped(i, reason="phq4_opt_out")
+                # Record this question itself as SKIPPED.
                 if io_rec.DB and io_rec.SESSION_ID:
-                    for remaining in CLINICAL_SCREENING[i:]:
-                        try:
-                            io_rec.DB.upsert_intermission_screening_status(
-                                session_id=io_rec.SESSION_ID,
-                                question_id=remaining["id"],
-                                status="SKIPPED",
-                                reason="phq4_opt_out",
-                            )
-                        except Exception:
-                            pass
+                    try:
+                        io_rec.DB.upsert_intermission_screening_status(
+                            session_id=io_rec.SESSION_ID,
+                            question_id=q["id"],
+                            status="SKIPPED",
+                            response_text=clean_resp,
+                            reason="phq4_opt_out",
+                        )
+                    except Exception:
+                        pass
                 break
 
-            # Score the response
-            score = score_response(clean_resp)
-            if score == -1:
-                logger.info(f"[PHQ-4] Refusal detected at question {i+1} ({q['id']}).")
-                # Mark remaining questions as SKIPPED for the intermission ladder
+            if score == SCORE_UNRESOLVED:
+                # Unresolved after retries → SKIP this one, continue with next.
                 if io_rec.DB and io_rec.SESSION_ID:
-                    for remaining in CLINICAL_SCREENING[i:]:
-                        try:
-                            io_rec.DB.upsert_intermission_screening_status(
-                                session_id=io_rec.SESSION_ID,
-                                question_id=remaining["id"],
-                                status="SKIPPED",
-                                reason="phq4_refusal",
-                            )
-                        except Exception:
-                            pass
-                break
+                    try:
+                        io_rec.DB.upsert_intermission_screening_status(
+                            session_id=io_rec.SESSION_ID,
+                            question_id=q["id"],
+                            status="SKIPPED",
+                            response_text=clean_resp,
+                            reason="stt_unresolved",
+                        )
+                    except Exception:
+                        pass
+                io_rec.log_reasoning("phq4_response", {
+                    "question_id": q["id"],
+                    "response": clean_resp,
+                    "score": None,
+                    "status": "SKIPPED_UNRESOLVED",
+                })
+                continue
 
             logger.info(f"[PHQ-4] {q['id']}: response='{clean_resp}' -> score={score}")
 
@@ -990,7 +1319,7 @@ class HandlerRL:
                 "running_total": phq4_total,
             })
 
-        # Final scores
+        # Final scores (M7: evaluated even on partial/opted-out completion).
         anxiety_total = sum(anxiety_scores) if anxiety_scores else 0
         depression_total = sum(depression_scores) if depression_scores else 0
         phq4_total = anxiety_total + depression_total
@@ -1003,18 +1332,69 @@ class HandlerRL:
             "total": phq4_total,
             "gad2_positive": gad2_positive,
             "phq4_high_risk": phq4_high_risk,
+            "opted_out_at": opted_out_at,
         }
 
-        # Log clinical flags
+        # Log clinical flags (legacy CSV trail + M3 authoritative DB row).
         if gad2_positive:
             logger.warning(f"[CLINICAL-FLAG] GAD2_POSITIVE — anxiety={anxiety_total} >= {GAD2_THRESHOLD}")
             io_rec.append_to_csv("clinical_flag", "system", f"GAD2_POSITIVE: anxiety={anxiety_total}")
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_clinical_flag(
+                        io_rec.SESSION_ID,
+                        flag_type="GAD2_POSITIVE",
+                        details={
+                            "anxiety": anxiety_total,
+                            "threshold": GAD2_THRESHOLD,
+                            "partial": opted_out_at is not None,
+                        },
+                    )
+                except Exception as e:
+                    logger.warning(f"clinical_flag write failed: {e}")
         if phq4_high_risk:
             logger.warning(f"[CLINICAL-FLAG] PHQ4_HIGH_RISK — total={phq4_total} >= {PHQ4_THRESHOLD}")
             io_rec.append_to_csv("clinical_flag", "system", f"PHQ4_HIGH_RISK: total={phq4_total}")
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_clinical_flag(
+                        io_rec.SESSION_ID,
+                        flag_type="PHQ4_HIGH_RISK",
+                        details={
+                            "total": phq4_total,
+                            "threshold": PHQ4_THRESHOLD,
+                            "partial": opted_out_at is not None,
+                        },
+                    )
+                except Exception as e:
+                    logger.warning(f"clinical_flag write failed: {e}")
+
+        # M7: if user opted out partway, still check whether their partial
+        # scores cross the clinical thresholds. A high GAD-2 followed by
+        # an opt-out is clinically alarming, not to be ignored.
+        if opted_out_at and (gad2_positive or phq4_high_risk):
+            logger.warning(
+                f"[CLINICAL-FLAG] PHQ-4 OPT-OUT WITH ELEVATED PARTIAL SCORES "
+                f"(gad2={anxiety_total}, total={phq4_total}). Delivering safety resources."
+            )
+            if io_rec.DB and io_rec.SESSION_ID:
+                try:
+                    io_rec.DB.log_clinical_flag(
+                        io_rec.SESSION_ID,
+                        flag_type="PHQ4_OPT_OUT_ELEVATED",
+                        details={
+                            "opted_out_at": opted_out_at,
+                            "anxiety": anxiety_total,
+                            "total": phq4_total,
+                        },
+                    )
+                except Exception:
+                    pass
+            # Deliver the safety path using the partial-score dimension as the tag.
+            self._deliver_safety_message(f"phq4_partial_{opted_out_at}")
 
         io_rec.log_reasoning("phq4_screening", {
-            "status": "completed",
+            "status": "opted_out" if opted_out_at else "completed",
             **result,
         })
 

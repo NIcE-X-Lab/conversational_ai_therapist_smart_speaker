@@ -1,37 +1,112 @@
-"""Utility helper managing file I/O operations and synchronous memory channels."""
+"""Utility helper managing file I/O operations and synchronous memory channels.
+
+Clinical-trial hardening applied in this module
+-----------------------------------------------
+- C1: `init_record` is idempotent — guarded by an init sentinel so handler-
+  side + main-side calls in the same session cannot create duplicate DB
+  session rows or reset CURRENT_TURN_INDEX mid-flight.
+- H1: Session mutation (SUBJECT_ID, DB, SESSION_ID) is protected by a
+  single `_INIT_LOCK` so the speech thread and handler thread cannot see
+  a torn state snapshot.
+- H3: OUTPUT_QUEUE is bounded (`maxsize=50`) with drop-oldest-on-overflow.
+  INPUT_QUEUE is intentionally UNBOUNDED — dropping a user reply is a
+  clinical data-loss event and is unacceptable.
+- H4: CURRENT_TURN_INDEX is atomic via `_TURN_INDEX_LOCK`; the
+  `_next_turn_index()` helper is the ONLY way to advance it.
+- M1: `REDACT_PII=1` env flag replaces transcript text with length tags
+  in all user-facing logger output. Structured DB/JSON logs are kept
+  untouched so clinicians can still audit.
+- M2: On `init_record()` we ask the DB to close any sessions left open
+  from a prior crash (end_reason='crash_recovery') before creating the
+  new session.
+"""
+import atexit
 import os
 import json
 import queue
-import logging
 import time
 import threading
-import pandas as pd
 from typing import List, Tuple
-
-import pysbd
 
 from src.utils.log_util import get_logger
 from src.drivers.db_manager import DBManager
 from src.utils.config_loader import DB_PATH, SUBJECT_ID, RECORD_CSV
 
-_SENTENCE_SEGMENTER = pysbd.Segmenter(language="en", clean=False)
+
+def _segment_utterance(text: str) -> List[str]:
+    """Legacy/paper-aligned utterance segmentation (zero dep)."""
+    if not text:
+        return []
+    normalised = text.replace(", and", ".").replace(" but ", ". ")
+    pieces = []
+    for chunk in normalised.replace("!", ".").replace("?", ".").split("."):
+        stripped = chunk.strip()
+        if stripped:
+            pieces.append(stripped)
+    return pieces
+
 
 logger = get_logger("IORecord")
+
+# ── Redaction (M1) ────────────────────────────────────────────────────────
+REDACT_PII = os.environ.get("REDACT_PII", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _redact(text) -> str:
+    """Return a log-safe rendering of `text` when REDACT_PII is enabled."""
+    s = "" if text is None else str(text)
+    if not REDACT_PII:
+        return s
+    # Keep length so log readers can still see "user said ~20 chars" without PII.
+    return f"[REDACTED_PII len={len(s)}]"
+
 
 _DEFAULT_RECORD_CSV = RECORD_CSV
 _LAST_AUTO_RECORD_CSV = None
 
-# IPC Queues
-# Agent puts questions here, Interface gets them
-OUTPUT_QUEUE = queue.Queue()
-# Interface puts responses here, Agent gets them
+# ── IPC Queues ───────────────────────────────────────────────────────────
+# INPUT_QUEUE: user -> handler. UNBOUNDED by design. Dropping a user
+# response is a clinical-data-loss event and not tolerable; overflow
+# indicates a dead handler and should surface as a clear error, not
+# silent data loss.
 INPUT_QUEUE = queue.Queue()
+
+# OUTPUT_QUEUE: handler -> speech. Bounded with drop-oldest-on-overflow
+# because speech is an output-only channel. A lost agent utterance is a
+# UX regression, not a safety issue.
+_OUTPUT_QUEUE_MAXSIZE = 50
+OUTPUT_QUEUE: queue.Queue = queue.Queue(maxsize=_OUTPUT_QUEUE_MAXSIZE)
+
+
+def _safe_output_put(item):
+    """Enqueue to OUTPUT_QUEUE with drop-oldest-on-overflow.
+
+    Never blocks. Logs a warning the first time we overflow per session so
+    a clogged TTS pipeline cannot silently pile up indefinitely.
+    """
+    try:
+        OUTPUT_QUEUE.put_nowait(item)
+    except queue.Full:
+        try:
+            dropped = OUTPUT_QUEUE.get_nowait()
+            logger.warning(
+                f"[QUEUE_OVERFLOW] OUTPUT_QUEUE full ({_OUTPUT_QUEUE_MAXSIZE}). "
+                f"Dropping oldest agent utterance to make room. "
+                f"Dropped preview: {_redact(str(dropped)[:60])}..."
+            )
+        except queue.Empty:
+            pass
+        try:
+            OUTPUT_QUEUE.put_nowait(item)
+        except queue.Full:
+            logger.error("[QUEUE_OVERFLOW] OUTPUT_QUEUE still full after drop; utterance lost.")
+
 
 END_SESSION_EVENT = threading.Event()
 START_SESSION_EVENT = threading.Event()
 
 
-# Database instance
+# ── Global session state (protected by _INIT_LOCK) ───────────────────────
 DB = None
 SESSION_ID = None
 CURRENT_TURN_INDEX = 0
@@ -46,21 +121,43 @@ _LATEST_SCREENING_SCORES = {
     "depression": None,
     "total": None,
 }
-
-# JSON session log path (set dynamically in init_record)
 _JSON_LOG_PATH: str = ""
+
+# ── Concurrency locks ────────────────────────────────────────────────────
+# H1: single lock serialising every mutation of session state.
+_INIT_LOCK = threading.Lock()
+# H4: atomic turn_index advance.
+_TURN_INDEX_LOCK = threading.Lock()
+
+# C1: idempotent-init sentinel. Cleared by reset_session() on explicit reset.
+_INIT_DONE = False
+
+
+def _next_turn_index() -> int:
+    """H4: atomically claim and advance CURRENT_TURN_INDEX."""
+    global CURRENT_TURN_INDEX
+    with _TURN_INDEX_LOCK:
+        idx = CURRENT_TURN_INDEX
+        CURRENT_TURN_INDEX += 1
+        return idx
+
+
+# ── Accessors (unchanged signatures) ─────────────────────────────────────
 
 def get_user_context():
     return USER_CONTEXT
+
 
 def set_last_user_signal(transcript: str, emotion: str = "Neutral"):
     global _LAST_USER_TRANSCRIPT, _LAST_USER_EMOTION
     _LAST_USER_TRANSCRIPT = str(transcript or "").strip()
     _LAST_USER_EMOTION = str(emotion or "Neutral").strip()
 
+
 def set_rl_context(state: dict):
     global _LAST_RL_STATE
     _LAST_RL_STATE = state if isinstance(state, dict) else {}
+
 
 def set_latest_screening_scores(anxiety=None, depression=None, total=None):
     global _LATEST_SCREENING_SCORES
@@ -70,29 +167,19 @@ def set_latest_screening_scores(anxiety=None, depression=None, total=None):
         "total": total,
     }
 
-def get_context_pack() -> dict:
-    return {
-        "user_transcript": _LAST_USER_TRANSCRIPT,
-        "emotion_tag": _LAST_USER_EMOTION,
-        "rl_state": _LAST_RL_STATE,
-        "screening_scores": _LATEST_SCREENING_SCORES,
-    }
 
 def set_question_prefix(text: str):
-    """
-    Set a pending prefix that will be prepended to the next question output.
-    """
+    """Set a pending prefix that will be prepended to the next question output."""
     global _PENDING_QUESTION_PREFIX
     _PENDING_QUESTION_PREFIX = str(text) if text is not None else ""
 
-# CSV Synchronization (Full Transcript Logging)
+
+# CSV header
 HEADER = ["Timestamp", "Type", "Speaker", "Text"]
 
+
 def log_json_event(event_type: str, data: dict):
-    """
-    Append a timestamped JSON line to the session JSON log file.
-    Format: {"ts": "...", "event": "...", ...data}
-    """
+    """Append a timestamped JSON line to the session JSON log."""
     global _JSON_LOG_PATH
     if not _JSON_LOG_PATH:
         return
@@ -108,142 +195,214 @@ def log_json_event(event_type: str, data: dict):
     except Exception as e:
         logger.error(f"Failed to write JSON log: {e}")
 
+
 def append_to_csv(log_type: str, speaker: str, text: str):
-    """
-    Append a single entry to record.csv to capture the full state of the conversation.
-    """
+    """Append a single CSV row capturing the full conversation state."""
     try:
         folder = os.path.dirname(RECORD_CSV)
         if folder and not os.path.exists(folder):
             os.makedirs(folder, exist_ok=True)
-            
+
         import datetime
         timestamp = datetime.datetime.now().isoformat()
-        
         write_header = not os.path.exists(RECORD_CSV)
-        
+
         with open(RECORD_CSV, 'a', encoding='utf-8') as f:
             if write_header:
                 f.write(",".join(HEADER) + "\n")
-            
-            # Escape strings for CSV
             escaped_text = str(text).replace('"', '""')
             line = f'"{timestamp}","{log_type}","{speaker}","{escaped_text}"\n'
             f.write(line)
     except Exception as e:
         logger.error(f"Failed to sync to CSV: {e}")
 
-def init_record(user_id_override: str = None):
-    """Initialize queues, database session, and CSV."""
+
+# ── Session lifecycle ────────────────────────────────────────────────────
+
+def init_record(user_id_override: str = None, force: bool = False):
+    """Initialize queues, DB session, CSV.
+
+    C1 + H1: idempotent + thread-safe. If already initialised in this
+    session, `init_record()` is a no-op unless called with force=True
+    (which is what `reset_session()` does).
+    """
     global DB, SESSION_ID, CURRENT_TURN_INDEX, SUBJECT_ID
     global _LAST_USER_TRANSCRIPT, _LAST_USER_EMOTION, _LAST_RL_STATE, _LATEST_SCREENING_SCORES
-    global _LAST_AUTO_RECORD_CSV
+    global _LAST_AUTO_RECORD_CSV, RECORD_CSV, _JSON_LOG_PATH, _INIT_DONE
 
-    # Reset PHQ-4 / GAD-2 screening state for this session
-    try:
-        from src.models.llm_client import _reset_screening
-        _reset_screening()
-    except Exception:
-        pass  # llm_client not yet loaded on first import is okay
+    with _INIT_LOCK:
+        if _INIT_DONE and not force:
+            logger.info(
+                f"init_record already ran this session (SESSION_ID={SESSION_ID}); "
+                "skipping duplicate init."
+            )
+            return
 
-    # Reset rolling clinical takeaway for the new session
-    try:
-        from src.core.context_manager import get_context_manager
-        get_context_manager().reset()
-    except Exception:
-        pass
+        if user_id_override:
+            logger.info(f"Overriding SUBJECT_ID with {user_id_override}")
+            SUBJECT_ID = user_id_override
 
-    if user_id_override:
-        logger.info(f"Overriding SUBJECT_ID with {user_id_override}")
-        SUBJECT_ID = user_id_override
-    
-    # Clear queues
-    with OUTPUT_QUEUE.mutex:
-        OUTPUT_QUEUE.queue.clear()
-    with INPUT_QUEUE.mutex:
-        INPUT_QUEUE.queue.clear()
-    
-    # Initialize DB
-    try:
-        DB = DBManager(DB_PATH)
-        user_id = DB.get_user_id(SUBJECT_ID)
-        SESSION_ID = DB.create_session(user_id)
-        # Load User Context (Summaries & Preferences)
+        # Clear queues (on force / fresh session)
+        with OUTPUT_QUEUE.mutex:
+            OUTPUT_QUEUE.queue.clear()
+        with INPUT_QUEUE.mutex:
+            INPUT_QUEUE.queue.clear()
+
         try:
-            global USER_CONTEXT
-            USER_CONTEXT = DB.get_user_context_string(user_id)
-            if USER_CONTEXT:
-                logger.info("Loaded User Context for session.")
+            DB = DBManager(DB_PATH)
+            user_id = DB.get_user_id(SUBJECT_ID)
+
+            # M2: crash recovery — close any sessions left open for this user.
+            try:
+                recovered = DB.close_open_sessions_for_user(user_id, reason="crash_recovery")
+                if recovered:
+                    logger.warning(
+                        f"[RECOVERY] Closed {len(recovered)} dangling session(s) "
+                        f"for user_id={user_id}: {recovered}"
+                    )
+                    try:
+                        DB.log_clinical_flag(
+                            session_id=recovered[0],
+                            flag_type="CRASH_RECOVERY",
+                            details={"closed_sessions": recovered, "user_id": user_id},
+                        )
+                    except Exception as e:
+                        logger.warning(f"[RECOVERY] Could not log recovery flag: {e}")
+            except Exception as e:
+                logger.warning(f"[RECOVERY] Skipping crash-recovery scan: {e}")
+
+            SESSION_ID = DB.create_session(user_id)
+
+            try:
+                global USER_CONTEXT
+                USER_CONTEXT = DB.get_user_context_string(user_id)
+                if USER_CONTEXT:
+                    logger.info("Loaded User Context for session.")
+            except Exception as e:
+                logger.error(f"Failed to load user context: {e}")
+
+            CURRENT_TURN_INDEX = 0
+            _LAST_USER_TRANSCRIPT = ""
+            _LAST_USER_EMOTION = "Neutral"
+            _LAST_RL_STATE = {}
+            _LATEST_SCREENING_SCORES = {"anxiety": None, "depression": None, "total": None}
         except Exception as e:
-            logger.error(f"Failed to load user context: {e}")
+            logger.error(f"Failed to initialize DB: {e}")
 
-        CURRENT_TURN_INDEX = 0
-        _LAST_USER_TRANSCRIPT = ""
-        _LAST_USER_EMOTION = "Neutral"
-        _LAST_RL_STATE = {}
-        _LATEST_SCREENING_SCORES = {"anxiety": None, "depression": None, "total": None}
-    except Exception as e:
-        logger.error(f"Failed to initialize DB: {e}")
-        
-    # Resolve RECORD_CSV and _JSON_LOG_PATH.
-    # Keep dynamic per-session path by default, but respect explicit overrides
-    # (e.g., tests that set io_record.RECORD_CSV to a fixed file).
-    global RECORD_CSV, _JSON_LOG_PATH
-    import datetime
-    timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_session_dir = os.path.join(os.path.abspath("."), "data", "logs", SUBJECT_ID)
-    record_csv_is_external = RECORD_CSV not in {_DEFAULT_RECORD_CSV, _LAST_AUTO_RECORD_CSV}
-    if record_csv_is_external:
-        logger.info(f"Using externally configured RECORD_CSV path: {RECORD_CSV}")
-    else:
-        RECORD_CSV = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.log")
-        _LAST_AUTO_RECORD_CSV = RECORD_CSV
-    _JSON_LOG_PATH = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.json")
-    
-    # Initialize session dossier (structured JSON log)
-    _init_dossier()
+        import datetime
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_session_dir = os.path.join(os.path.abspath("."), "data", "logs", SUBJECT_ID)
+        record_csv_is_external = RECORD_CSV not in {_DEFAULT_RECORD_CSV, _LAST_AUTO_RECORD_CSV}
+        if record_csv_is_external:
+            logger.info(f"Using externally configured RECORD_CSV path: {RECORD_CSV}")
+        else:
+            RECORD_CSV = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.log")
+            _LAST_AUTO_RECORD_CSV = RECORD_CSV
+        _JSON_LOG_PATH = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.json")
 
-    # Initialize CSV
-    append_to_csv("internal", "system", f"Session initialized. User: {SUBJECT_ID}, DB ID: {SESSION_ID}")
+        _init_dossier()
+
+        append_to_csv("internal", "system", f"Session initialized. User: {SUBJECT_ID}, DB ID: {SESSION_ID}")
+        _INIT_DONE = True
+
 
 def reset_session(new_user_id: str = None):
-    """Reset the session, optionally switching users."""
-    init_record(new_user_id)
+    """Explicit reset — tears down the init sentinel and re-initialises."""
+    global _INIT_DONE
+    with _INIT_LOCK:
+        _INIT_DONE = False
+    init_record(new_user_id, force=True)
 
 
+def mark_session_finalised(reason: str = "normal"):
+    """Close the current SESSION_ID row in DB cleanly on session end.
+
+    Called by the handler on normal exit, by the speech service on
+    user-initiated end, and by the `atexit` hook below on interpreter
+    shutdown. Idempotent; safe to call twice.
+
+    Phase B (strategy 1a): on a `reason="normal"` close (clean graceful
+    end with the runtime still alive), we trigger the therapist-report
+    CSV generator. On `reason="atexit"` the report call is a backstop —
+    the internal run-once guard in `therapist_report._EXPORTED_SESSIONS`
+    prevents duplicate files.
+    """
+    global _INIT_DONE, _DOSSIER
+    current_session_id = SESSION_ID
+
+    # Phase B: attempt therapist report before closing the session row,
+    # so the export runs while all state (DB, subject_id) is still
+    # available. Best-effort — report failure must not block session
+    # closure or the atexit shutdown path.
+    if DB and current_session_id:
+        try:
+            from src.utils.therapist_report import generate_therapist_report
+            generate_therapist_report(current_session_id, db=DB)
+        except Exception as e:
+            logger.warning(f"therapist_report generation failed (non-fatal): {e}")
+
+    if DB and current_session_id:
+        try:
+            DB.close_session(current_session_id, reason=reason)
+        except Exception as e:
+            logger.warning(f"Could not close session {current_session_id}: {e}")
+    # Flush and close the open dossier so `interactions[]` is persisted
+    # even when the process exits abruptly (SIGTERM from systemd, Ctrl-C).
+    try:
+        if _DOSSIER is not None and not _DOSSIER._closed:
+            _DOSSIER.save_and_close()
+    except Exception as e:
+        logger.warning(f"Could not save dossier on shutdown: {e}")
+    with _INIT_LOCK:
+        _INIT_DONE = False
+
+
+def _atexit_close_session():
+    """atexit hook: stamp end_time on any still-open session at shutdown.
+
+    Phase A: without this hook, SIGTERM/SIGINT leaves `sessions.end_time`
+    NULL — producing the "dangling session" clutter that Phase A is meant
+    to eliminate. The subsequent boot's crash-recovery path will mark
+    those rows with reason='crash_recovery', which is misleading for a
+    clean Ctrl-C exit.
+    """
+    try:
+        mark_session_finalised(reason="atexit")
+    except Exception as e:
+        # atexit handlers must never raise — logging is best-effort.
+        try:
+            logger.warning(f"atexit session closure failed: {e}")
+        except Exception:
+            pass
+
+
+atexit.register(_atexit_close_session)
+
+
+# ── Queue-level logging ──────────────────────────────────────────────────
 
 def log_question(text: str, meta_data: dict = None):
+    """Log an agent question → OUTPUT_QUEUE + DB + CSV + dossier.
+
+    Respects `_PENDING_QUESTION_PREFIX` so RV Validator / CBT recap can
+    prepend context to the next question.
     """
-    Log a question from the agent. 
-    Prepends pending prefix, puts into Output Queue, saves to DB, and updates CSV.
-    """
-    global _PENDING_QUESTION_PREFIX, CURRENT_TURN_INDEX
-    
+    global _PENDING_QUESTION_PREFIX
+
     combined = text
     if _PENDING_QUESTION_PREFIX:
         combined = f"{_PENDING_QUESTION_PREFIX}\n\n{text}"
         logger.info("Combining pending prefix with next question.")
-    
-    # Push to queue for interface
-    OUTPUT_QUEUE.put(combined)
-    
-    # Save to DB
+
+    _safe_output_put(combined)
+
     if DB and SESSION_ID:
-        DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "agent", combined, meta_data=meta_data)
-        CURRENT_TURN_INDEX += 1
-    
-    # Sync to CSV
+        idx = _next_turn_index()
+        DB.add_turn(SESSION_ID, idx, "agent", combined, meta_data=meta_data)
+
     append_to_csv("turn", "agent", combined)
     log_json_event("agent_turn", {"text": combined})
 
-    # Feed the rolling clinical takeaway engine
-    try:
-        from src.core.context_manager import get_context_manager
-        get_context_manager().record_turn("agent", combined)
-    except Exception:
-        pass
-
-    # Record to session dossier (pairs last user transcript with this agent reply)
     if _DOSSIER and not _DOSSIER._closed:
         _DOSSIER.record_interaction(
             raw_transcription=_LAST_USER_TRANSCRIPT,
@@ -255,33 +414,25 @@ def log_question(text: str, meta_data: dict = None):
             },
         )
 
-    # Clear prefix
     _PENDING_QUESTION_PREFIX = ""
+    # Agent output is the model's output — not PII. Logged in full.
     logger.info(f"Prompted question: {combined}")
 
+
 def log_reasoning(reasoning_type: str, data: dict):
-    """
-    Log a system reasoning event (e.g., RL states, Semantic scores) to the database.
-    """
-    global CURRENT_TURN_INDEX
+    """Log a system reasoning event (RL states, Semantic scores) to DB."""
     if DB and SESSION_ID:
+        idx = _next_turn_index()
         meta = {"reasoning_type": reasoning_type}
         meta.update(data)
-        DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "system", f"[{reasoning_type.upper()}]", meta_data=meta)
-        CURRENT_TURN_INDEX += 1
+        DB.add_turn(SESSION_ID, idx, "system", f"[{reasoning_type.upper()}]", meta_data=meta)
         logger.info(f"Logged Reasoning ({reasoning_type}) to DB.")
     if reasoning_type == "rl_decision":
         set_rl_context(data)
 
-def get_answer() -> Tuple[List, List[str]]:
-    """
-    Get answer from the user.
-    Blocks until input is available in Input Queue, but checks END_SESSION_EVENT
-    every 0.5s so the session can be terminated promptly.
-    Returns (dummy_DLA_result, segments).
-    """
-    global CURRENT_TURN_INDEX
 
+def get_answer() -> Tuple[List, List[str]]:
+    """Block on INPUT_QUEUE; return (DLA_result=[], segments)."""
     logger.info("Waiting for user answer...")
     user_input_raw = None
     while user_input_raw is None:
@@ -292,19 +443,14 @@ def get_answer() -> Tuple[List, List[str]]:
             user_input_raw = INPUT_QUEUE.get(timeout=0.5)
         except queue.Empty:
             continue
-    logger.info(f"Received user input: {user_input_raw}")
-    
-    # Save to DB
+    logger.info(f"Received user input: {_redact(user_input_raw)}")
+
     if DB and SESSION_ID:
-        DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "user", user_input_raw)
-        CURRENT_TURN_INDEX += 1
-        
-    # We should read the last Question from CSV? Or just write Resp.
-    # Let's try to keep it simple.
+        idx = _next_turn_index()
+        DB.add_turn(SESSION_ID, idx, "user", user_input_raw)
+
     append_to_csv("turn", "user", user_input_raw)
-        
-    # Process as JSON if possible
-    import json
+
     emotion_str = "Neutral"
     try:
         parsed = json.loads(str(user_input_raw))
@@ -314,27 +460,15 @@ def get_answer() -> Tuple[List, List[str]]:
         user_input_text = str(user_input_raw)
 
     set_last_user_signal(user_input_text, emotion_str)
+    segments = _segment_utterance(user_input_text)
 
-    # Feed the rolling clinical takeaway engine
-    try:
-        from src.core.context_manager import get_context_manager
-        get_context_manager().record_turn("user", user_input_text)
-    except Exception:
-        pass
-
-    segments = [s.strip() for s in _SENTENCE_SEGMENTER.segment(user_input_text) if s.strip()]
-            
     DLA_result = []
     log_json_event("user_turn", {"transcript": user_input_text, "emotion": emotion_str, "segments": segments})
     return DLA_result, segments
 
-def get_resp_log() -> str:
-    """
-    Get raw user response (for RV logic).
-    Blocks but checks END_SESSION_EVENT every 0.5s for prompt termination.
-    """
-    global CURRENT_TURN_INDEX
 
+def get_resp_log() -> str:
+    """Block on INPUT_QUEUE; return the raw user response string (RV path)."""
     logger.info("Waiting for user response (raw)...")
     user_response_raw = None
     while user_response_raw is None:
@@ -345,8 +479,7 @@ def get_resp_log() -> str:
             user_response_raw = INPUT_QUEUE.get(timeout=0.5)
         except queue.Empty:
             continue
-    
-    import json
+
     try:
         parsed = json.loads(str(user_response_raw))
         transcript = parsed.get("transcript", "")
@@ -356,22 +489,15 @@ def get_resp_log() -> str:
     except Exception:
         user_response = str(user_response_raw)
         set_last_user_signal(user_response, "Neutral")
-    
+
     if DB and SESSION_ID:
-        DB.add_turn(SESSION_ID, CURRENT_TURN_INDEX, "user", user_response)
-        CURRENT_TURN_INDEX += 1
+        idx = _next_turn_index()
+        DB.add_turn(SESSION_ID, idx, "user", user_response)
 
     append_to_csv("turn", "user", user_response)
     log_json_event("user_turn", {"response": user_response})
 
-    # Feed the rolling clinical takeaway engine
-    try:
-        from src.core.context_manager import get_context_manager
-        get_context_manager().record_turn("user", user_response)
-    except Exception:
-        pass
-
-    logger.info(f"Received user response: {user_response}")
+    logger.info(f"Received user response: {_redact(user_response)}")
     return user_response
 
 
@@ -385,6 +511,10 @@ def dump_session_history_to_terminal() -> None:
     for idx, turn in enumerate(history, start=1):
         speaker = str(turn.get("speaker", "unknown")).upper()
         text = str(turn.get("text", "")).strip()
+        # Redact user turns in terminal dump (agent + system turns are AI
+        # output and safe to print in full).
+        if speaker == "USER":
+            text = _redact(text)
         logger.info(f"[{idx:03d}] {speaker}: {text}")
     logger.info("=========== SESSION HISTORY END ===========")
 
@@ -394,19 +524,8 @@ def dump_session_history_to_terminal() -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class SessionDossier:
-    """Accumulates structured per-interaction records and flushes to a single
-    JSON file under ``data/sessions/session_<SUBJECT>_<TIMESTAMP>.json``.
-
-    Each interaction captures:
-      - raw_transcription (user STT text)
-      - llm_response (agent reply)
-      - rl_decision_logic (state, action, q-values snapshot)
-      - ser_metrics (emotion tag, screening scores)
-      - resource_telemetry (memory snapshot, inference timing)
-
-    The dossier is append-only during the session and written atomically on
-    ``save_and_close()``.
-    """
+    """Accumulates structured per-interaction records into a single JSON
+    dumped to `data/sessions/session_<SUBJECT>_<TIMESTAMP>.json` on close."""
 
     def __init__(self, subject_id: str, session_id):
         import datetime
@@ -434,7 +553,6 @@ class SessionDossier:
         ser_metrics: dict | None = None,
         resource_telemetry: dict | None = None,
     ):
-        """Append one interaction record to the in-memory dossier."""
         if self._closed:
             return
         import datetime
@@ -450,7 +568,6 @@ class SessionDossier:
             self._interactions.append(entry)
 
     def save_and_close(self):
-        """Flush the accumulated dossier to disk as a single JSON file."""
         if self._closed:
             return
         import datetime
@@ -462,8 +579,12 @@ class SessionDossier:
         }
         try:
             os.makedirs(self._dir, exist_ok=True)
-            with open(self._path, "w", encoding="utf-8") as f:
+            # Atomic dossier write — tmp + replace so a crash mid-dump
+            # cannot corrupt the session file.
+            tmp_path = self._path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, default=str)
+            os.replace(tmp_path, self._path)
             logger.info(f"[DOSSIER] Saved {len(self._interactions)} interactions to {self._path}")
         except Exception as e:
             logger.error(f"[DOSSIER] Failed to save: {e}")
@@ -475,7 +596,6 @@ class SessionDossier:
         return self._path
 
 
-# Module-level dossier singleton — created per session in init_record()
 _DOSSIER: SessionDossier | None = None
 
 
@@ -488,4 +608,3 @@ def _init_dossier():
     if _DOSSIER is not None and not _DOSSIER._closed:
         _DOSSIER.save_and_close()
     _DOSSIER = SessionDossier(SUBJECT_ID, SESSION_ID)
-

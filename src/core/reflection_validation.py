@@ -10,10 +10,31 @@ A thin `rv_consolidated()` wrapper is retained for call-site compatibility
 but now dispatches to the split pipeline.
 """
 
-from src.models.llm_client import llm_complete, llm_complete_with_interstitial
+from src.models.llm_client import llm_complete, LLMRole
 from src.utils.log_util import get_logger
+import src.utils.io_record as io_rec
 
 logger = get_logger("ReflectionValidation")
+
+
+def _log_mi_intervention(technique: str, detail: dict | None = None, dim_label: str | None = None):
+    """Phase B: record an MI micro-event into intervention_logs."""
+    try:
+        db = getattr(io_rec, "DB", None)
+        session_id = getattr(io_rec, "SESSION_ID", None)
+        if db is None or not session_id:
+            return
+        db.record_intervention_log(
+            session_id=session_id,
+            kind="MI",
+            stage="rv",
+            technique=technique,
+            outcome="delivered",
+            dim_label=dim_label,
+            detail=detail,
+        )
+    except Exception as e:
+        logger.warning(f"intervention_log (MI) persist failed (non-fatal): {e}")
 
 
 # ── Reasoner: decide if follow-up is topically related ───────────────────
@@ -57,85 +78,83 @@ DECISION: 1
 '''
 
 
-# ── Validator: OARS / Motivational Interviewing complex reflection ───────
-RV_VALIDATOR_OARS_SYSTEM_PROMPT = '''You are a Motivational Interviewing (MI) therapist.
-The client's follow-up response IS related to the topic.  Your task is to
-provide a single complex reflection using the OARS framework:
-  O — Open question (not used here; do NOT ask questions)
-  A — Affirmation (acknowledge strength or effort implicitly)
-  R — Reflection (mirror feeling + reason, not just content)
-  S — Summary (tie feeling to the topic at hand)
+# ── Validator: empathic validation & support (paper p.13, Fig.9) ─────────
+RV_VALIDATOR_OARS_SYSTEM_PROMPT = '''You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You are in the conversation with a client. You need to provide empathic validation and support to the client.
 
-Input format:
-{"Topic": "...", "Original Question": "...", "Original Response": "...", "Follow-up Response": "..."}
+You will be provided with:
+1. The conversation topic.
+2. The original response from the client.
+3. The follow-up response from the client to the question "Can you tell me more about it?".
+These will be provided in the format of '{"Topic": XXXX, "Original Question": XXXX, "Original Response": XXXX, "Follow-up Response": XXXX}'
 
-Output format (exactly one line, no labels):
-VALIDATION: It sounds like you feel <feeling> because <reason they gave>, which makes <topic-relevant consequence> harder.
+Goal:
+Provide empathic validation and support to the client based on the conversation topic, original response, and follow-up response.
+First express understanding of the client's follow-up response, then offer grounded, concrete support or strategies connected to what they said.
+Use the phrases and wording the client used rather than heavily rephrasing, so your response feels anchored to their experience.
+Do not read into the client's mind or make strong assumptions. Do not output any open-ended questions or invitations for further follow-up.
 
-Rules:
-- ONE complex reflection, 1-2 sentences only.
-- Mirror the client's own words where possible; do NOT add new facts.
-- Do NOT ask any questions or invite follow-up.
-- Do NOT advise, fix, or suggest resources.
-- ASCII only (no smart quotes, em-dashes, or ellipses).
+Formatting:
+- ASCII characters only. Replace smart quotes, en/em dashes, and ellipses with ASCII equivalents (' " - ...).
+- Aim for a substantive reflection: typically 3-5 sentences. Shorter is fine when the client's input is short; go longer when the situation genuinely warrants deeper support.
+- Output format (one block of prose, prefixed with the label):
+VALIDATION: <your validation and support text here>
 
 Example 1:
-{"Topic": "Maintaining stable weight", "Original Question": "Have your weight changed significantly recently?", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "I have upcoming deadlines. So I often do stress eating."}
-VALIDATION: It sounds like you feel pressured because the deadlines keep piling up, which makes it harder to manage your eating habits and your weight right now.
+{"Topic": "Maintaining stable weight", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "I am a ISFP. I like to follow my heart. My personality leads me to just eat whenever I want. And I usually don't control how much I eat."}
+VALIDATION: I completely understand that as an ISFP, rigid rules may not be your preference. Nonetheless, it is worth being aware of how eating whenever you want can affect your health over time. If the recent weight gain is tied to this pattern, small adjustments to your diet and daily routine can make a meaningful difference without feeling like strict rules. Talking with a healthcare professional or dietitian can also help you build a more tailored, sustainable approach that still honours how you naturally operate.
 
 Example 2:
-{"Topic": "Managing mood", "Original Question": "How's your mood recently?", "Original Response": "I am sad recently.", "Follow-up Response": "My sadness stems from a lot of stress at work and isolation from friends due to the pandemic."}
-VALIDATION: It sounds like you feel quite weighed down because the work stress and pandemic isolation have been compounding, which makes it harder to maintain a stable mood day to day.
+{"Topic": "Maintaining stable weight", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "I have upcoming deadlines. So I often do stress eating."}
+VALIDATION: It sounds like the pressure from your upcoming deadlines is really weighing on you, and the stress eating is one of the ways your body has been responding to that pressure. This is a very common reaction, and it does not make you weak; it makes sense that a stressed body reaches for comfort. You might notice it helps to identify the moments when stress peaks, keep some healthier snacks nearby, and protect regular meal times even during busy weeks. Leaning on a friend, family member, or therapist when deadlines pile up can also give you a healthier outlet than food alone.
 
 Example 3:
-{"Topic": "Maintaining stable weight", "Original Question": "Have your weight changed significantly recently?", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "My personality leads me to just eat whenever I want. And I usually don't control how much I eat."}
-VALIDATION: It sounds like you feel that your natural inclinations make it difficult to set boundaries around eating, which makes managing your weight harder when there is no structure in place.
+{"Topic": "Managing mood", "Original Response": "I am sad recently.", "Follow-up Response": "My sadness stems from a variety of factors. I have been dealing with a lot of stress at work, and it is affecting my mood. I am also finding it hard to connect with my friends due to the pandemic, and this isolation has been making me feel quite depressed."}
+VALIDATION: It sounds like you are going through a really challenging time, with work stress and pandemic isolation compounding each other and weighing on your mood. It is important to acknowledge these feelings and to understand that feeling overwhelmed in these circumstances is completely understandable. Staying connected during a pandemic can be hard, but small steps such as scheduled video calls with people you trust, or joining online communities around interests you enjoy, can ease the isolation over time. Sharing what you are going through with a friend, family member, or a mental health professional can also offer relief and help you cope more sustainably.
 '''
 
 
-# ── Guide: redirect off-topic follow-up ──────────────────────────────────
-RV_GUIDE_SYSTEM_PROMPT = '''You are a warm therapist-assistant.
-The client's follow-up response is NOT related to the topic.  Acknowledge
-their statement briefly, then gently steer the conversation back to the
-original topic using phrases the client already used.
+# ── Guide: redirect off-topic follow-up (paper p.13, Fig.9) ──────────────
+RV_GUIDE_SYSTEM_PROMPT = '''You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You are in the conversation with a client.
 
-Input format:
-{"Topic": "...", "Original Question": "...", "Original Response": "...", "Follow-up Response": "..."}
+You will be provided with:
+1. The conversation topic.
+2. The original response from the client.
+3. The follow-up response from the client to the question "Can you tell me more about it?". This follow-up is off-topic or unclear, and the client needs guidance to provide a more relevant continuation.
+These will be provided in the format of '{"Topic": XXXX, "Original Question": XXXX, "Original Response": XXXX, "Follow-up Response": XXXX}'
 
-Output format (exactly one line, no labels):
-GUIDE: <one-sentence acknowledgement>. <one-sentence redirect to the topic>.
+Goal:
+Guide the client to produce a valid follow-up response that adds detail to the original response or the topic.
+First express understanding of the client's follow-up response, then gently lead them back toward the right direction.
+Use the phrases the client already used when redirecting, rather than heavily rephrasing. Do not make assumptions about them.
+Do not output open-ended invitations like "feel free to share anything"; instead, ask one concrete, focused question that ties back to the topic.
 
-Rules:
-- 1-2 short sentences total.
-- Acknowledge the follow-up once, then redirect.
-- Do NOT ask open-ended questions; make a gentle statement that invites them
-  to return to the topic.
-- Re-use the client's phrasing when redirecting.
-- ASCII only.
+Formatting:
+- ASCII characters only. Replace smart quotes, en/em dashes, and ellipses with ASCII equivalents.
+- Aim for a substantive redirect: typically 2-4 sentences. Include a brief acknowledgement, a connective such as "However, since we are discussing ...", and a focused redirect question that uses the client's own phrasing.
+- Output format (one block of prose, prefixed with the label):
+Guide: <your guidance text here>
 
 Example 1:
-{"Topic": "Managing mood", "Original Question": "How's your mood recently?", "Original Response": "I am sad recently.", "Follow-up Response": "I love to go out for movie alone."}
-GUIDE: It is good to know about your habit. However, as we are discussing about mood management and you mentioned being sad recently, could you tell me more about what might contribute to your sadness?
+{"Topic": "Managing mood", "Original Response": "I am sad recently.", "Follow-up Response": "I love to go out for movie alone."}
+Guide: It is good to know about your habit of going out for movies on your own. However, since we are focusing on mood management and you mentioned you have been sad recently, could you tell me more about what might be contributing to your sadness? For example, are there specific situations, people, or times of day where you notice the sadness getting heavier?
 
 Example 2:
-{"Topic": "Maintaining stable weight", "Original Question": "Have your weight changed significantly recently?", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "I am a ISFP. I like to follow my heart."}
-GUIDE: It is interesting to know about your personality type. However, to better understand your situation, could you share more about how your daily routine might have affected your weight change?
+{"Topic": "Maintaining stable weight", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "I am a ISFP. I like to follow my heart."}
+Guide: It is interesting to hear about your personality type and how you like to follow your heart. However, since we are talking about the recent weight increase, could you share more about how your day-to-day routine might have contributed to this change? In particular, I would love to hear about your eating habits, activity levels, or any recent changes in your schedule.
 
 Example 3:
-{"Topic": "Maintaining stable weight", "Original Question": "Have your weight changed significantly recently?", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "Besides that, I've been finding it hard to concentrate at work. I've been making a lot of errors and it's not like me at all."}
-GUIDE: I understand that you are experiencing some difficulties at work and it is causing you stress. However, as our current discussion is about your weight, could you elaborate more on your recent lifestyle changes which might contribute to the increase in your weight?
+{"Topic": "Maintaining stable weight", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "Besides that, I have been finding it hard to concentrate at work. I have been making a lot of errors and it is not like me at all. It is been stressing me out."}
+Guide: I understand that you are dealing with difficulties concentrating at work and that the stress has been weighing on you. However, since our current focus is the recent weight increase, could you elaborate on any recent lifestyle changes that might be contributing to it? For instance, have your eating patterns, sleep, or activity levels shifted along with the work stress you are describing?
 
 Example 4:
-{"Topic": "Maintaining mood", "Original Question": "How's your mood recently?", "Original Response": "My mood swings a lot these days.", "Follow-up Response": "The weather has been really unpredictable lately. I really enjoy going for a walk when it's sunny outside."}
-GUIDE: It is interesting to hear about your observations of the weather. However, since we are discussing your mood swings, could you share more about the situations or triggers that might be causing these mood fluctuations?
+{"Topic": "Managing mood", "Original Response": "My mood swings a lot these days.", "Follow-up Response": "The weather has been really unpredictable lately. It is been raining heavily for the past few days and then suddenly it is sunny. I really enjoy going for a walk when it is sunny outside."}
+Guide: It is nice to hear how you enjoy going for a walk when the weather is sunny. However, since we are looking at your recent mood swings, could you share more about the situations or triggers that tend to move your mood? For example, are there specific events, thoughts, or moments in the day when you notice your mood shifting the most?
 
 Example 5:
-{"Topic": "Maintaining mood", "Original Question": "How's your mood recently?", "Original Response": "I cannot control my mood.", "Follow-up Response": "Apart from this, I also struggle with maintaining a regular sleep schedule. I often stay up late and feel tired the next day."}
-GUIDE: It seems like you are dealing with some challenges around sleep as well. However, since we are focusing on mood management at the moment, could you elaborate more on situations or triggers that make it hard for you to control your mood?
-
-Example 6:
-{"Topic": "Maintaining mood", "Original Question": "How's your mood recently?", "Original Response": "I cannot control my mood.", "Follow-up Response": "I am a vegetarian. I made this choice when I was in college. It was a bit of a challenge at first, but now I can't imagine living any other way."}
-GUIDE: It is great to hear about your commitment to a vegetarian lifestyle. However, since we are focusing on understanding your mood fluctuations, could you please provide more details about when you usually feel you cannot control your mood?
+{"Topic": "Managing mood", "Original Response": "I cannot control my mood.", "Follow-up Response": "Apart from this, I also struggle with maintaining a regular sleep schedule. I often stay up late and feel tired the next day."}
+Guide: It sounds like your sleep schedule has also been a challenge, and feeling tired the next day is understandably difficult. However, since we are focusing on mood management right now, could you elaborate on the moments when you feel you cannot control your mood? Do you notice a pattern connecting those moments with your sleep or with specific triggers during the day?
 '''
 
 
@@ -148,40 +167,71 @@ def _payload(topic: str, original_question: str, original_response: str, follow_
     )
 
 
+def _extract_labelled(raw: str, *labels: str) -> str:
+    """Return every character after the first matching label up to end-of-output.
+
+    Validation and Guide responses are paragraphs (3-5 sentences); the old
+    first-line-only parser truncated everything after the newline following
+    the label. This captures the full block and strips whitespace.
+    """
+    if not raw:
+        return ""
+    text = raw.strip()
+    lower = text.lower()
+    for label in labels:
+        lbl_lower = label.lower()
+        idx = lower.find(lbl_lower)
+        if idx != -1:
+            tail = text[idx + len(lbl_lower):]
+            # Drop an optional leading colon + whitespace: "Guide:" or "GUIDE: "
+            if tail.startswith(":"):
+                tail = tail[1:]
+            return tail.strip()
+    return text
+
+
 def rv_reasoner(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
-    """Return '0' (related) or '1' (unrelated)."""
+    """Return '0' (related) or '1' (unrelated).
+
+    Paper role: RV_REASONER (GPT-4 in paper; best validity judgement).
+
+    Fail-closed default: if the LLM output is unparseable, return '1'
+    (unrelated) so the caller runs the Guide path. Matches the symmetric
+    default in `CBT._parse_decision` and the paper's intent: when in doubt,
+    guide the user back to the topic rather than emit an OARS validation
+    that might land on an off-topic reply.
+    """
     payload = _payload(topic, original_question, original_response, follow_up_response)
-    raw = llm_complete_with_interstitial(RV_REASONER_SYSTEM_PROMPT, payload)
+    raw = llm_complete(RV_REASONER_SYSTEM_PROMPT, payload, role=LLMRole.RV_REASONER)
     for line in (raw or "").splitlines():
         line = line.strip()
         if line.upper().startswith("DECISION:"):
             token = line.split(":", 1)[1].strip()
             if token in ("0", "1"):
                 return token
-    logger.warning("R-V Reasoner returned no parseable DECISION; defaulting to 0.")
-    return "0"
+    logger.warning("R-V Reasoner returned no parseable DECISION; defaulting to 1 (unrelated, guide path).")
+    return "1"
 
 
 def rv_validator_mi(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
-    """Produce an OARS-style complex reflection."""
+    """Produce a paper-length empathic validation (3-5 sentences).
+
+    Paper role: RV_VALIDATOR (GPT-3.5-Turbo in paper; therapists flagged
+    GPT-4 as "reads into feelings" for empathic validation).
+    """
     payload = _payload(topic, original_question, original_response, follow_up_response)
-    raw = llm_complete(RV_VALIDATOR_OARS_SYSTEM_PROMPT, payload)
-    for line in (raw or "").splitlines():
-        line = line.strip()
-        if line.upper().startswith("VALIDATION:"):
-            return line.split(":", 1)[1].strip()
-    return (raw or "").strip()
+    raw = llm_complete(RV_VALIDATOR_OARS_SYSTEM_PROMPT, payload, role=LLMRole.RV_VALIDATOR)
+    return _extract_labelled(raw, "VALIDATION")
 
 
 def rv_guide(topic: str, original_question: str, original_response: str, follow_up_response: str) -> str:
-    """Produce a gentle redirect when the follow-up is off-topic."""
+    """Produce a paper-length redirect (2-4 sentences) when follow-up is off-topic.
+
+    Paper role: RV_GUIDE (GPT-3.5-Turbo in paper; fewer "read-mind" drifts).
+    """
     payload = _payload(topic, original_question, original_response, follow_up_response)
-    raw = llm_complete(RV_GUIDE_SYSTEM_PROMPT, payload)
-    for line in (raw or "").splitlines():
-        line = line.strip()
-        if line.upper().startswith("GUIDE:"):
-            return line.split(":", 1)[1].strip()
-    return (raw or "").strip()
+    raw = llm_complete(RV_GUIDE_SYSTEM_PROMPT, payload, role=LLMRole.RV_GUIDE)
+    return _extract_labelled(raw, "GUIDE", "FOLLOW-UP")
 
 
 def rv_consolidated(
@@ -201,7 +251,23 @@ def rv_consolidated(
     decision = rv_reasoner(topic, original_question, original_response, follow_up_response)
     if decision == "1":
         guide_text = rv_guide(topic, original_question, original_response, follow_up_response)
+        # Phase B: record the MI guide-redirect event.
+        _log_mi_intervention(
+            "guide_redirect",
+            detail={"topic": topic, "original_response": original_response,
+                    "follow_up_response": follow_up_response,
+                    "guide_text": guide_text},
+            dim_label=str(topic),
+        )
         return decision, guide_text, ""
     else:
         validation_text = rv_validator_mi(topic, original_question, original_response, follow_up_response)
+        # Phase B: record the MI OARS simple-reflection event.
+        _log_mi_intervention(
+            "oars_validation",
+            detail={"topic": topic, "original_response": original_response,
+                    "follow_up_response": follow_up_response,
+                    "validation_text": validation_text},
+            dim_label=str(topic),
+        )
         return decision, "", validation_text

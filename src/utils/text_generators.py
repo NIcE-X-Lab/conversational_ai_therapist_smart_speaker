@@ -1,6 +1,6 @@
 """Utility helper wrapping boilerplate text prompts or templates."""
 # src/text_generators.py
-from src.models.llm_client import llm_complete
+from src.models.llm_client import llm_complete, LLMRole
 
 from src.utils.log_util import get_logger
 logger = get_logger("TextGenerators")
@@ -30,11 +30,15 @@ def generate_synonymous_sentences(question_text):
     """
     Use LLM to generate a synonymous sentence for the given question_text.
     Paper describes 95% synonym rephrasing probability to reduce repetition.
+
+    Paper role: REPHRASER (GPT-4 in paper; structural rephrase of screening
+    questions).
     """
     user_input = question_text
     raw = llm_complete(
         "You generate synonymous sentences for a given text. Return only the rewritten sentence, without any prefixes.",
-        generate_prompt_synonymous_sentences(user_input)
+        generate_prompt_synonymous_sentences(user_input),
+        role=LLMRole.REPHRASER,
     )
     results = raw.strip()
     lower = results.lower()
@@ -47,37 +51,6 @@ def generate_synonymous_sentences(question_text):
             results = parts[-1].split(":", 1)[1].strip()
     logger.info(f"generate_synonymous_sentences: {results}")
     return results
-
-def generate_prompt_therapist(user_input):
-    """
-    Generate a prompt for the model to act as a therapist in a conversation.
-    The prompt provides several example exchanges and then asks the model to respond to the user's input.
-    """
-    return """Chat with people as a therapist.
-
-    User: I feel so depressed daily.
-    Answer: I am so sorry to hear that. It's OK to feel a little bit depressed but you need to figure out a way to makes you feel better. You can talk to a friend or family member. Or you can reach out to a therapist. And I am always here to support you.
-    User: I don't want to talk.
-    Answer: I get that you don’t want to have this conversation. But it's important to share your feelings with others and find out ways to make you feel better. 
-    User: My partner wants to check my messages everyday.
-    Answer: When you having a controlling partner, you might want to know the following items. Understand Controlling Personality Types. Recognize the Part of You That Accepts Another's Control. Take Back Responsibility for Your Life. Decide Whether You Need or Want Controlling Men in Your Life. Know What You Want Out of Life. Learn and Practice Assertiveness. Set Healthy Boundaries.
-    User: I don't know what's going on with me.
-    Answer: It's fine not to know the reason why you don't feel well now. Doing medication might help you understand yourself better. Or you can reach out to your family members, friends, or therapist to help you out.
-    User:{}
-    Answer:""".format(
-        user_input.capitalize()
-    )
-
-def generate_therapist_chat(user_input):
-    """
-    Use OpenAI API to generate a therapist-like response to the user's input.
-    """
-    result = llm_complete(
-        "Chat with people as a virtual AI therapist.",
-        generate_prompt_therapist(user_input)
-    )
-    logger.info(f"generate_therapist_chat: {result}")
-    return result
 
 def generate_prompt_change(user_input):
     """
@@ -100,10 +73,14 @@ def generate_prompt_change(user_input):
 def generate_change(user_input):
     """
     Use LLM to convert a first-person sentence to a second-person sentence.
+
+    Paper role: REFLECTIVE_SUMMARIZER (1st→3rd person is the ReflectiveSummarizer
+    task per paper §5.2; GPT-4 in paper).
     """
     resp = llm_complete(
         "Convert first-person to second-person statements.",
-        generate_prompt_change(user_input)
+        generate_prompt_change(user_input),
+        role=LLMRole.REFLECTIVE_SUMMARIZER,
     )
     logger.debug(resp)
     return resp
@@ -129,10 +106,14 @@ def generate_prompt_change_positive(user_input):
 def generate_change_positive(user_input):
     """
     Use OpenAI API to convert a question to a positive declarative sentence.
+
+    Paper role: REPHRASER (structural rewrite of the asked question into a
+    declarative for Yes-path follow-ups; GPT-4 in paper).
     """
     resp = llm_complete(
         "Turn a question into a positive declarative sentence.",
-        generate_prompt_change_positive(user_input)
+        generate_prompt_change_positive(user_input),
+        role=LLMRole.REPHRASER,
     )
     logger.debug(resp)
     return resp
@@ -158,10 +139,14 @@ def generate_prompt_change_negative(user_input):
 def generate_change_negative(user_input):
     """
     Use OpenAI API to convert a question to a negative declarative sentence.
+
+    Paper role: REPHRASER (structural rewrite of the asked question into a
+    declarative for No-path follow-ups; GPT-4 in paper).
     """
     resp = llm_complete(
         "Turn a question into a negative declarative sentence.",
-        generate_prompt_change_negative(user_input)
+        generate_prompt_change_negative(user_input),
+        role=LLMRole.REPHRASER,
     )
     logger.debug(resp)
     return resp

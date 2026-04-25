@@ -94,6 +94,12 @@ def get_env_feedback(S, A, reward, terminate_flag, item_mask):
     If all items are masked (no available actions), return terminal state and reward 10.
     If terminate_flag is set, return terminal state and reward 0.
     Otherwise, return the next state (action taken) and the given reward.
+
+    Note on state count: paper §5.1 defines 39 states (37 dims + START + END).
+    We model END as the sentinel string 'terminal' rather than a 39th row in
+    the Q-table. The caller uses `S_ != 'terminal'` to skip the discounted-
+    future term in the Q-update, which is mathematically identical to an
+    absorbing END row with Q-values fixed at 0.
     """
     logger.debug(f"Getting environment feedback: S={S}, A={A}, reward={reward}, terminate_flag={terminate_flag}, item_mask={item_mask}")
     if sum(item_mask) == 0:

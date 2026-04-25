@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "subject_id": "8080",
+    "session_id": 1,
+    "started_at": "2026-04-25T03:17:29.791747",
+    "ended_at": "2026-04-25T03:17:31.213868",
+    "total_interactions": 1
+  },
+  "interactions": [
+    {
+      "timestamp": "2026-04-25T03:17:29.807507",
+      "raw_transcription": "",
+      "llm_response": "Hello API",
+      "rl_decision_logic": {},
+      "ser_metrics": {
+        "emotion_tag": "Neutral",
+        "screening_scores": {
+          "anxiety": null,
+          "depression": null,
+          "total": null
+        }
+      },
+      "resource_telemetry": {}
+    }
+  ]
+}

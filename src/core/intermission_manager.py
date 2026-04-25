@@ -119,13 +119,20 @@ class IntermissionTracker:
 
 
 class IntermissionLadderManager:
-    """Strict SCREENING -> BREATHING -> MUSIC stage progression."""
+    """Randomised cycling selector across SCREENING, BREATHING, and MUSIC.
+
+    Each call to :meth:`next_activity` chooses one of the eligible stages
+    uniformly at random, deprioritising whichever stage ran last so a user
+    does not get the same activity twice in a row when alternatives exist.
+    Screening is only eligible while at least one PHQ/GAD question remains
+    unanswered; breathing and music are always eligible.
+    """
 
     def __init__(self):
         self._tracker = IntermissionTracker()
-        self._breathing_count = 0
         self._rng = random.Random()
         self._last_breathing_idx = None
+        self._last_activity: IntermissionStage | None = None
 
     @property
     def tracker(self) -> IntermissionTracker:
@@ -133,22 +140,52 @@ class IntermissionLadderManager:
 
     def reset(self):
         self._tracker.reset()
-        self._breathing_count = 0
         self._last_breathing_idx = None
+        self._last_activity = None
 
     def load_checkpoint(self, status_map: Dict[str, dict] | None):
         self._tracker.restore_from_status_map(status_map)
 
-    def current_stage(self) -> IntermissionStage:
-        # Use next_unanswered() as the single source of truth so that
-        # current_stage() and next_screening_question() can never disagree
-        # (the old is_complete() check could diverge, causing a deadlock
-        # where SCREENING was selected but no question was available).
-        if self._tracker.next_unanswered() is not None:
-            return IntermissionStage.SCREENING
-        if self._breathing_count <= 0:
-            return IntermissionStage.BREATHING_EXERCISE
-        return IntermissionStage.MUSIC
+    def screening_available(self) -> bool:
+        return self._tracker.next_unanswered() is not None
+
+    def next_activity(
+        self, exclude: frozenset[IntermissionStage] | None = None
+    ) -> IntermissionStage:
+        """Pick the next intermission activity.
+
+        Any stage listed in ``exclude`` is skipped for this call — used when
+        a user has just declined an activity and we need to fall through to
+        an alternative within the same turn.  SCREENING is automatically
+        excluded when all screening questions are resolved.  If every stage
+        ends up excluded, MUSIC is returned as the guaranteed fallback so
+        the user never hears silence.
+        """
+        excluded = set(exclude) if exclude else set()
+        if not self.screening_available():
+            excluded.add(IntermissionStage.SCREENING)
+
+        eligible = [
+            stage for stage in
+            (IntermissionStage.SCREENING,
+             IntermissionStage.BREATHING_EXERCISE,
+             IntermissionStage.MUSIC)
+            if stage not in excluded
+        ]
+        if not eligible:
+            # Silence is never acceptable — music is the always-on bed.
+            return IntermissionStage.MUSIC
+
+        # Deprioritise the most recent activity when an alternative exists.
+        if self._last_activity in eligible and len(eligible) > 1:
+            eligible.remove(self._last_activity)
+
+        choice = self._rng.choice(eligible)
+        return choice
+
+    def mark_activity(self, stage: IntermissionStage):
+        """Record which stage just ran so the next pick can rotate away."""
+        self._last_activity = stage
 
     def next_screening_question(self) -> ScreeningQuestion | None:
         return self._tracker.next_unanswered()
@@ -170,13 +207,9 @@ class IntermissionLadderManager:
         self._last_breathing_idx = idx
         return MEDITATIONS[idx]
 
-    def mark_breathing_complete(self):
-        self._breathing_count += 1
-
     def stage_snapshot(self) -> dict:
         return {
-            "stage": self.current_stage().value,
-            "breathing_count": self._breathing_count,
-            "breathing_done": self._breathing_count > 0,
+            "last_activity": self._last_activity.value if self._last_activity else None,
+            "screening_available": self.screening_available(),
             "screening": self._tracker.stage_snapshot(),
         }

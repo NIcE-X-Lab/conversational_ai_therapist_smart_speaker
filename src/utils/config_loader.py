@@ -49,6 +49,19 @@ GAMMA = float(RL["gamma"])
 ITEM_IMPORTANCE = RL["item_importance"]
 NUMBER_QUESTIONS = RL["number_questions"]
 
+# Paper §5.1 runtime Rephraser: structural rewrite of the picked question
+# variant before it is spoken. Flag defaults preserve paper behaviour when
+# the key is absent from config.yaml.
+REPHRASE_AT_RUNTIME = bool(RL.get("rephrase_at_runtime", True))
+REPHRASE_PROBABILITY = float(RL.get("rephrase_probability", 0.95))
+
+# Per-dimension reward aggregation mode: "mean" = paper §5.1 / legacy
+# prototype arithmetic mean; "hybrid" = (max+mean)/2, our default, keeps
+# sensitivity to high-severity single segments. Any unknown value falls
+# back to "hybrid".
+_reward_mode_raw = str(RL.get("reward_mode", "hybrid")).strip().lower()
+REWARD_MODE = _reward_mode_raw if _reward_mode_raw in ("mean", "hybrid") else "hybrid"
+
 
 # LLM configuration — Gemma 4 E2B via LiteRT-LM (in-process inference)
 LLM_MODEL = os.environ.get("LLM_MODEL", "gemma-4-E2B-it")
@@ -56,20 +69,16 @@ LITERT_MODEL_PATH = os.environ.get(
     "LITERT_MODEL_PATH", "./models/litert/gemma-4-E2B-it.litertlm"
 )
 LITERT_BACKEND = os.environ.get("LITERT_BACKEND", "cpu").strip().lower()
-LITERT_CONTEXT_LENGTH = int(os.environ.get("LITERT_CONTEXT_LENGTH", "512"))
-# LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "80"))  # original on-device limit; revert if context/memory issues arise
-LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "400"))
+# Paper-aligned sizing: the RV Validator / Guide prompts alone are ~500
+# tokens (long system prompt + multi-example few-shot), and the expected
+# output is 3-5 sentences (~120 tokens).  2048 ctx + 512 max_tokens gives
+# the Validator, CBT stages, and closing reflections room to produce the
+# paragraph-length outputs the paper demonstrates.
+LITERT_CONTEXT_LENGTH = int(os.environ.get("LITERT_CONTEXT_LENGTH", "2048"))
+LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "512"))
 
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
 LLM_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "90"))
-
-# Zero-History diagnostic toggle: when enabled, conversation context and user
-# history are stripped from LLM prompts.  If the crash still occurs on turn 1,
-# the issue is *Initialization Peak* (Whisper + KV cache).  If it only occurs
-# on turn 5+, the issue is *Context Bloat* (unbounded history injection).
-DISABLE_CONTEXT_HISTORY = os.environ.get(
-    "DISABLE_CONTEXT_HISTORY", "0"
-).strip().lower() in {"1", "true", "yes", "on"}
 
 # Audio
 AUDIO = _CFG.get("audio", {})

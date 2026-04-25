@@ -1,7 +1,7 @@
 """Domain logic handling Cognitive Behavioral Therapy (CBT) protocols."""
 import re
 
-from src.models.llm_client import llm_complete
+from src.models.llm_client import llm_complete, LLMRole
 from src.core.therapy_content import CBT_ESCALATION_MESSAGE
 
 
@@ -30,7 +30,38 @@ def _parse_decision(raw: str, default: str = "1") -> str:
 # Set up logger for this module
 from src.utils.log_util import get_logger
 from src.utils.io_record import get_resp_log, log_question, set_question_prefix
+import src.utils.io_record as io_rec
+
 logger = get_logger("CBT")
+
+
+def _log_cbt_intervention(
+    stage: str,
+    outcome: str,
+    dim_label: str | None = None,
+    detail: dict | None = None,
+    technique: str = "cbt_stage",
+):
+    """Phase B: persist a CBT stage event into intervention_logs.
+
+    Best-effort: never block the clinical pipeline on a DB write failure.
+    """
+    try:
+        db = getattr(io_rec, "DB", None)
+        session_id = getattr(io_rec, "SESSION_ID", None)
+        if db is None or not session_id:
+            return
+        db.record_intervention_log(
+            session_id=session_id,
+            kind="CBT",
+            stage=stage,
+            technique=technique,
+            outcome=outcome,
+            dim_label=dim_label,
+            detail=detail,
+        )
+    except Exception as e:
+        logger.warning(f"intervention_log persist failed (non-fatal): {e}")
 
 
 PROMPTER_CBT_STAGE0_PROMPT = '''You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
@@ -295,44 +326,52 @@ Example 2:
 REFRAME: My ideas have value, and sharing them can contribute to the discussion. Others are likely focused on the topic, not on judging me, and speaking up can help me grow more confident.
 '''
 
-def _chat_complete(system_content: str, user_content: str):
-    return llm_complete(system_content, user_content)
+def _chat_complete(system_content: str, user_content: str, role: LLMRole = LLMRole.GENERAL):
+    return llm_complete(system_content, user_content, role=role)
 
 def stage0_prompter(history: str) -> str:
+    """Paper role: GENERAL (CBT entry prompt, not explicitly microbenchmarked)."""
     payload = f"HISTORY: {history}"
-    return _chat_complete(PROMPTER_CBT_STAGE0_PROMPT, payload)
+    return _chat_complete(PROMPTER_CBT_STAGE0_PROMPT, payload, role=LLMRole.GENERAL)
 
 def stage1_reasoner(statement: str, unhelpful_thoughts: str) -> str:
+    """Paper role: CBT_REASONER (GPT-4 in paper, hardest Stage 1 reasoning)."""
     payload = f'"STATEMENT: {statement}; UNHELPFUL_THOUGHTS: {unhelpful_thoughts};"'
-    return _chat_complete(REASONER_CBT_STAGE1_PROMPT, payload)
+    return _chat_complete(REASONER_CBT_STAGE1_PROMPT, payload, role=LLMRole.CBT_REASONER)
 
 def stage2_reasoner(statement: str, unhelpful_thoughts: str, challenge: str) -> str:
+    """Paper role: CBT_REASONER (GPT-4 in paper)."""
     payload = f'"STATEMENT: {statement}; UNHELPFUL_THOUGHTS: {unhelpful_thoughts}; CHALLENGE: {challenge};"'
-    return _chat_complete(REASONER_CBT_STAGE2_PROMPT, payload)
+    return _chat_complete(REASONER_CBT_STAGE2_PROMPT, payload, role=LLMRole.CBT_REASONER)
 
 def stage3_reasoner(statement: str, unhelpful_thoughts: str, challenge: str, reframe: str) -> str:
+    """Paper role: CBT_REASONER (GPT-4 in paper)."""
     payload = f'"STATEMENT: {statement}; UNHELPFUL_THOUGHTS: {unhelpful_thoughts}; CHALLENGE: {challenge}; REFRAME: {reframe};"'
-    return _chat_complete(REASONER_CBT_STAGE3_PROMPT, payload)
+    return _chat_complete(REASONER_CBT_STAGE3_PROMPT, payload, role=LLMRole.CBT_REASONER)
 
 def stage1_guide(statement: str) -> str:
+    """Paper role: CBT_GUIDE (GPT-3.5-Turbo in paper; less "reads into feelings")."""
     payload = f"STATEMENT: {statement}"
-    return _chat_complete(GUIDE_CBT_STAGE1_PROMPT, payload)
+    return _chat_complete(GUIDE_CBT_STAGE1_PROMPT, payload, role=LLMRole.CBT_GUIDE)
 
 def stage2_guide(statement: str, unhelpful_thoughts: str) -> str:
+    """Paper role: CBT_GUIDE (GPT-3.5-Turbo in paper)."""
     payload = f"STATEMENT: {statement}. UNHELPFUL_THOUGHTS: {unhelpful_thoughts}"
-    return _chat_complete(GUIDE_CBT_STAGE2_PROMPT, payload)
+    return _chat_complete(GUIDE_CBT_STAGE2_PROMPT, payload, role=LLMRole.CBT_GUIDE)
 
 def stage3_guide(statement: str, unhelpful_thoughts: str, challenge: str) -> str:
+    """Paper role: CBT_GUIDE (GPT-3.5-Turbo in paper)."""
     payload = f"STATEMENT: {statement}. UNHELPFUL_THOUGHTS: {unhelpful_thoughts}. CHALLENGE: {challenge}"
-    return _chat_complete(GUIDE_CBT_STAGE3_PROMPT, payload)
+    return _chat_complete(GUIDE_CBT_STAGE3_PROMPT, payload, role=LLMRole.CBT_GUIDE)
 
 def recap_stage3_challenge(statement: str, unhelpful_thoughts: str, challenge: str) -> str:
+    """Paper role: CBT_GUIDE (recap is part of Stage 3 guidance flow)."""
     payload = (
         f"STATEMENT: {statement}\n"
         f"UNHELPFUL_THOUGHTS: {unhelpful_thoughts}\n"
         f"CHALLENGE: {challenge}"
     )
-    return _chat_complete(RECAP_CBT_STAGE3_CHALLENGE_PROMPT, payload)
+    return _chat_complete(RECAP_CBT_STAGE3_CHALLENGE_PROMPT, payload, role=LLMRole.CBT_GUIDE)
 
 __all__ = [
     "stage0_prompter",
@@ -344,14 +383,31 @@ __all__ = [
     "stage3_guide",
 ]
 
-def run_cbt(question_lib):
+def run_cbt(question_lib, crisis_callback=None):
     """Paper-aligned 3-stage CBT clinical loop: Recognize -> Challenge -> Reframe.
 
     Presents all Score-2 dimensions and awaits the user's selection (user
     autonomy).  Each subsequent stage uses a Reasoner (validity/utility
     check) and a Guide (clinical direction) with up to two retries.
+
+    C7: `crisis_callback` is a no-arg callable supplied by the handler that
+    (a) runs a fresh _crisis_scan on the current question_lib state and
+    (b) delivers the SAFETY_RESOURCES_MESSAGE if a NEW critical dim just
+    hit Score 2 (e.g. user mentions self-harm in their CHALLENGE).
+    When the callback reports True, we pause CBT and exit — continuing
+    clinical work while a crisis is unaddressed is not safe.
     """
     logger.info("Starting CBT flow (3-stage: Recognize/Challenge/Reframe).")
+
+    def _crisis_intervened() -> bool:
+        """Call the handler's scan+deliver hook; True means pause CBT."""
+        if crisis_callback is None:
+            return False
+        try:
+            return bool(crisis_callback())
+        except Exception as e:
+            logger.warning(f"[CBT] crisis_callback raised: {e}")
+            return False
     # Collect dimensions with score=2
     candidates = []
     idx = 1
@@ -428,6 +484,12 @@ def run_cbt(question_lib):
 
     i_sel, j_sel, label_sel, name_sel = chosen
     logger.info(f"CBT dimension chosen: [{label_sel}] ({name_sel}) at ({i_sel},{j_sel}).")
+    _log_cbt_intervention(
+        stage="dimension_selected",
+        outcome="started",
+        dim_label=label_sel,
+        detail={"name": name_sel, "i_sel": i_sel, "j_sel": j_sel},
+    )
 
     # Stage 1 — RECOGNIZE: derive statement from RV notes of the chosen dimension.
     # Prefer the latest RV follow-up response (followup_resp_1),
@@ -461,6 +523,13 @@ def run_cbt(question_lib):
         if statement:
             break
 
+    # Phase A: Pre-stage crisis scan. Catch critical-dim Score=2 that may
+    # have been set during the screening RV loop before we prompt the
+    # user, rather than only after they respond.
+    if _crisis_intervened():
+        logger.warning("[CBT] Crisis intervention fired before Stage 1 entry; pausing CBT.")
+        return
+
     # Add recap prefix (similar to RV), then ask to identify unhelpful thoughts
     recap = (
         f"Let us work on dimension '{name_sel}'. "
@@ -474,6 +543,10 @@ def run_cbt(question_lib):
         return
     if isinstance(unhelpful, str) and unhelpful.strip().lower().find("stop") != -1:
         logger.info("User requested stop at CBT stage 1.")
+        return
+    # C7: user may have just mentioned a critical-dim concern. Pause CBT if so.
+    if _crisis_intervened():
+        logger.warning("[CBT] Crisis intervention fired in Stage 1; pausing CBT.")
         return
 
     # Reason and guide up to two retries
@@ -507,9 +580,20 @@ def run_cbt(question_lib):
             "CBT_stage: 1_failed",
             "CBT_escalation_delivered: true",
         ])
+        _log_cbt_intervention(
+            stage="recognize",
+            outcome="failed",
+            dim_label=label_sel,
+            detail={"statement": statement, "unhelpful": unhelpful, "escalation_delivered": True},
+        )
         return
 
     # Stage 2 — CHALLENGE: challenge the unhelpful thoughts
+    # Phase A: Pre-stage crisis scan, in case Stage 1's Reasoner/Guide
+    # loop or any async path flipped a critical dim to Score=2.
+    if _crisis_intervened():
+        logger.warning("[CBT] Crisis intervention fired before Stage 2 entry; pausing CBT.")
+        return
     log_question("Now, how could you challenge those unhelpful thoughts? Please write a brief challenge.")
     challenge = get_resp_log()
     if isinstance(challenge, str) and "SESSION_END" in challenge:
@@ -517,6 +601,9 @@ def run_cbt(question_lib):
         return
     if isinstance(challenge, str) and challenge.strip().lower().find("stop") != -1:
         logger.info("User requested stop at CBT stage 2.")
+        return
+    if _crisis_intervened():
+        logger.warning("[CBT] Crisis intervention fired in Stage 2; pausing CBT.")
         return
 
     dec2_raw = stage2_reasoner(statement, unhelpful, challenge)
@@ -547,9 +634,19 @@ def run_cbt(question_lib):
             "CBT_stage: 2_failed",
             "CBT_escalation_delivered: true",
         ])
+        _log_cbt_intervention(
+            stage="challenge",
+            outcome="failed",
+            dim_label=label_sel,
+            detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "escalation_delivered": True},
+        )
         return
 
     # Stage 3 — REFRAME: reframe the thought (prepend an LLM-rephrased recap of user's CHALLENGE)
+    # Phase A: Pre-stage crisis scan before the Reframe prompt.
+    if _crisis_intervened():
+        logger.warning("[CBT] Crisis intervention fired before Stage 3 entry; pausing CBT.")
+        return
     recap3 = recap_stage3_challenge(statement, unhelpful, challenge)
     set_question_prefix(recap3.strip())
     log_question("Finally, can you reframe the unhelpful thought into a more balanced, constructive one?")
@@ -559,6 +656,9 @@ def run_cbt(question_lib):
         return
     if isinstance(reframe, str) and reframe.strip().lower().find("stop") != -1:
         logger.info("User requested stop at CBT stage 3.")
+        return
+    if _crisis_intervened():
+        logger.warning("[CBT] Crisis intervention fired in Stage 3; pausing CBT.")
         return
 
     dec3_raw = stage3_reasoner(statement, unhelpful, challenge, reframe)
@@ -590,6 +690,12 @@ def run_cbt(question_lib):
             "CBT_stage: 3_failed",
             "CBT_escalation_delivered: true",
         ])
+        _log_cbt_intervention(
+            stage="reframe",
+            outcome="failed",
+            dim_label=label_sel,
+            detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "reframe": reframe, "escalation_delivered": True},
+        )
         return
 
     # Success
@@ -601,6 +707,12 @@ def run_cbt(question_lib):
         f"CBT_reframe: {reframe}",
         "CBT_stage: success"
     ])
+    _log_cbt_intervention(
+        stage="reframe",
+        outcome="success",
+        dim_label=label_sel,
+        detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "reframe": reframe},
+    )
     log_question("Great work today. We completed the CBT steps for this topic. Thank you for your effort.")
 
 

@@ -3,51 +3,150 @@
 Uses Google's LiteRT-LM framework (litert-lm-api) for in-process Gemma 4 E2B
 inference on Jetson Orin Nano.  No external server required — the model runs
 directly inside this Python process via litert_lm.Engine.
+
+Task-specific LLM roles (paper §5, Fig. 10)
+-------------------------------------------
+The CaiTI paper assigns different LLMs to different subtasks so each task
+uses the model that microbenchmarks showed was best at it:
+
+    Role                Paper mapping                       Why
+    ──────────────────────────────────────────────────────────────────────────
+    ANALYZER            fine-tuned GPT-3.5-Turbo            best (Dim, Score)
+    REPHRASER           GPT-4                               structural rewrite
+    REFLECTIVE_SUMMARIZER  GPT-4                            1st→3rd-person
+    RV_REASONER         GPT-4                               best validity judge
+    RV_GUIDE            GPT-3.5-Turbo                       fewer "read-mind" drifts
+    RV_VALIDATOR        GPT-3.5-Turbo                       less "reads into feelings"
+    CBT_REASONER        GPT-4                               hardest reasoning task
+    CBT_GUIDE           GPT-3.5-Turbo                       empathic, non-assumptive
+    GENERAL             any capable LLM                     greetings / closings / intent
+
+On this deployment (Jetson Orin Nano, 8 GB budget), every role maps to the
+same local Gemma 4 E2B model. The role plumbing is in place so that future
+deployments can swap per-role models without touching call sites — just
+update `ROLE_MODEL_MAP`.
+
+Every call site must pass a `role`; call sites record which task they serve
+in the log, which makes it straightforward to later split roles across
+model backends (e.g., a larger Gemma for reasoning, a smaller one for
+validation).
 """
-import atexit
 import os
 import time
 import threading
+from enum import Enum
 from src.utils.config_loader import (
     LLM_MODEL,
     LITERT_MODEL_PATH,
     LITERT_BACKEND,
-    LITERT_CONTEXT_LENGTH,
-    LITERT_MAX_TOKENS,
-    LLM_REQUEST_TIMEOUT_SECONDS,
-    DISABLE_CONTEXT_HISTORY,
 )
-from src.utils.inference_guard import (
-    clear_inference_cache,
-    get_system_memory_snapshot,
-    heavy_stage,
-)
+from src.utils.inference_guard import heavy_stage
 from src.utils.log_util import get_logger
-from src.utils.resource_audit import get_resource_audit
 
 logger = get_logger("LLMClient")
-RESOURCE_AUDIT = get_resource_audit()
+
+
+class LLMRole(str, Enum):
+    """Paper-aligned roles for each LLM call site.
+
+    Every call to `llm_complete` must pass one of these. Today they all
+    resolve to the same Gemma model via ROLE_MODEL_MAP below, but once a
+    multi-model deployment is viable, swapping the mapping is the only
+    change required — call sites stay untouched.
+    """
+
+    # Paper §5.2 — Response Analyzer, fine-tuned GPT-3.5-Turbo in paper
+    ANALYZER = "analyzer"
+
+    # Paper §5.1 — Rephraser, GPT-4 in paper (structural rewrite)
+    REPHRASER = "rephraser"
+
+    # Paper §5.2 — ReflectiveSummarizer, GPT-4 in paper (1st→3rd person)
+    REFLECTIVE_SUMMARIZER = "reflective_summarizer"
+
+    # Paper §5.3 — R-V Reasoner, GPT-4 in paper (validity judgement)
+    RV_REASONER = "rv_reasoner"
+
+    # Paper §5.3 — R-V Guide, GPT-3.5-Turbo in paper (redirect off-topic)
+    RV_GUIDE = "rv_guide"
+
+    # Paper §5.3 — R-V Validator, GPT-3.5-Turbo in paper (MI empathic reflection)
+    RV_VALIDATOR = "rv_validator"
+
+    # Paper §5.4 — CBT Stage{1,2,3} Reasoner, GPT-4 in paper
+    CBT_REASONER = "cbt_reasoner"
+
+    # Paper §5.4 — CBT Stage{1,2,3} Guide, GPT-3.5-Turbo in paper
+    CBT_GUIDE = "cbt_guide"
+
+    # Generic tasks not explicitly microbenchmarked in the paper: greeting,
+    # closing, SOAP summary, intent classifier, therapist chat.
+    GENERAL = "general"
+
+
+# Role → concrete model identifier. Today every entry points at the single
+# on-device Gemma model; split this map to swap per-role models later.
+# Keep this keyed by role.value (str) so config-file overrides stay simple.
+ROLE_MODEL_MAP: dict[str, str] = {role.value: LLM_MODEL for role in LLMRole}
+
+class LLMError(Exception):
+    """C6: typed exception for hard LLM failures.
+
+    Raised when the engine itself fails (crash, timeout, unrecoverable
+    error) — distinct from an empty/short output which is returned as a
+    string. Callers that care about clinical correctness (the Analyzer,
+    R-V Reasoner, CBT Reasoner) can catch this and mark the turn SKIPPED
+    instead of silently scoring the user as healthy.
+    """
+
 
 # ── LiteRT-LM engine singleton ────────────────────────────────────────────
 _ENGINE = None
 _ENGINE_LOCK = threading.Lock()
 
-_INTERMISSION_MANAGER = None
+# H2: bounded re-init attempts per session. If the engine crashes 3 times
+# in a row we stop trying — further calls raise LLMError immediately so
+# the handler can close the session cleanly instead of hanging.
+_ENGINE_FAILURE_COUNT = 0
+_ENGINE_MAX_FAILURES = 3
 
 
-def _get_intermission_manager():
-    global _INTERMISSION_MANAGER
-    if _INTERMISSION_MANAGER is None:
-        from src.services.response_bridge import IntermissionManager
-        _INTERMISSION_MANAGER = IntermissionManager()
-    return _INTERMISSION_MANAGER
+def _invalidate_engine(reason: str):
+    """H2: drop the singleton so the next call re-loads."""
+    global _ENGINE, _ENGINE_FAILURE_COUNT
+    with _ENGINE_LOCK:
+        if _ENGINE is not None:
+            logger.warning(f"[LiteRT] Invalidating engine singleton ({reason}).")
+            _ENGINE = None
+        _ENGINE_FAILURE_COUNT += 1
+
+
+def _reset_engine_failure_count():
+    """Called after a successful call so transient hiccups don't exhaust the budget."""
+    global _ENGINE_FAILURE_COUNT
+    _ENGINE_FAILURE_COUNT = 0
+
+
+def engine_is_healthy() -> bool:
+    """Public check so handler_rl can decide whether to short-circuit to SKIPPED."""
+    return _ENGINE_FAILURE_COUNT < _ENGINE_MAX_FAILURES
 
 
 def _init_engine():
-    """Lazy-initialise the LiteRT-LM inference engine (thread-safe singleton)."""
+    """Lazy-initialise the LiteRT-LM inference engine (thread-safe singleton).
+
+    Raises LLMError when repeated failures exhaust the budget so the caller
+    can record a clean SKIPPED turn instead of spinning.
+    """
     global _ENGINE
     if _ENGINE is not None:
         return _ENGINE
+
+    if _ENGINE_FAILURE_COUNT >= _ENGINE_MAX_FAILURES:
+        raise LLMError(
+            f"LiteRT engine has failed {_ENGINE_FAILURE_COUNT} times this "
+            "session; refusing further attempts."
+        )
 
     with _ENGINE_LOCK:
         if _ENGINE is not None:
@@ -66,7 +165,6 @@ def _init_engine():
         try:
             import litert_lm
 
-            # Select backend: try GPU if configured, fall back to CPU
             backend = litert_lm.Backend.CPU
             if LITERT_BACKEND == "gpu":
                 if hasattr(litert_lm.Backend, "GPU"):
@@ -85,7 +183,7 @@ def _init_engine():
             )
         except Exception as e:
             logger.error(f"[LiteRT] Failed to load model: {e}")
-            raise
+            raise LLMError(f"LiteRT engine failed to initialize: {e}") from e
 
         rss_after = _rss_mb()
         logger.info(
@@ -114,71 +212,53 @@ def _build_gemma_prompt(system_content: str, user_content: str) -> str:
     return f"{system_content}\n\n{user_content}"
 
 
-def llm_complete(system_content: str, user_content: str, *, inject_context: bool = True) -> str:
+def _resolve_model(role: LLMRole | str | None) -> tuple[str, str]:
+    """Return (role_value, model_id) for a call.
+
+    Accepts the enum, its string value, or None (→ GENERAL). Unknown role
+    strings fall back to GENERAL with a warning so typos never crash a
+    session.
     """
-    Unified LLM caller used across the app.
-    Inputs:
-      - system_content: system prompt/instructions
-      - user_content: user input/payload
-      - inject_context: when True (default), appends user history and
-        session context pack to the system prompt.  Set to False for
-        utility calls (classification, rephrasing) where context bloats
-        the prompt without benefit.
-    Output:
-      - plain text content returned by the model
-    """
-    if not inject_context:
-        logger.debug("[LLM_CLIENT] Context injection skipped (inject_context=False).")
-    elif DISABLE_CONTEXT_HISTORY:
-        logger.info("[ZERO-HISTORY] Context injection disabled for diagnostic mode.")
+    if role is None:
+        role_value = LLMRole.GENERAL.value
+    elif isinstance(role, LLMRole):
+        role_value = role.value
     else:
-        # Prepend rolling clinical takeaway so the Brain always has
-        # up-to-date clinical status regardless of context trimming.
-        try:
-            from src.core.context_manager import get_context_manager
-            system_content = get_context_manager().inject_into_prompt(system_content)
-        except Exception:
-            pass
-        try:
-            from src.utils.io_record import get_user_context, get_context_pack
-            user_ctx = get_user_context()
-            context_pack = get_context_pack()
-            if user_ctx:
-                system_content = f"{system_content}\n\n{user_ctx}"
+        role_value = str(role).strip().lower()
+        if role_value not in ROLE_MODEL_MAP:
+            logger.warning(
+                f"[LLM_CLIENT] Unknown role '{role_value}' — routing to GENERAL."
+            )
+            role_value = LLMRole.GENERAL.value
+    return role_value, ROLE_MODEL_MAP.get(role_value, LLM_MODEL)
 
-            if context_pack:
-                system_content = (
-                    f"{system_content}\n\n"
-                    "[Context Pack]\n"
-                    f"User Transcript: {context_pack.get('user_transcript', '')}\n"
-                    f"Emotion Tag: {context_pack.get('emotion_tag', 'Neutral')}\n"
-                    f"RL State: {context_pack.get('rl_state', {})}\n"
-                    f"Latest PHQ-4/GAD-2 Scores: {context_pack.get('screening_scores', {})}\n"
-                )
-        except ImportError:
-            pass
 
-    # ── Context Governance: enforce sliding window ──────────────────────
-    _CHARS_PER_TOKEN = 4
-    _CTX_BUDGET_RATIO = 0.75
-    total_chars = len(system_content) + len(user_content)
-    budget_chars = int(LITERT_CONTEXT_LENGTH * _CTX_BUDGET_RATIO * _CHARS_PER_TOKEN)
-    if total_chars > budget_chars:
-        overshoot = total_chars - budget_chars
-        logger.warning(
-            f"[CONTEXT GOV] Prompt est. {total_chars // _CHARS_PER_TOKEN} tokens "
-            f"exceeds 75% budget ({LITERT_CONTEXT_LENGTH}). Trimming {overshoot} chars "
-            "from system content tail (injected context)."
-        )
-        system_content = system_content[:len(system_content) - overshoot]
+def llm_complete(
+    system_content: str,
+    user_content: str,
+    role: LLMRole | str | None = None,
+) -> str:
+    """Unified LLM caller — legacy/paper pattern: self-contained per call.
 
-    logger.info(f"[LLM_CLIENT] Requesting in-process LiteRT inference ({LLM_MODEL})")
+    Raises:
+        LLMError — on engine crash, timeout, or exhausted retry budget.
+                   Clinically-important callers (Analyzer, R-V Reasoner,
+                   CBT Reasoner) MUST catch this and mark the turn SKIPPED
+                   rather than silently accepting the legacy placeholder
+                   string, which would corrupt downstream classification.
+
+    Returns the model's response (stripped). On empty/whitespace output
+    returns the legacy placeholder "I am currently unable to access my
+    language model, but I am listening." — distinguishable from a real
+    answer by callers that care.
+    """
+    role_value, model_id = _resolve_model(role)
+    logger.info(
+        f"[LLM_CLIENT] Requesting in-process LiteRT inference "
+        f"(role={role_value}, model={model_id})"
+    )
     started_at = time.monotonic()
-    clear_inference_cache("Before LLM phase")
-    logger.info(f"[Memory PRE-LLM] {get_system_memory_snapshot()}")
-    RESOURCE_AUDIT.capture_process_inventory("llm_pre_call_inventory")
 
-    # ── Heartbeat thread: logs every 10s so terminal never looks dead ──
     _heartbeat_stop = threading.Event()
 
     def _heartbeat():
@@ -186,7 +266,7 @@ def llm_complete(system_content: str, user_content: str, *, inject_context: bool
             elapsed = time.monotonic() - started_at
             logger.info(
                 f"[Heartbeat] LLM inference in progress... "
-                f"Time elapsed: {elapsed:.0f}s. Model: {LLM_MODEL}."
+                f"Time elapsed: {elapsed:.0f}s. Role: {role_value}. Model: {model_id}."
             )
 
     heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
@@ -196,27 +276,20 @@ def llm_complete(system_content: str, user_content: str, *, inject_context: bool
         engine = _init_engine()
         prompt = _build_gemma_prompt(system_content, user_content)
 
-        RESOURCE_AUDIT.record_prompt_budget(
-            model_name=LLM_MODEL,
-            system_content=system_content,
-            user_content=user_content,
-            num_ctx=LITERT_CONTEXT_LENGTH,
-            num_predict=LITERT_MAX_TOKENS,
-            f16_kv=False,
-        )
-
-        with RESOURCE_AUDIT.track_peak(
-            f"LLM/{LLM_MODEL}/generate",
-            metadata={"context_length": LITERT_CONTEXT_LENGTH, "backend": LITERT_BACKEND},
-        ):
-            with heavy_stage(f"LLM/{LLM_MODEL}"):
-                RESOURCE_AUDIT.capture_point(
-                    f"LLM/{LLM_MODEL}/pre_dispatch",
-                    extra={"phase": "generate", "context_length": LITERT_CONTEXT_LENGTH},
-                )
+        try:
+            with heavy_stage(f"LLM/{model_id}/{role_value}"):
                 with engine.create_conversation() as conversation:
                     response = conversation.send_message(prompt)
-                RESOURCE_AUDIT.capture_point(f"LLM/{LLM_MODEL}/post_dispatch")
+        except LLMError:
+            raise
+        except Exception as e:
+            # Engine-level crash — invalidate singleton so the next call
+            # can attempt a fresh init. Budget-exhausted cases raise
+            # LLMError from _init_engine on the next call.
+            _invalidate_engine(reason=f"generate failure: {e}")
+            elapsed = time.monotonic() - started_at
+            logger.error(f"LLM engine crash after {elapsed:.2f}s: {e}")
+            raise LLMError(f"LLM engine crash during generate: {e}") from e
 
         # Extract text from the conversation response
         if isinstance(response, dict):
@@ -232,97 +305,28 @@ def llm_complete(system_content: str, user_content: str, *, inject_context: bool
 
         if not result or not result.strip():
             logger.warning("[LLM_CLIENT] Empty response from LiteRT engine.")
+            # Successful round-trip, empty output — reset failure counter.
+            _reset_engine_failure_count()
             return "I am currently unable to access my language model, but I am listening."
 
+        _reset_engine_failure_count()
         content = result.strip()
         elapsed = time.monotonic() - started_at
-        logger.info(f"Received response from LLM in {elapsed:.2f}s (LiteRT in-process)")
-        logger.info(f"[Memory POST-LLM] {get_system_memory_snapshot()}")
-        RESOURCE_AUDIT.capture_process_inventory("llm_post_call_inventory")
-        RESOURCE_AUDIT.write_report()
+        logger.info(
+            f"Received response from LLM in {elapsed:.2f}s "
+            f"(role={role_value}, LiteRT in-process)"
+        )
         return content
 
-    except Exception as e:
-        elapsed = time.monotonic() - started_at
-        logger.info(f"[Memory POST-LLM FAIL] {get_system_memory_snapshot()}")
-        RESOURCE_AUDIT.capture_process_inventory("llm_post_call_failure_inventory")
-        RESOURCE_AUDIT.write_report()
-        logger.error(f"LLM Call Failed after {elapsed:.2f}s: {e}")
-        return "I am currently unable to access my language model, but I am listening."
     finally:
         _heartbeat_stop.set()
         heartbeat_thread.join(timeout=1.0)
 
 
-# Reuse a single thread-pool to avoid creating (and leaking) an executor per call.
-_LLM_POOL = None
-_LLM_POOL_LOCK = threading.Lock()
-
-
-def _shutdown_llm_pool():
-    global _LLM_POOL
-    if _LLM_POOL is not None:
-        _LLM_POOL.shutdown(wait=False)
-        _LLM_POOL = None
-
-
-def _get_llm_pool():
-    global _LLM_POOL
-    if _LLM_POOL is None:
-        with _LLM_POOL_LOCK:
-            if _LLM_POOL is None:
-                import concurrent.futures
-                _LLM_POOL = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=1, thread_name_prefix="llm_async"
-                )
-                atexit.register(_shutdown_llm_pool)
-    return _LLM_POOL
-
-
-def llm_complete_async(system_content: str, user_content: str):
-    return _get_llm_pool().submit(llm_complete, system_content, user_content)
-
-
-def _reset_screening():
-    """Reset per-session interstitial state (screeners + meditation sequence)."""
-    _get_intermission_manager().reset()
-
-
-def llm_complete_with_interstitial(
-    system_content: str,
-    user_content: str,
-    trigger_threshold: float = 2.0,
-    led_controller=None,
-) -> str:
-    """
-    Async LLM wrapper with a looping filler engine.
-    This keeps the user engaged during slow LLM inference turns (e.g. on Jetson Orin Nano).
-
-    Sequence Flow:
-    1. Fast Path (< 2.0s): wait silently.
-    2. Slow Path (>= 2.0s):
-       a. Immediately trigger PHQ-4/GAD-2 clinical screening.
-       b. If screening is done/refused, provide a guided Breathing Exercise.
-       c. Stay in Exercise State until the LLM thread signals done.
-       d. If exercises exhaust, fall back to neutral Waiting Music.
-
-    LED Synchronization:
-    Pin 18 (Green LED) is held LOW for the entire Thinking + Intermission phase
-    to signal that the device is processing, not listening.  The caller passes
-    in a `led_controller(bool)` callable (typically `gpio.set_led`).
-    """
-    future = llm_complete_async(system_content, user_content)
-    _get_intermission_manager().engage_while_waiting(
-        future=future,
-        trigger_threshold=trigger_threshold,
-        led_controller=led_controller,
-    )
-
-    try:
-        return future.result(timeout=LLM_REQUEST_TIMEOUT_SECONDS + 5)
-    except Exception as e:
-        logger.error(f"LLM future timeout/failure in interstitial wrapper: {e}")
-        return "I am currently unable to access my language model, but I am listening."
-
-
-__all__ = ["llm_complete", "llm_complete_async", "llm_complete_with_interstitial", "_reset_screening"]
+__all__ = [
+    "LLMRole",
+    "LLMError",
+    "ROLE_MODEL_MAP",
+    "llm_complete",
+    "engine_is_healthy",
+]

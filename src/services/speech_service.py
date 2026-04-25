@@ -19,7 +19,7 @@ from src.models.tts import TTSGenerator
 from src.drivers.player import AudioPlayer
 from src.drivers.gpio_manager import GPIOManager, EVENT_START, EVENT_END, EVENT_OPT_OUT
 from src.core.intermission_manager import IntermissionLadderManager, IntermissionStage
-from src.core.therapy_content import score_response
+from src.core.therapy_content import SCORE_OPT_OUT, SCORE_UNRESOLVED, score_response
 from src.utils.log_util import get_logger
 from src.utils.resource_audit import get_resource_audit
 from src.utils.inference_guard import get_system_memory_snapshot
@@ -490,10 +490,22 @@ class SpeechInteractionService:
         return bool(words & self._ONBOARD_BYPASS_KEYWORDS)
 
     def handle_onboarding(self):
-        """Triggered by voice or Button 1: Ask for user name and init session."""
+        """Triggered by voice or Button 1: Ask for user name and init session.
+
+        The greeting is split into two TTS utterances with a short music
+        beat between them so the bed swells briefly before the name
+        prompt, giving the opener an "arrival" feel rather than sounding
+        like a single fast sentence.
+        """
         self.state = "onboarding"
         logger.info("Starting Onboarding flow...")
-        self.say("Hello, I'm CaiTI. Who am I speaking with today?")
+        self.say("Hello, I'm CaiTI.")
+        # Short music beat: fade music up briefly, then back to base so
+        # the name question lands cleanly over a soft bed.
+        self.music_service.fade_to(0.30, duration=0.8)
+        time.sleep(1.2)
+        self.music_service.fade_to(0.15, duration=0.8)
+        self.say("Who am I speaking with today?")
 
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
@@ -651,12 +663,220 @@ class SpeechInteractionService:
     # Intermission State Machine                                           #
     # ------------------------------------------------------------------ #
 
+    # ── Intermission helpers ───────────────────────────────────────────
+    #
+    # Each _run_*_block returns a dict describing the outcome so the
+    # parent loop can decide whether to loop, fall through to another
+    # activity within the same turn, or break out and deliver the LLM.
+    #
+    # Outcome keys used across blocks:
+    #   "end"         — END_SESSION signal received; caller should break.
+    #   "llm_ready"   — LLM output arrived during the block; caller should
+    #                   break and deliver it (after music fade-down).
+    #   "declined"    — user asked to skip this activity; caller should
+    #                   fall through to the declared fallback for this turn.
+    #   "completed"   — activity finished; caller continues normal cycling.
+
+    def _run_screening_block(self, question, llm_done, listener_active):
+        """Ask one PHQ/GAD question and record the result."""
+        self.state = "intermission_screening"
+        intro = _random.choice(_SCREENING_INTROS)
+        full_prompt = f"{intro} {question.text}\n{_SCREENING_OPTIONS_HINT}"
+        logger.info(f"[INTERMISSION] Screening question: {question.question_id}")
+        self.say(full_prompt)
+
+        listener_active.set()
+        try:
+            self.stt.resume_all()
+        except Exception as e:
+            logger.warning(f"[INTERMISSION] STT resume for screening failed: {e}")
+
+        response = self._listen_for_intermission_answer(
+            timeout=_SCREENING_LISTEN_TIMEOUT,
+            min_window=_SCREENING_MIN_LISTEN_WINDOW_SEC,
+        )
+
+        try:
+            self.stt.suspend_all()
+        except Exception:
+            pass
+        listener_active.clear()
+
+        clean = response.lower().strip()
+        if clean == "__cmd_end__":
+            return {"outcome": "end"}
+        if clean == "__cmd_start__":
+            self.say("We're already in session, and I'm listening.")
+            return {"outcome": "completed"}
+
+        # Empty / very short transcript — one silent re-prompt before skip.
+        if not clean or len(clean) < 2:
+            logger.info("[INTERMISSION] No response to screening. Re-prompting.")
+            self.say("I didn't catch that. Could you try again?")
+            listener_active.set()
+            try:
+                self.stt.resume_all()
+            except Exception:
+                pass
+            response = self._listen_for_intermission_answer(
+                timeout=_SILENCE_REPROMPT_SEC,
+                min_window=min(_SCREENING_MIN_LISTEN_WINDOW_SEC, _SILENCE_REPROMPT_SEC),
+            )
+            try:
+                self.stt.suspend_all()
+            except Exception:
+                pass
+            listener_active.clear()
+            clean = response.lower().strip()
+            if clean == "__cmd_end__":
+                return {"outcome": "end"}
+            if clean == "__cmd_start__":
+                self.say("We're already in session, and I'm listening.")
+                return {"outcome": "completed"}
+            if not clean:
+                logger.info("[INTERMISSION] Silence timeout; marking question skipped.")
+                self.intermission_ladder.skip_screening_question(
+                    question.question_id, reason="silence_timeout",
+                )
+                self._persist_intermission_status(
+                    question_id=question.question_id,
+                    status="SKIPPED", reason="silence_timeout",
+                )
+                return {"outcome": "completed"}
+
+        if _is_repeat_request(clean):
+            logger.info("[INTERMISSION] Repeat requested.")
+            return {"outcome": "completed"}
+
+        # Phase A: distinguish the three outcomes so the audit trail
+        # records what actually happened:
+        #   - Explicit skip / opt-out  -> SKIPPED (reason captured)
+        #   - SCORE_UNRESOLVED         -> UNRESOLVED (non-empty utterance
+        #                                 with no Likert anchor; NOT a
+        #                                 false-negative on PHQ-4)
+        #   - Valid 0-3 score          -> ANSWERED
+        user_declined = False
+        skip_reason = None
+        if _is_skip_question_request(clean):
+            user_declined, skip_reason = True, "user_skip_phrase"
+        elif _is_opt_out(clean):
+            user_declined, skip_reason = True, "opt_out"
+        else:
+            score = score_response(clean)
+            if score == SCORE_OPT_OUT:
+                user_declined, skip_reason = True, "opt_out_keyword"
+            elif score == SCORE_UNRESOLVED:
+                # A1/A2: non-empty but not a Likert anchor. Record as
+                # UNRESOLVED so a clinician reviewing the export can
+                # distinguish "user mumbled" from "user opted out" and
+                # from "user scored 0". The reason tag is `stt_unresolved`
+                # so the forensic audit query groups it under an STT-layer
+                # issue rather than a user-initiated skip.
+                logger.info(
+                    f"[INTERMISSION] {question.question_id}: '{clean}' -> UNRESOLVED"
+                )
+                self.intermission_ladder.skip_screening_question(
+                    question.question_id, reason="stt_unresolved",
+                )
+                self._persist_intermission_status(
+                    question_id=question.question_id,
+                    status="UNRESOLVED", response_text=clean,
+                    reason="stt_unresolved",
+                )
+                return {"outcome": "completed"}
+            else:
+                self.intermission_ladder.record_screening_answer(
+                    question.question_id, score=score, response=clean,
+                )
+                self._persist_intermission_status(
+                    question_id=question.question_id,
+                    status="ANSWERED", score=score, response_text=clean,
+                )
+                logger.info(
+                    f"[INTERMISSION] {question.question_id}: '{clean}' -> score={score}"
+                )
+                time.sleep(_TRANSITION_PAUSE)
+                return {"outcome": "completed"}
+
+        if user_declined:
+            logger.info(f"[INTERMISSION] Screening declined ({skip_reason}); falling through to relaxation.")
+            self.intermission_ladder.skip_screening_question(
+                question.question_id, reason=skip_reason,
+            )
+            self._persist_intermission_status(
+                question_id=question.question_id,
+                status="SKIPPED", response_text=clean, reason=skip_reason,
+            )
+            return {"outcome": "declined"}
+
+        return {"outcome": "completed"}
+
+    def _run_breathing_block(self, llm_done):
+        """Guide one random breathing exercise; honour mid-exercise opt-out."""
+        self.state = "intermission_exercise"
+        exercise_text = self.intermission_ladder.next_breathing_exercise()
+        logger.info("[INTERMISSION] Breathing exercise.")
+        self.say(exercise_text)
+
+        # Brief listen for opt-out ("no", "skip", "just music")
+        try:
+            self.stt.resume_all()
+        except Exception:
+            pass
+        opt_response = self._listen_for_intermission_answer(
+            timeout=6.0, min_window=3.0,
+        )
+        try:
+            self.stt.suspend_all()
+        except Exception:
+            pass
+
+        opt_clean = opt_response.lower().strip()
+        if opt_clean == "__cmd_end__":
+            return {"outcome": "end"}
+        if opt_clean and (_is_opt_out(opt_clean)
+                          or opt_clean in ("no", "nah", "nope", "no thanks")):
+            logger.info("[INTERMISSION] User declined breathing — will fall back to music.")
+            return {"outcome": "declined"}
+
+        # Hold the remainder of _EXERCISE_HOLD_SEC but wake immediately if
+        # the LLM becomes ready.  If the LLM is still thinking after the
+        # hold, cycle back to another activity.
+        if llm_done.wait(timeout=_EXERCISE_HOLD_SEC):
+            return {"outcome": "llm_ready"}
+        return {"outcome": "completed"}
+
+    def _run_music_block(self, llm_done):
+        """Raise music bed, wait for LLM output or a hold interval."""
+        self.state = "music_fallback"
+        if not self._music_announced_for_turn:
+            self.say("I'm still thinking, enjoy the music while I continue.")
+            self._music_announced_for_turn = True
+        # Fade up so it becomes prominent — not a hard volume jump.
+        self.music_service.fade_to(0.30, duration=2.0)
+        self.music_service.start(_get_music_path())
+        # Jump to a fresh random segment so each MUSIC intermission sounds
+        # different — avoids the "same opening bars every time" feel on
+        # long ambient tracks.  No-op if the worker isn't running yet.
+        self.music_service.jump_to_random_segment()
+        # Give the music a 30 s window before we consider cycling back
+        # (prevents frantic activity churn on long LLM stalls).
+        if llm_done.wait(timeout=_EXERCISE_HOLD_SEC):
+            return {"outcome": "llm_ready"}
+        return {"outcome": "completed"}
+
     def _wait_for_output_with_intermission(self):
-        """
-                Wait for the next pipeline utterance and engage strict intermission ladder:
-                        Stage 1: next unanswered PHQ/GAD screening item.
-                        Stage 2: one random breathing exercise once screening is complete/skipped.
-                        Stage 3: calming music while waiting.
+        """Wait for the next pipeline utterance, engaging the intermission pipeline.
+
+        The three activities (screening, breathing, music) are picked
+        randomly with last-activity deprioritisation — NOT strictly
+        ordered.  If the user declines an activity, we fall through to
+        another within the same turn.  Music always wins any tie and is
+        the guaranteed fallback so the user never hears silence.
+
+        Music fades softly up during the MUSIC block and fades softly
+        back down before the LLM response is delivered, so the handoff
+        never feels like a jump cut.
         """
         llm_done = threading.Event()
         response_text = [None]
@@ -665,7 +885,7 @@ class SpeechInteractionService:
         # and we are waiting for the user's answer.  The main loop must NOT
         # break out (even if llm_done fires) until the listener completes —
         # otherwise the user's clinical answer is lost mid-sentence.
-        _listener_active = threading.Event()
+        listener_active = threading.Event()
 
         def _watcher():
             try:
@@ -687,7 +907,7 @@ class SpeechInteractionService:
 
         logger.info(
             f"[INTERMISSION] LLM latency > {_INTERMISSION_TRIGGER_SEC}s. "
-            "Entering intermission ladder."
+            "Entering intermission pipeline."
         )
         intermission_was_active = True
 
@@ -697,249 +917,120 @@ class SpeechInteractionService:
 
         self._music_announced_for_turn = False
         last_heartbeat = time.monotonic()
+        # Per-iteration fallback exclusions: resets each time we pick
+        # fresh (i.e., after a completed activity).  Within one iteration,
+        # a declined activity is added here so the re-pick chooses an
+        # alternative for the *same* turn.
+        turn_exclude: set[IntermissionStage] = set()
 
-        while not llm_done.is_set() or _listener_active.is_set():
+        while not llm_done.is_set() or listener_active.is_set():
             if io_record.END_SESSION_EVENT.is_set():
                 logger.info("[INTERMISSION] Session ended. Aborting.")
                 break
 
             # If LLM is done but listener is still active, wait for the
             # user to finish answering before breaking out.
-            if llm_done.is_set() and _listener_active.is_set():
-                logger.info("[INTERMISSION] LLM ready, but listener lock held. Waiting for user to finish.")
+            if llm_done.is_set() and listener_active.is_set():
+                logger.info("[INTERMISSION] LLM ready, listener lock held. Waiting for user.")
                 time.sleep(0.3)
                 continue
 
             now = time.monotonic()
             if now - last_heartbeat >= _INTERMISSION_HEARTBEAT_SEC:
                 last_heartbeat = now
-                logger.info(
-                    f"[Heartbeat] Intermission stage={self.intermission_ladder.current_stage().value}; "
-                    "still waiting for LLM output."
-                )
+                logger.info("[Heartbeat] Still waiting for LLM output; cycling intermission activities.")
 
-            current_stage = self.intermission_ladder.current_stage()
+            stage = self.intermission_ladder.next_activity(
+                exclude=frozenset(turn_exclude) if turn_exclude else None,
+            )
+            logger.info(f"[INTERMISSION] Selected activity: {stage.value}")
 
-            if current_stage == IntermissionStage.SCREENING:
+            if stage == IntermissionStage.SCREENING:
                 question = self.intermission_ladder.next_screening_question()
                 if question is None:
-                    # All screening questions answered/skipped but tracker
-                    # still reports SCREENING — force completion so the
-                    # ladder advances to BREATHING / MUSIC instead of
-                    # spinning here forever (the "ladder deadlock").
-                    logger.info("[INTERMISSION] No unanswered screening questions remain. Advancing ladder.")
+                    # Defensive: ladder said SCREENING but no question is
+                    # available — skip without marking (shouldn't happen
+                    # since next_activity() gates on screening_available).
+                    turn_exclude.add(IntermissionStage.SCREENING)
                     continue
-
-                self.state = "intermission_screening"
-
-                intro = _random.choice(_SCREENING_INTROS)
-                full_prompt = f"{intro} {question.text}\n{_SCREENING_OPTIONS_HINT}"
-                logger.info(f"[INTERMISSION] Screening question: {question.question_id}")
-                self.say(full_prompt)
-
-                # ── Listener Lock ON ─────────────────────────────
-                # Prevents the loop from yielding to the LLM response
-                # while we are capturing the user's clinical answer.
-                _listener_active.set()
-
-                # NOTE: DB sync removed here — in-memory tracker is the
-                # authoritative source during a turn.  The old call reset
-                # state mid-cycle, causing gad_1 to repeat every turn.
-
-                try:
-                    self.stt.resume_all()
-                except Exception as e:
-                    logger.warning(f"[INTERMISSION] STT resume for screening failed: {e}")
-
-                response = self._listen_for_intermission_answer(
-                    timeout=_SCREENING_LISTEN_TIMEOUT,
-                    min_window=_SCREENING_MIN_LISTEN_WINDOW_SEC,
-                )
-
-                try:
-                    self.stt.suspend_all()
-                except Exception:
-                    pass
-
-                # ── Listener Lock OFF ────────────────────────────
-                _listener_active.clear()
-
-                clean = response.lower().strip()
-                if clean == "__cmd_end__":
+                result = self._run_screening_block(question, llm_done, listener_active)
+                self.intermission_ladder.mark_activity(stage)
+                if result["outcome"] == "end":
                     break
-                if clean == "__cmd_start__":
-                    self.say("We're already in session, and I'm listening.")
+                if result["outcome"] == "declined":
+                    # Paper-aligned fallback: if user declines screening,
+                    # don't re-ask screening this turn — fall through to
+                    # a random pick of {BREATHING, MUSIC}.
+                    turn_exclude.add(IntermissionStage.SCREENING)
                     continue
-
-                if not clean or len(clean) < 2:
-                    logger.info("[INTERMISSION] No response to screening. Re-prompting.")
-                    self.say("I didn't catch that. Could you try again?")
-
-                    _listener_active.set()
-                    try:
-                        self.stt.resume_all()
-                    except Exception:
-                        pass
-                    response = self._listen_for_intermission_answer(
-                        timeout=_SILENCE_REPROMPT_SEC,
-                        min_window=min(_SCREENING_MIN_LISTEN_WINDOW_SEC, _SILENCE_REPROMPT_SEC),
-                    )
-                    try:
-                        self.stt.suspend_all()
-                    except Exception:
-                        pass
-                    _listener_active.clear()
-                    clean = response.lower().strip()
-                    if clean == "__cmd_end__":
-                        break
-                    if clean == "__cmd_start__":
-                        self.say("We're already in session, and I'm listening.")
-                        continue
-
-                    if not clean:
-                        logger.info("[INTERMISSION] Silence timeout; marking question skipped.")
-                        self.intermission_ladder.skip_screening_question(
-                            question.question_id,
-                            reason="silence_timeout",
-                        )
-                        self._persist_intermission_status(
-                            question_id=question.question_id,
-                            status="SKIPPED",
-                            reason="silence_timeout",
-                        )
-                        continue
-
-                if _is_repeat_request(clean):
-                    logger.info("[INTERMISSION] Repeat requested.")
-                    continue
-
-                if _is_skip_question_request(clean):
-                    logger.info("[INTERMISSION] User skipped current screening question.")
-                    self.intermission_ladder.skip_screening_question(
-                        question.question_id,
-                        reason="user_skip_phrase",
-                    )
-                    self._persist_intermission_status(
-                        question_id=question.question_id,
-                        status="SKIPPED",
-                        response_text=clean,
-                        reason="user_skip_phrase",
-                    )
-                    continue
-
-                if _is_opt_out(clean):
-                    logger.info("[INTERMISSION] User opted out of this screening question.")
-                    self.intermission_ladder.skip_screening_question(
-                        question.question_id,
-                        reason="opt_out",
-                    )
-                    self._persist_intermission_status(
-                        question_id=question.question_id,
-                        status="SKIPPED",
-                        response_text=clean,
-                        reason="opt_out",
-                    )
-                    continue
-
-                score = score_response(clean)
-                if score < 0:
-                    self.intermission_ladder.skip_screening_question(
-                        question.question_id,
-                        reason="declined",
-                    )
-                    self._persist_intermission_status(
-                        question_id=question.question_id,
-                        status="SKIPPED",
-                        response_text=clean,
-                        reason="declined",
-                    )
-                else:
-                    self.intermission_ladder.record_screening_answer(
-                        question.question_id,
-                        score=score,
-                        response=clean,
-                    )
-                    self._persist_intermission_status(
-                        question_id=question.question_id,
-                        status="ANSWERED",
-                        score=score,
-                        response_text=clean,
-                    )
-                    logger.info(
-                        f"[INTERMISSION] {question.question_id}: '{clean}' -> score={score}"
-                    )
-
-                time.sleep(_TRANSITION_PAUSE)
+                # Completed (answered, silence-skip, repeat, etc.) — reset
+                # the exclude set so next cycle can pick any activity.
+                turn_exclude.clear()
                 continue
 
-            if current_stage == IntermissionStage.BREATHING_EXERCISE:
-                self.state = "intermission_exercise"
-                exercise_text = self.intermission_ladder.next_breathing_exercise()
-                logger.info("[INTERMISSION] Stage 2: breathing exercise.")
-                self.say(exercise_text)
-
-                # Brief listen for opt-out ("no", "skip", "just music")
-                try:
-                    self.stt.resume_all()
-                except Exception:
-                    pass
-                opt_response = self._listen_for_intermission_answer(
-                    timeout=6.0, min_window=3.0,
-                )
-                try:
-                    self.stt.suspend_all()
-                except Exception:
-                    pass
-
-                opt_clean = opt_response.lower().strip()
-                if opt_clean and (_is_opt_out(opt_clean) or opt_clean in ("no", "nah", "nope", "no thanks")):
-                    logger.info("[INTERMISSION] User declined breathing exercise. Switching to music bed.")
-                    self.say("I'll let the music play while I finish my thoughts.")
-                    self.music_service.set_base_volume(0.20)
-                    self.music_service.start(_get_music_path())
-                    self.intermission_ladder.mark_breathing_complete()
-                    llm_done.wait(timeout=120.0)
+            if stage == IntermissionStage.BREATHING_EXERCISE:
+                result = self._run_breathing_block(llm_done)
+                self.intermission_ladder.mark_activity(stage)
+                if result["outcome"] == "end":
                     break
-
-                self.intermission_ladder.mark_breathing_complete()
-
-                if llm_done.wait(timeout=_EXERCISE_HOLD_SEC):
+                if result["outcome"] == "llm_ready":
                     break
+                if result["outcome"] == "declined":
+                    # User said no to breathing — force MUSIC this turn.
+                    turn_exclude.add(IntermissionStage.BREATHING_EXERCISE)
+                    turn_exclude.add(IntermissionStage.SCREENING)
+                    continue
+                turn_exclude.clear()
                 continue
 
-            if current_stage == IntermissionStage.MUSIC:
-                self.state = "music_fallback"
-                if not self._music_announced_for_turn:
-                    self.say("I'm still thinking, enjoy the music while I continue.")
-                    self._music_announced_for_turn = True
-                self.music_service.set_base_volume(0.15)
-                self.music_service.start(_get_music_path())
-                llm_done.wait(timeout=120.0)
-                break
+            if stage == IntermissionStage.MUSIC:
+                result = self._run_music_block(llm_done)
+                self.intermission_ladder.mark_activity(stage)
+                if result["outcome"] == "llm_ready":
+                    break
+                # Music held its full interval and LLM is still thinking —
+                # cycle back and let another activity take the next beat.
+                turn_exclude.clear()
+                continue
 
         watcher.join(timeout=2.0)
-        self.music_service.set_base_volume(0.15)
+
         if io_record.END_SESSION_EVENT.is_set():
+            # On forced end, let the existing end-session path manage audio.
             self.state = "main_process"
             return
 
         if response_text[0]:
             logger.info("[INTERMISSION] Complete. Delivering LLM response.")
 
+            # Soft handoff: fade music down over ~1.2 s before we speak.
+            # Brief sleep so the fade is audibly underway before TTS plays;
+            # once TTS starts, audio.set_ai_speaking() will further duck
+            # the bed to speaking_volume automatically.
+            self.music_service.fade_to(0.05, duration=1.2)
+            time.sleep(0.9)
+
             if intermission_was_active:
                 bridge = _random.choice(_BRIDGE_PHRASES)
                 logger.info(f"[HANDOFF] Bridge phrase: '{bridge}'")
                 self.say(bridge)
 
-            time.sleep(0.5)
+            time.sleep(0.3)
             self.say(response_text[0])
+
+            # Restore the ambient base volume after the reply so the bed
+            # sits at a calm level for the next listen.
+            self.music_service.fade_to(0.15, duration=1.5)
         else:
             # LLM timed out or produced no response — never leave silence.
             # Fall back to a breathing exercise so the user stays engaged.
             logger.warning("[INTERMISSION] LLM produced no response. Delivering therapeutic fallback.")
+            self.music_service.fade_to(0.05, duration=1.0)
+            time.sleep(0.7)
             fallback = self.intermission_ladder.next_breathing_exercise()
             self.say(fallback)
             self.say("I'm having a little trouble with my thoughts right now. Let me try again shortly.")
+            self.music_service.fade_to(0.15, duration=1.5)
 
         self.state = "main_process"
 
