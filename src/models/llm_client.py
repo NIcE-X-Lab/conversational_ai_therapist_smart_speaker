@@ -39,6 +39,7 @@ from src.utils.config_loader import (
     LLM_MODEL,
     LITERT_MODEL_PATH,
     LITERT_BACKEND,
+    LITERT_MAX_TOKENS,
 )
 from src.utils.inference_guard import heavy_stage
 from src.utils.log_util import get_logger
@@ -159,7 +160,7 @@ def _init_engine():
                 "Run: python scripts/model_fetch.py"
             )
 
-        logger.info(f"[LiteRT] Loading model from {model_path} (backend={LITERT_BACKEND})")
+        logger.debug(f"[LiteRT] Loading model from {model_path} (backend={LITERT_BACKEND})")
         rss_before = _rss_mb()
 
         try:
@@ -169,16 +170,23 @@ def _init_engine():
             if LITERT_BACKEND == "gpu":
                 if hasattr(litert_lm.Backend, "GPU"):
                     backend = litert_lm.Backend.GPU
-                    logger.info("[LiteRT] Using GPU backend (ML Drift).")
+                    logger.debug("[LiteRT] Using GPU backend (ML Drift).")
                 else:
                     logger.warning(
                         "[LiteRT] GPU backend requested but not available in this "
                         "litert-lm-api version. Falling back to CPU."
                     )
 
+            # max_num_tokens is a construction-time ceiling on the engine
+            # (no per-call override in this litert_lm version).  We lift
+            # it generously so paragraph-length Validator / CBT-Guide
+            # outputs — the demo's enumerations and 3-5 sentence MI
+            # reflections — never get clipped mid-word.  See
+            # config_loader.LITERT_MAX_TOKENS (defaults to 4096).
             engine = litert_lm.Engine(
                 model_path,
                 backend=backend,
+                max_num_tokens=int(LITERT_MAX_TOKENS),
                 cache_dir="/tmp/litert-lm-cache",
             )
         except Exception as e:
@@ -186,7 +194,7 @@ def _init_engine():
             raise LLMError(f"LiteRT engine failed to initialize: {e}") from e
 
         rss_after = _rss_mb()
-        logger.info(
+        logger.debug(
             f"[LiteRT] Model loaded. RSS delta: +{rss_after - rss_before:.1f}MB "
             f"(now {rss_after:.1f}MB)"
         )
@@ -253,7 +261,9 @@ def llm_complete(
     answer by callers that care.
     """
     role_value, model_id = _resolve_model(role)
-    logger.info(
+    # Per-call request log stays available for deep debugging but does
+    # not spam the console (demo log taxonomy only surfaces the result).
+    logger.debug(
         f"[LLM_CLIENT] Requesting in-process LiteRT inference "
         f"(role={role_value}, model={model_id})"
     )
@@ -264,7 +274,8 @@ def llm_complete(
     def _heartbeat():
         while not _heartbeat_stop.wait(10.0):
             elapsed = time.monotonic() - started_at
-            logger.info(
+            # DEBUG: heartbeat is useful in files/forensics, not on-console.
+            logger.debug(
                 f"[Heartbeat] LLM inference in progress... "
                 f"Time elapsed: {elapsed:.0f}s. Role: {role_value}. Model: {model_id}."
             )
@@ -312,9 +323,12 @@ def llm_complete(
         _reset_engine_failure_count()
         content = result.strip()
         elapsed = time.monotonic() - started_at
-        logger.info(
-            f"Received response from LLM in {elapsed:.2f}s "
-            f"(role={role_value}, LiteRT in-process)"
+        # DEBUG only: per-call LLM receipt is diagnostic, not clinical.
+        # The clinician-facing log shows the downstream interpretation
+        # ([DLA], [RV], [CBT], [AGENT]) rather than every raw model call.
+        logger.debug(
+            f"Received response for LLM (client.responses) after {elapsed:.2f}s "
+            f"(role={role_value})"
         )
         return content
 

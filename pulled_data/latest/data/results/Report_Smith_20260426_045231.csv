@@ -1,0 +1,38 @@
+Item Label,Score,Notes
+weight,[1],"[['original_question: Have you observed any substantial shifts in your weight recently?', 'original_resp: Yes, I feel like I lost some weight']]"
+mood,[0],"[['original_question: Can you describe your mood over the recent period, and how effectively have you been managing those moods?', ""original_resp: I've been pretty happy,""]]"
+medication,[1],"[['original_question: Have you been adhering to the instructions for your prescribed medications recently?', 'original_resp: Not really']]"
+care,[0],"[['original_question: Are you maintaining regular appointments with your physician, therapist, or case manager?', ""original_resp: I don't know""]]"
+house,[],[]
+talk,[],[]
+emo,[],[]
+safe,[],[]
+risk,[],[]
+sleep,[0],"[['original_question: Is your sleep pattern maintaining consistency for you?', 'original_resp: Yes']]"
+eat,[2],"[['original_question: Can you describe your eating patterns and whether you are consuming food consistently?', 'original_resp: I have not been eating properly'], ['original_question: Can you describe your eating patterns and whether you are consuming food consistently?', 'original_resp: I have not been eating properly', ""followup_resp: I just get stressed and I don't eat any food."", 'rv_decision: 0', 'rv_guide: ', 'followup_resp_1: ', ""rv_validation: It sounds like when you get stressed, the result is that you don't eat any food, and that feeling of not eating is a very real and painful experience. It makes sense that stress leads to a complete loss of appetite, as the body often shuts down certain functions when overwhelmed. You might try to focus on very small, non-food activities when stress hits, like deep breathing exercises, to see if that can create a small pause before the urge to avoid food takes over. You could also try to schedule very small, non-pressured moments for hydration, like sipping water, even when you feel overwhelmed. Perhaps exploring simple, low-effort coping mechanisms for stress, such as a short walk or listening to calming music, could help manage the intensity that leads to not eating."", 'therapist_resp: '], ['CBT_dimension: eat', ""CBT_statement: I just get stressed and I don't eat any food."", ""CBT_unhelpful_thoughts: Whenever I think about it and I'm very stressed, I just feel like I should not eat anything because I get very anxious and stressed about it."", 'CBT_challenge: Whenever I feel anxious or stressed, I will do some deep breathing to calm myself so that I can feel okay to eat.', ""CBT_reframe: Now whenever I'm stressed or anxious I will remember that it's good to be healthy and eat food properly"", 'CBT_stage: success']]"
+work,[],[]
+work_dayoff,[],[]
+showup,[],[]
+finance,[],[]
+nutrition,"[0, 0]",[]
+problem,[],[]
+support,[],[]
+family,[],[]
+alcohol,[],[]
+ciga,[],[]
+drug,[],[]
+hobbies,[],[]
+creativity,[],[]
+community,[],[]
+support,[],[]
+social,[],[]
+comfortable,[],[]
+protection,[],[]
+productivity,[],[]
+motivation,[],[]
+coping,[],[]
+sib,[],[]
+arrest,[],[]
+legal,[],[]
+hygiene,[],[]
+sports,[],[]

@@ -1,0 +1,1868 @@
+/home/arth/project/.venv/lib/python3.10/site-packages/Jetson/GPIO/gpio.py:316: UserWarning: Jetson.GPIO ignores setup()'s pull_up_down parameter
+  warnings.warn("Jetson.GPIO ignores setup()'s pull_up_down parameter")
+/home/arth/project/.venv/lib/python3.10/site-packages/Jetson/GPIO/gpio_cdev.py:373: UserWarning: Could not open /dev/mem for pinmux check. If you want pinmux checks, make sure your user has permissions to read /dev/mem and that it exists. Error: [Errno 13] Permission denied: '/dev/mem'
+  warnings.warn('Could not open /dev/mem for pinmux check. If you want pinmux checks, make sure your user has permissions to read /dev/mem and that it exists. Error: ' + str(e))
+[src/libmpg123/id3.c:process_comment():584] error: No comment text / valid description?
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1777193552.888411   14776 litert_lm_loader.cc:126] LitertLmLoader::Initialize
+I0000 00:00:1777193552.888605   14776 litert_lm_loader.cc:149] mmap_status is ok
+I0000 00:00:1777193552.888636   14776 litert_lm_loader.cc:155] status: OK
+I0000 00:00:1777193552.888641   14776 litert_lm_loader.cc:156] major_version: 1
+I0000 00:00:1777193552.888663   14776 litert_lm_loader.cc:157] minor_version: 5
+I0000 00:00:1777193552.888666   14776 litert_lm_loader.cc:158] patch_version: 0
+I0000 00:00:1777193552.888673   14776 litert_lm_loader.cc:209] section_index: 0
+I0000 00:00:1777193552.888675   14776 litert_lm_loader.cc:210] section_data_type: LlmMetadataProto
+I0000 00:00:1777193552.888680   14776 litert_lm_loader.cc:212] section_begin_offset: 16384
+I0000 00:00:1777193552.888683   14776 litert_lm_loader.cc:213] section_end_offset: 28576
+I0000 00:00:1777193552.888686   14776 litert_lm_loader.cc:209] section_index: 1
+I0000 00:00:1777193552.888688   14776 litert_lm_loader.cc:210] section_data_type: SP_Tokenizer
+I0000 00:00:1777193552.888690   14776 litert_lm_loader.cc:212] section_begin_offset: 32768
+I0000 00:00:1777193552.888693   14776 litert_lm_loader.cc:213] section_end_offset: 4721781
+I0000 00:00:1777193552.888697   14776 litert_lm_loader.cc:190] model_type: tf_lite_embedder
+I0000 00:00:1777193552.888703   14776 litert_lm_loader.cc:209] section_index: 2
+I0000 00:00:1777193552.888707   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888709   14776 litert_lm_loader.cc:212] section_begin_offset: 4734976
+I0000 00:00:1777193552.888711   14776 litert_lm_loader.cc:213] section_end_offset: 108546696
+I0000 00:00:1777193552.888714   14776 litert_lm_loader.cc:190] model_type: tf_lite_per_layer_embedder
+I0000 00:00:1777193552.888717   14776 litert_lm_loader.cc:209] section_index: 3
+I0000 00:00:1777193552.888720   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888722   14776 litert_lm_loader.cc:212] section_begin_offset: 108560384
+I0000 00:00:1777193552.888725   14776 litert_lm_loader.cc:213] section_end_offset: 1393078776
+I0000 00:00:1777193552.888729   14776 litert_lm_loader.cc:190] model_type: tf_lite_audio_encoder_hw
+I0000 00:00:1777193552.888734   14776 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777193552.888737   14776 litert_lm_loader.cc:209] section_index: 4
+I0000 00:00:1777193552.888740   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888744   14776 litert_lm_loader.cc:212] section_begin_offset: 1393082368
+I0000 00:00:1777193552.888746   14776 litert_lm_loader.cc:213] section_end_offset: 1487134648
+I0000 00:00:1777193552.888749   14776 litert_lm_loader.cc:190] model_type: tf_lite_audio_adapter
+I0000 00:00:1777193552.888752   14776 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777193552.888756   14776 litert_lm_loader.cc:209] section_index: 5
+I0000 00:00:1777193552.888759   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888761   14776 litert_lm_loader.cc:212] section_begin_offset: 1487142912
+I0000 00:00:1777193552.888764   14776 litert_lm_loader.cc:213] section_end_offset: 1496584156
+I0000 00:00:1777193552.888767   14776 litert_lm_loader.cc:190] model_type: tf_lite_end_of_audio
+I0000 00:00:1777193552.888770   14776 litert_lm_loader.cc:209] section_index: 6
+I0000 00:00:1777193552.888772   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888774   14776 litert_lm_loader.cc:212] section_begin_offset: 1496596480
+I0000 00:00:1777193552.888777   14776 litert_lm_loader.cc:213] section_end_offset: 1496603252
+I0000 00:00:1777193552.888779   14776 litert_lm_loader.cc:190] model_type: tf_lite_vision_encoder
+I0000 00:00:1777193552.888782   14776 litert_lm_loader.cc:209] section_index: 7
+I0000 00:00:1777193552.888784   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888786   14776 litert_lm_loader.cc:212] section_begin_offset: 1496612864
+I0000 00:00:1777193552.888788   14776 litert_lm_loader.cc:213] section_end_offset: 1715702984
+I0000 00:00:1777193552.888791   14776 litert_lm_loader.cc:190] model_type: tf_lite_vision_adapter
+I0000 00:00:1777193552.888793   14776 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777193552.888796   14776 litert_lm_loader.cc:209] section_index: 8
+I0000 00:00:1777193552.888798   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888800   14776 litert_lm_loader.cc:212] section_begin_offset: 1715716096
+I0000 00:00:1777193552.888802   14776 litert_lm_loader.cc:213] section_end_offset: 1720443208
+I0000 00:00:1777193552.888804   14776 litert_lm_loader.cc:190] model_type: tf_lite_end_of_vision
+I0000 00:00:1777193552.888807   14776 litert_lm_loader.cc:209] section_index: 9
+I0000 00:00:1777193552.888809   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888811   14776 litert_lm_loader.cc:212] section_begin_offset: 1720451072
+I0000 00:00:1777193552.888815   14776 litert_lm_loader.cc:213] section_end_offset: 1720457844
+I0000 00:00:1777193552.888817   14776 litert_lm_loader.cc:190] model_type: tf_lite_prefill_decode
+I0000 00:00:1777193552.888820   14776 litert_lm_loader.cc:209] section_index: 10
+I0000 00:00:1777193552.888823   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888826   14776 litert_lm_loader.cc:212] section_begin_offset: 1720467456
+I0000 00:00:1777193552.888828   14776 litert_lm_loader.cc:213] section_end_offset: 2538742640
+I0000 00:00:1777193552.888831   14776 litert_lm_loader.cc:190] model_type: tf_lite_mtp_drafter
+I0000 00:00:1777193552.888834   14776 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777193552.888836   14776 litert_lm_loader.cc:209] section_index: 11
+I0000 00:00:1777193552.888839   14776 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777193552.888841   14776 litert_lm_loader.cc:212] section_begin_offset: 2538749952
+I0000 00:00:1777193552.888843   14776 litert_lm_loader.cc:213] section_end_offset: 2583082648
+I0000 00:00:1777193552.888923   14776 engine_impl.cc:306] New model files have LlmModelType, loading tokenizer asynchronously
+W0000 00:00:1777193552.889066   14776 litert_lm_loader.h:144] TFLite model type: TF_LITE_PREFILL_DECODE not found for backend constraints. Skipping.
+W0000 00:00:1777193552.889091   14776 litert_lm_loader.h:144] TFLite model type: TF_LITE_VISION_ENCODER not found for backend constraints. Skipping.
+I0000 00:00:1777193552.889116   14776 engine_settings.cc:97] The Main backend constraint is not set.
+I0000 00:00:1777193552.889127   14776 engine_settings.cc:337] The validated engine settings: EngineSettings: 
+  MainExecutorSettings: backend: CPU
+backend_config:
+kv_increment_size: 16
+prefill_chunk_size: -1
+number_of_threads: 4
+
+max_tokens: 4096
+activation_data_type: Not set
+max_num_images: 0
+lora_rank: 0
+cache_dir: /tmp/litert-lm-cache
+cache_file: Not set
+litert_dispatch_lib_dir: Not set
+model_assets: model_path: ./models/litert/gemma-4-E2B-it.litertlm
+fake_weights_mode: FAKE_WEIGHTS_NONE
+
+advanced_settings: prefill_batch_sizes: []
+num_output_candidates: 1
+configure_magic_numbers: true
+verify_magic_numbers: false
+clear_kv_cache_before_prefill: true
+num_logits_to_print_after_decode: 0
+gpu_madvise_original_shared_tensors: true
+is_benchmark: false
+preferred_device_substr: 
+num_threads_to_upload: -1
+num_threads_to_compile: -1
+convert_weights_on_gpu: true
+wait_for_weights_conversion_complete_in_benchmark: true
+optimize_shader_compilation: true
+cache_compiled_shaders_only: false
+share_constant_tensors: true
+sampler_handles_input: true
+allow_src_quantized_fc_conv_ops: true
+hint_waiting_for_completion: false
+gpu_context_low_priority: false
+enable_speculative_decoding: false
+disable_delegate_clustering: true
+
+  LlmMetadata: goo.gle/debugproto  
+start_token {
+  token_ids {
+    ids: 2
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 1
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 50
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 106
+  }
+}
+sampler_params {
+  type: TOP_P
+  k: 1
+  p: 0.95
+  temperature: 1
+  seed: 0
+}
+llm_model_type {
+  gemma4 {
+    start_of_image_token {
+      token_str: "<|image>"
+    }
+    end_of_image_token {
+      token_str: "<image|>"
+    }
+    start_of_audio_token {
+      token_str: "<|audio>"
+    }
+    end_of_audio_token {
+      token_str: "<audio|>"
+    }
+    code_fence_start: "<|tool_call>"
+    code_fence_end: "<tool_call|>"
+    open_quote: "<|\"|>"
+    close_quote: "<|\"|>"
+    function_response_start: "<|tool_response>"
+    use_template_for_fc_format: true
+    patch_width: 16
+    patch_height: 16
+    max_num_patches: 2520
+  }
+}
+jinja_prompt_template: "{%- macro format_parameters(properties, required) -%}\n    {%- set standard_keys = [\'description\', \'type\', \'properties\', \'required\', \'nullable\'] -%}\n    {%- set ns = namespace(found_first=false) -%}\n    {%- for key, value in properties | dictsort -%}\n        {%- set add_comma = false -%}\n        {%- if key not in standard_keys -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {{ key }}:{\n            {%- if value[\'description\'] -%}\n                description:<|\"|>{{ value[\'description\'] }}<|\"|>\n                {%- set add_comma = true -%}\n            {%- endif -%}\n            {%- if value[\'nullable\'] %}\n                {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                nullable:true\n            {%- endif -%}\n            {%- if value[\'type\'] | upper == \'STRING\' -%}\n                {%- if value[\'enum\'] -%}\n                    {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                    enum:{{ format_argument(value[\'enum\']) }}\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'OBJECT\' -%}\n                ,properties:{\n                {%- if value[\'properties\'] is defined and value[\'properties\'] is mapping -%}\n                    {{- format_parameters(value[\'properties\'], value[\'required\'] | default([])) -}}\n                {%- elif value is mapping -%}\n                    {{- format_parameters(value, value[\'required\'] | default([])) -}}\n                {%- endif -%}\n                }\n                {%- if value[\'required\'] -%}\n                    ,required:[\n                    {%- for item in value[\'required\'] | default([]) -%}\n                        <|\"|>{{- item -}}<|\"|>\n                        {%- if not loop.last %},{% endif -%}\n                    {%- endfor -%}\n                    ]\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'ARRAY\' -%}\n                {%- if value[\'items\'] is mapping and value[\'items\'] -%}\n                    ,items:{\n                    {%- set ns_items = namespace(found_first=false) -%}\n                    {%- for item_key, item_value in value[\'items\'] | dictsort -%}\n                        {%- if item_value is not none -%}\n                            {%- if ns_items.found_first %},{% endif -%}\n                            {%- set ns_items.found_first = true -%}\n                            {%- if item_key == \'properties\' -%}\n                                properties:{\n                                {%- if item_value is mapping -%}\n                                    {{- format_parameters(item_value, value[\'items\'][\'required\'] | default([])) -}}\n                                {%- endif -%}\n                                }\n                            {%- elif item_key == \'required\' -%}\n                                required:[\n                                {%- for req_item in item_value -%}\n                                    <|\"|>{{- req_item -}}<|\"|>\n                                    {%- if not loop.last %},{% endif -%}\n                                {%- endfor -%}\n                                ]\n                            {%- elif item_key == \'type\' -%}\n                                {%- if item_value is string -%}\n                                    type:{{ format_argument(item_value | upper) }}\n                                {%- else -%}\n                                    type:{{ format_argument(item_value | map(\'upper\') | list) }}\n                                {%- endif -%}\n                            {%- else -%}\n                                {{ item_key }}:{{ format_argument(item_value) }}\n                            {%- endif -%}\n                        {%- endif -%}\n                    {%- endfor -%}\n                    }\n                {%- endif -%}\n            {%- endif -%}\n            {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n            type:<|\"|>{{ value[\'type\'] | upper }}<|\"|>}\n        {%- endif -%}\n    {%- endfor -%}\n{%- endmacro -%}\n{%- macro format_function_declaration(tool_data) -%}\n    declaration:{{- tool_data[\'function\'][\'name\'] -}}{description:<|\"|>{{- tool_data[\'function\'][\'description\'] -}}<|\"|>\n    {%- set params = tool_data[\'function\'][\'parameters\'] -%}\n    {%- if params -%}\n        ,parameters:{\n        {%- if params[\'properties\'] -%}\n            properties:{ {{- format_parameters(params[\'properties\'], params[\'required\']) -}} },\n        {%- endif -%}\n        {%- if params[\'required\'] -%}\n            required:[\n            {%- for item in params[\'required\'] -%}\n                <|\"|>{{- item -}}<|\"|>\n                {{- \',\' if not loop.last -}}\n            {%- endfor -%}\n            ],\n        {%- endif -%}\n        {%- if params[\'type\'] -%}\n            type:<|\"|>{{- params[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    {%- if \'response\' in tool_data[\'function\'] -%}\n        {%- set response_declaration = tool_data[\'function\'][\'response\'] -%}\n        ,response:{\n        {%- if response_declaration[\'description\'] -%}\n            description:<|\"|>{{- response_declaration[\'description\'] -}}<|\"|>,\n        {%- endif -%}\n        {%- if response_declaration[\'type\'] | upper == \'OBJECT\' -%}\n            type:<|\"|>{{- response_declaration[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    }\n{%- endmacro -%}\n{%- macro format_argument(argument, escape_keys=True) -%}\n    {%- if argument is string -%}\n        {{- \'<|\"|>\' + argument + \'<|\"|>\' -}}\n    {%- elif argument is boolean -%}\n        {{- \'true\' if argument else \'false\' -}}\n    {%- elif argument is mapping -%}\n        {{- \'{\' -}}\n        {%- set ns = namespace(found_first=false) -%}\n        {%- for key, value in argument | dictsort -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {%- if escape_keys -%}\n                {{- \'<|\"|>\' + key + \'<|\"|>\' -}}\n            {%- else -%}\n                {{- key -}}\n            {%- endif -%}\n            :{{- format_argument(value, escape_keys=escape_keys) -}}\n        {%- endfor -%}\n        {{- \'}\' -}}\n    {%- elif argument is sequence -%}\n        {{- \'[\' -}}\n        {%- for item in argument -%}\n            {{- format_argument(item, escape_keys=escape_keys) -}}\n            {%- if not loop.last %},{% endif -%}\n        {%- endfor -%}\n        {{- \']\' -}}\n    {%- else -%}\n        {{- argument -}}\n    {%- endif -%}\n{%- endmacro -%}\n{%- macro strip_thinking(text) -%}\n    {%- set ns = namespace(result=\'\') -%}\n    {%- for part in text.split(\'<channel|>\') -%}\n        {%- if \'<|channel>\' in part -%}\n            {%- set ns.result = ns.result + part.split(\'<|channel>\')[0] -%}\n        {%- else -%}\n            {%- set ns.result = ns.result + part -%}\n        {%- endif -%}\n    {%- endfor -%}\n    {{- ns.result | trim -}}\n{%- endmacro -%}\n\n{%- set ns = namespace(prev_message_type=None) -%}\n{%- set loop_messages = messages -%}\n{{ bos_token }}\n{#- Handle System/Tool Definitions Block -#}\n{%- if (enable_thinking is defined and enable_thinking) or tools or messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n    {{- \'<|turn>system\\n\' -}}\n\n    {#- Inject Thinking token at the very top of the FIRST system turn -#}\n    {%- if enable_thinking is defined and enable_thinking -%}\n        {{- \'<|think|>\' -}}\n    {%- endif -%}\n\n    {%- if messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n        {%- if messages[0][\'content\'] is string -%}\n            {{- messages[0][\'content\'] | trim -}}\n        {%- elif messages[0][\'content\'] is sequence -%}\n            {%- for item in messages[0][\'content\'] -%}\n                {%- if item[\'type\'] == \'text\' -%}\n                    {{- item[\'text\'] | trim -}}\n                {%- endif -%}\n            {%- endfor -%}\n        {%- endif -%}\n        {%- set loop_messages = messages[1:] -%}\n    {%- endif -%}\n\n    {%- if tools -%}\n        {{- \'\\n\\n\' -}}\n        {%- for tool in tools %}\n            {{- \'<|tool>\' -}}\n            {{- format_function_declaration(tool) | trim -}}\n            {{- \'<tool|>\' -}}\n        {%- endfor %}\n    {%- endif -%}\n\n    {{- \'<turn|>\\n\' -}}\n{%- endif %}\n\n{#- Loop through messages -#}\n{%- for message in loop_messages -%}\n    {%- set role = \'model\' if message[\'role\'] == \'assistant\' else message[\'role\'] -%}\n        {%- if role != \'tool\' -%}\n            {{- \'<|turn>\' + role + \'\\n\' }}\n        {%- endif -%}\n\n            {%- if message[\'tool_calls\'] -%}\n                {%- for tool_call in message[\'tool_calls\'] -%}\n                    {%- set function = tool_call[\'function\'] -%}\n                    {{- \'<|tool_call>call:\' + function[\'name\'] + \'{\' -}}\n                    {%- if function[\'arguments\'] is mapping -%}\n                        {%- set ns_args = namespace(found_first=false) -%}\n                        {%- for key, value in function[\'arguments\'] | dictsort -%}\n                            {%- if ns_args.found_first %},{% endif -%}\n                            {%- set ns_args.found_first = true -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                        {%- endfor -%}\n                    {%- elif function[\'arguments\'] is string -%}\n                        {{- function[\'arguments\'] -}}\n                    {%- endif -%}\n                    {{- \'}<tool_call|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_call\' -%}\n            {%- endif -%}\n\n            {%- if role == \'tool\' and message[\'content\'] is sequence -%}\n                {#- Tool Response handling -#}\n                {%- for item in message[\'content\'] -%}\n                    {{- \'<|tool_response>\' -}}\n                    {%- if item[\'response\'] is mapping -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{\' -}}\n                        {%- for key, value in item[\'response\'] | dictsort -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                            {%- if not loop.last %},{% endif -%}\n                        {%- endfor -%}\n                        {{- \'}\' -}}\n                    {%- else -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{value:\' + format_argument(item[\'response\'], escape_keys=False) + \'}\' -}}\n                    {%- endif -%}\n                    {{- \'<tool_response|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_response\' -%}\n            {%- else -%}\n                {%- if message[\'content\'] is string -%}\n                    {%- if role == \'model\' -%}\n                        {{- strip_thinking(message[\'content\']) -}}\n                    {%- else -%}\n                        {{- message[\'content\'] | trim -}}\n                    {%- endif -%}\n                {%- elif message[\'content\'] is sequence -%}\n                    {%- for item in message[\'content\'] -%}\n                        {%- if item[\'type\'] == \'text\' -%}\n                            {%- if role == \'model\' -%}\n                                {{- strip_thinking(item[\'text\']) -}}\n                            {%- else -%}\n                                {{- item[\'text\'] | trim -}}\n                            {%- endif -%}\n                        {%- elif item[\'type\'] == \'image\' -%}\n                            {{- \'\\n\\n<|image|>\\n\\n\' -}}\n                        {%- elif item[\'type\'] == \'audio\' -%}\n                            {{- \'<|audio|>\' -}}\n                        {%- endif -%}\n                    {%- endfor -%}\n                {%- endif -%}\n                {%- set ns.prev_message_type = None -%} \n            {%- endif -%}\n        {%- if ns.prev_message_type == None -%}\n            {{- \'<turn|>\\n\' -}}\n        {%- endif -%}\n{%- endfor -%}\n\n{%- if add_generation_prompt -%}\n    {%- if ns.prev_message_type != \'tool_response\' -%}\n        {{- \'<|turn>model\\n\' -}}\n    {%- endif -%}\n{%- endif -%}"
+channels {
+  channel_name: "thought"
+  start: "<|channel>thought\n"
+  end: "<channel|>"
+}
+  BenchmarkParams: Not set
+  VisionExecutorSettings: Not set
+  AudioExecutorSettings: Not set
+
+I0000 00:00:1777193552.892185   14776 model_resources_litert_lm.cc:67] model_type: TF_LITE_PREFILL_DECODE
+I0000 00:00:1777193552.892212   14776 model_resources_litert_lm.cc:68] litert model size: 818275184
+INFO: [environment.cc:30] Creating LiteRT environment with options
+WARNING: [auto_registration.cc:192] NPU accelerator could not be loaded and registered: kLiteRtStatusErrorInvalidArgument.
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtGpuAccelerator.so).
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtWebGpuAccelerator.so).
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaaacd2fd2b0, name=GPU WebGPU
+INFO: [auto_registration.cc:287] Dynamically loaded GPU accelerator(libLiteRtWebGpuAccelerator.so) registered.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaaace3f16c0, name=CpuAccelerator
+INFO: [auto_registration.cc:325] CPU accelerator registered.
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=976, num_signatures=4
+INFO: [magic_number_utils.cc:105]   signature=decode, subgraph_index=0, num_tensors=2703, num_inputs=35, num_outputs=32, num_ops=2068
+INFO: [magic_number_utils.cc:105]   signature=prefill_1024, subgraph_index=1, num_tensors=1454, num_inputs=35, num_outputs=30, num_ops=1107
+INFO: [magic_number_utils.cc:105]   signature=prefill_128, subgraph_index=2, num_tensors=1454, num_inputs=35, num_outputs=30, num_ops=1107
+INFO: [magic_number_utils.cc:105]   signature=verify, subgraph_index=3, num_tensors=2887, num_inputs=35, num_outputs=32, num_ops=2243
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [magic_number_utils.cc:425] 439 tensors of signature decode have been updated for magic number  32003 to target number 4096
+INFO: [magic_number_utils.cc:425] 271 tensors of signature prefill_1024 have been updated for magic number  32003 to target number 4096
+INFO: [magic_number_utils.cc:425] 270 tensors of signature prefill_128 have been updated for magic number  32003 to target number 4096
+INFO: [magic_number_utils.cc:425] 444 tensors of signature verify have been updated for magic number  32003 to target number 4096
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+ERROR: third_party/tensorflow/lite/delegates/xnnpack/weight_cache.cc:460: could not open file ('/tmp/litert-lm-cache/gemma-4-E2B-it.litertlm.xnnpack_cache'): No such file or directory.
+ERROR: XNNPack weight cache could neither be loaded from or saved to '/tmp/litert-lm-cache/gemma-4-E2B-it.litertlm.xnnpack_cache'. Check that this location is readable and writable.
+INFO: [environment.cc:30] Creating LiteRT environment with options
+WARNING: [auto_registration.cc:192] NPU accelerator could not be loaded and registered: kLiteRtStatusErrorInvalidArgument.
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtGpuAccelerator.so).
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtWebGpuAccelerator.so).
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaab44752f40, name=GPU WebGPU
+INFO: [auto_registration.cc:287] Dynamically loaded GPU accelerator(libLiteRtWebGpuAccelerator.so) registered.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaab4475fae0, name=CpuAccelerator
+INFO: [auto_registration.cc:325] CPU accelerator registered.
+I0000 00:00:1777193574.128905   14776 model_resources_litert_lm.cc:67] model_type: TF_LITE_END_OF_AUDIO
+I0000 00:00:1777193574.128961   14776 model_resources_litert_lm.cc:68] litert model size: 6772
+I0000 00:00:1777193574.129054   14776 model_resources_litert_lm.cc:67] model_type: TF_LITE_END_OF_VISION
+I0000 00:00:1777193574.129067   14776 model_resources_litert_lm.cc:68] litert model size: 6772
+I0000 00:00:1777193574.129138   14776 model_resources_litert_lm.cc:67] model_type: TF_LITE_EMBEDDER
+I0000 00:00:1777193574.129146   14776 model_resources_litert_lm.cc:68] litert model size: 103811720
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=embedder, subgraph_index=0, num_tensors=16, num_inputs=1, num_outputs=1, num_ops=8
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+I0000 00:00:1777193574.130827   14776 embedding_lookup_text.cc:345] EmbeddingLookupText initialized: signature=embedder, rank=3, floats_per_token=1536
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=eoa, subgraph_index=0, num_tensors=1, num_inputs=0, num_outputs=1, num_ops=0
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+INFO: [compiled_model.cc:1486] Tracked constant output tensor eoa_embedding with locked address
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=eoi, subgraph_index=0, num_tensors=1, num_inputs=0, num_outputs=1, num_ops=0
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+INFO: [compiled_model.cc:1486] Tracked constant output tensor eoi_embedding with locked address
+I0000 00:00:1777193574.131390   14776 model_resources_litert_lm.cc:67] model_type: TF_LITE_PER_LAYER_EMBEDDER
+I0000 00:00:1777193574.131406   14776 model_resources_litert_lm.cc:68] litert model size: 1284518392
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=per_layer_embedder, subgraph_index=0, num_tensors=83, num_inputs=1, num_outputs=1, num_ops=42
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+I0000 00:00:1777193574.196211   14776 embedding_lookup_text.cc:345] EmbeddingLookupText initialized: signature=per_layer_embedder, rank=4, floats_per_token=8960
+W0000 00:00:1777193574.196404   14776 litert_lm_loader.h:144] TFLite model type: TF_LITE_PREFILL_DECODE not found for backend constraints. Skipping.
+W0000 00:00:1777193574.196423   14776 litert_lm_loader.h:144] TFLite model type: TF_LITE_VISION_ENCODER not found for backend constraints. Skipping.
+I0000 00:00:1777193574.196454   14776 engine_settings.cc:97] The Main backend constraint is not set.
+I0000 00:00:1777193574.196461   14776 engine_settings.cc:337] The validated engine settings: EngineSettings: 
+  MainExecutorSettings: backend: CPU
+backend_config:
+kv_increment_size: 16
+prefill_chunk_size: -1
+number_of_threads: 4
+
+max_tokens: 4096
+activation_data_type: Not set
+max_num_images: 0
+lora_rank: 0
+cache_dir: /tmp/litert-lm-cache
+cache_file: Not set
+litert_dispatch_lib_dir: Not set
+model_assets: model_path: ./models/litert/gemma-4-E2B-it.litertlm
+fake_weights_mode: FAKE_WEIGHTS_NONE
+
+advanced_settings: prefill_batch_sizes: []
+num_output_candidates: 1
+configure_magic_numbers: true
+verify_magic_numbers: false
+clear_kv_cache_before_prefill: true
+num_logits_to_print_after_decode: 0
+gpu_madvise_original_shared_tensors: true
+is_benchmark: false
+preferred_device_substr: 
+num_threads_to_upload: -1
+num_threads_to_compile: -1
+convert_weights_on_gpu: true
+wait_for_weights_conversion_complete_in_benchmark: true
+optimize_shader_compilation: true
+cache_compiled_shaders_only: false
+share_constant_tensors: true
+sampler_handles_input: true
+allow_src_quantized_fc_conv_ops: true
+hint_waiting_for_completion: false
+gpu_context_low_priority: false
+enable_speculative_decoding: false
+disable_delegate_clustering: true
+
+  LlmMetadata: goo.gle/debugproto  
+start_token {
+  token_ids {
+    ids: 2
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 1
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 50
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 106
+  }
+}
+sampler_params {
+  type: TOP_P
+  k: 1
+  p: 0.95
+  temperature: 1
+  seed: 0
+}
+llm_model_type {
+  gemma4 {
+    start_of_image_token {
+      token_str: "<|image>"
+    }
+    end_of_image_token {
+      token_str: "<image|>"
+    }
+    start_of_audio_token {
+      token_str: "<|audio>"
+    }
+    end_of_audio_token {
+      token_str: "<audio|>"
+    }
+    code_fence_start: "<|tool_call>"
+    code_fence_end: "<tool_call|>"
+    open_quote: "<|\"|>"
+    close_quote: "<|\"|>"
+    function_response_start: "<|tool_response>"
+    use_template_for_fc_format: true
+    patch_width: 16
+    patch_height: 16
+    max_num_patches: 2520
+  }
+}
+jinja_prompt_template: "{%- macro format_parameters(properties, required) -%}\n    {%- set standard_keys = [\'description\', \'type\', \'properties\', \'required\', \'nullable\'] -%}\n    {%- set ns = namespace(found_first=false) -%}\n    {%- for key, value in properties | dictsort -%}\n        {%- set add_comma = false -%}\n        {%- if key not in standard_keys -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {{ key }}:{\n            {%- if value[\'description\'] -%}\n                description:<|\"|>{{ value[\'description\'] }}<|\"|>\n                {%- set add_comma = true -%}\n            {%- endif -%}\n            {%- if value[\'nullable\'] %}\n                {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                nullable:true\n            {%- endif -%}\n            {%- if value[\'type\'] | upper == \'STRING\' -%}\n                {%- if value[\'enum\'] -%}\n                    {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                    enum:{{ format_argument(value[\'enum\']) }}\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'OBJECT\' -%}\n                ,properties:{\n                {%- if value[\'properties\'] is defined and value[\'properties\'] is mapping -%}\n                    {{- format_parameters(value[\'properties\'], value[\'required\'] | default([])) -}}\n                {%- elif value is mapping -%}\n                    {{- format_parameters(value, value[\'required\'] | default([])) -}}\n                {%- endif -%}\n                }\n                {%- if value[\'required\'] -%}\n                    ,required:[\n                    {%- for item in value[\'required\'] | default([]) -%}\n                        <|\"|>{{- item -}}<|\"|>\n                        {%- if not loop.last %},{% endif -%}\n                    {%- endfor -%}\n                    ]\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'ARRAY\' -%}\n                {%- if value[\'items\'] is mapping and value[\'items\'] -%}\n                    ,items:{\n                    {%- set ns_items = namespace(found_first=false) -%}\n                    {%- for item_key, item_value in value[\'items\'] | dictsort -%}\n                        {%- if item_value is not none -%}\n                            {%- if ns_items.found_first %},{% endif -%}\n                            {%- set ns_items.found_first = true -%}\n                            {%- if item_key == \'properties\' -%}\n                                properties:{\n                                {%- if item_value is mapping -%}\n                                    {{- format_parameters(item_value, value[\'items\'][\'required\'] | default([])) -}}\n                                {%- endif -%}\n                                }\n                            {%- elif item_key == \'required\' -%}\n                                required:[\n                                {%- for req_item in item_value -%}\n                                    <|\"|>{{- req_item -}}<|\"|>\n                                    {%- if not loop.last %},{% endif -%}\n                                {%- endfor -%}\n                                ]\n                            {%- elif item_key == \'type\' -%}\n                                {%- if item_value is string -%}\n                                    type:{{ format_argument(item_value | upper) }}\n                                {%- else -%}\n                                    type:{{ format_argument(item_value | map(\'upper\') | list) }}\n                                {%- endif -%}\n                            {%- else -%}\n                                {{ item_key }}:{{ format_argument(item_value) }}\n                            {%- endif -%}\n                        {%- endif -%}\n                    {%- endfor -%}\n                    }\n                {%- endif -%}\n            {%- endif -%}\n            {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n            type:<|\"|>{{ value[\'type\'] | upper }}<|\"|>}\n        {%- endif -%}\n    {%- endfor -%}\n{%- endmacro -%}\n{%- macro format_function_declaration(tool_data) -%}\n    declaration:{{- tool_data[\'function\'][\'name\'] -}}{description:<|\"|>{{- tool_data[\'function\'][\'description\'] -}}<|\"|>\n    {%- set params = tool_data[\'function\'][\'parameters\'] -%}\n    {%- if params -%}\n        ,parameters:{\n        {%- if params[\'properties\'] -%}\n            properties:{ {{- format_parameters(params[\'properties\'], params[\'required\']) -}} },\n        {%- endif -%}\n        {%- if params[\'required\'] -%}\n            required:[\n            {%- for item in params[\'required\'] -%}\n                <|\"|>{{- item -}}<|\"|>\n                {{- \',\' if not loop.last -}}\n            {%- endfor -%}\n            ],\n        {%- endif -%}\n        {%- if params[\'type\'] -%}\n            type:<|\"|>{{- params[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    {%- if \'response\' in tool_data[\'function\'] -%}\n        {%- set response_declaration = tool_data[\'function\'][\'response\'] -%}\n        ,response:{\n        {%- if response_declaration[\'description\'] -%}\n            description:<|\"|>{{- response_declaration[\'description\'] -}}<|\"|>,\n        {%- endif -%}\n        {%- if response_declaration[\'type\'] | upper == \'OBJECT\' -%}\n            type:<|\"|>{{- response_declaration[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    }\n{%- endmacro -%}\n{%- macro format_argument(argument, escape_keys=True) -%}\n    {%- if argument is string -%}\n        {{- \'<|\"|>\' + argument + \'<|\"|>\' -}}\n    {%- elif argument is boolean -%}\n        {{- \'true\' if argument else \'false\' -}}\n    {%- elif argument is mapping -%}\n        {{- \'{\' -}}\n        {%- set ns = namespace(found_first=false) -%}\n        {%- for key, value in argument | dictsort -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {%- if escape_keys -%}\n                {{- \'<|\"|>\' + key + \'<|\"|>\' -}}\n            {%- else -%}\n                {{- key -}}\n            {%- endif -%}\n            :{{- format_argument(value, escape_keys=escape_keys) -}}\n        {%- endfor -%}\n        {{- \'}\' -}}\n    {%- elif argument is sequence -%}\n        {{- \'[\' -}}\n        {%- for item in argument -%}\n            {{- format_argument(item, escape_keys=escape_keys) -}}\n            {%- if not loop.last %},{% endif -%}\n        {%- endfor -%}\n        {{- \']\' -}}\n    {%- else -%}\n        {{- argument -}}\n    {%- endif -%}\n{%- endmacro -%}\n{%- macro strip_thinking(text) -%}\n    {%- set ns = namespace(result=\'\') -%}\n    {%- for part in text.split(\'<channel|>\') -%}\n        {%- if \'<|channel>\' in part -%}\n            {%- set ns.result = ns.result + part.split(\'<|channel>\')[0] -%}\n        {%- else -%}\n            {%- set ns.result = ns.result + part -%}\n        {%- endif -%}\n    {%- endfor -%}\n    {{- ns.result | trim -}}\n{%- endmacro -%}\n\n{%- set ns = namespace(prev_message_type=None) -%}\n{%- set loop_messages = messages -%}\n{{ bos_token }}\n{#- Handle System/Tool Definitions Block -#}\n{%- if (enable_thinking is defined and enable_thinking) or tools or messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n    {{- \'<|turn>system\\n\' -}}\n\n    {#- Inject Thinking token at the very top of the FIRST system turn -#}\n    {%- if enable_thinking is defined and enable_thinking -%}\n        {{- \'<|think|>\' -}}\n    {%- endif -%}\n\n    {%- if messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n        {%- if messages[0][\'content\'] is string -%}\n            {{- messages[0][\'content\'] | trim -}}\n        {%- elif messages[0][\'content\'] is sequence -%}\n            {%- for item in messages[0][\'content\'] -%}\n                {%- if item[\'type\'] == \'text\' -%}\n                    {{- item[\'text\'] | trim -}}\n                {%- endif -%}\n            {%- endfor -%}\n        {%- endif -%}\n        {%- set loop_messages = messages[1:] -%}\n    {%- endif -%}\n\n    {%- if tools -%}\n        {{- \'\\n\\n\' -}}\n        {%- for tool in tools %}\n            {{- \'<|tool>\' -}}\n            {{- format_function_declaration(tool) | trim -}}\n            {{- \'<tool|>\' -}}\n        {%- endfor %}\n    {%- endif -%}\n\n    {{- \'<turn|>\\n\' -}}\n{%- endif %}\n\n{#- Loop through messages -#}\n{%- for message in loop_messages -%}\n    {%- set role = \'model\' if message[\'role\'] == \'assistant\' else message[\'role\'] -%}\n        {%- if role != \'tool\' -%}\n            {{- \'<|turn>\' + role + \'\\n\' }}\n        {%- endif -%}\n\n            {%- if message[\'tool_calls\'] -%}\n                {%- for tool_call in message[\'tool_calls\'] -%}\n                    {%- set function = tool_call[\'function\'] -%}\n                    {{- \'<|tool_call>call:\' + function[\'name\'] + \'{\' -}}\n                    {%- if function[\'arguments\'] is mapping -%}\n                        {%- set ns_args = namespace(found_first=false) -%}\n                        {%- for key, value in function[\'arguments\'] | dictsort -%}\n                            {%- if ns_args.found_first %},{% endif -%}\n                            {%- set ns_args.found_first = true -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                        {%- endfor -%}\n                    {%- elif function[\'arguments\'] is string -%}\n                        {{- function[\'arguments\'] -}}\n                    {%- endif -%}\n                    {{- \'}<tool_call|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_call\' -%}\n            {%- endif -%}\n\n            {%- if role == \'tool\' and message[\'content\'] is sequence -%}\n                {#- Tool Response handling -#}\n                {%- for item in message[\'content\'] -%}\n                    {{- \'<|tool_response>\' -}}\n                    {%- if item[\'response\'] is mapping -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{\' -}}\n                        {%- for key, value in item[\'response\'] | dictsort -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                            {%- if not loop.last %},{% endif -%}\n                        {%- endfor -%}\n                        {{- \'}\' -}}\n                    {%- else -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{value:\' + format_argument(item[\'response\'], escape_keys=False) + \'}\' -}}\n                    {%- endif -%}\n                    {{- \'<tool_response|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_response\' -%}\n            {%- else -%}\n                {%- if message[\'content\'] is string -%}\n                    {%- if role == \'model\' -%}\n                        {{- strip_thinking(message[\'content\']) -}}\n                    {%- else -%}\n                        {{- message[\'content\'] | trim -}}\n                    {%- endif -%}\n                {%- elif message[\'content\'] is sequence -%}\n                    {%- for item in message[\'content\'] -%}\n                        {%- if item[\'type\'] == \'text\' -%}\n                            {%- if role == \'model\' -%}\n                                {{- strip_thinking(item[\'text\']) -}}\n                            {%- else -%}\n                                {{- item[\'text\'] | trim -}}\n                            {%- endif -%}\n                        {%- elif item[\'type\'] == \'image\' -%}\n                            {{- \'\\n\\n<|image|>\\n\\n\' -}}\n                        {%- elif item[\'type\'] == \'audio\' -%}\n                            {{- \'<|audio|>\' -}}\n                        {%- endif -%}\n                    {%- endfor -%}\n                {%- endif -%}\n                {%- set ns.prev_message_type = None -%} \n            {%- endif -%}\n        {%- if ns.prev_message_type == None -%}\n            {{- \'<turn|>\\n\' -}}\n        {%- endif -%}\n{%- endfor -%}\n\n{%- if add_generation_prompt -%}\n    {%- if ns.prev_message_type != \'tool_response\' -%}\n        {{- \'<|turn>model\\n\' -}}\n    {%- endif -%}\n{%- endif -%}"
+channels {
+  channel_name: "thought"
+  start: "<|channel>thought\n"
+  end: "<channel|>"
+}
+  BenchmarkParams: Not set
+  VisionExecutorSettings: Not set
+  AudioExecutorSettings: Not set
+
+I0000 00:00:1777193574.196613   14776 threadpool.cc:41] ThreadPool 'engine': Running up to 1 threads.
+I0000 00:00:1777193574.203021   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193574.203070   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193574.203889   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193574.203905   14776 session_basic.cc:301] <|turn>user
+You are a warm, concise, and professional therapist-assistant.
+
+Identity Rules:
+- AI_NAME: CaiTI
+- USER_NAME: Smith
+- You are CaiTI. The user is USER_NAME.
+- Never confuse the two identities.
+
+Task: Generate a brief transition sentence that moves a new user from the opening handshake into the first session.
+Rules:
+- The user has ALREADY been greeted with 'Hello, <their name>. I'm CaiTI, your intelligent therapist. Thank you for joining me today.' — do NOT repeat any of that. Start with a short warm sentence that moves the session forward (e.g. 'Let's begin with a few quick check-ins about your recent day-to-day.' or 'I'd like to start with a couple of questions about how you've been.').
+- Do NOT open with 'Hello', 'Hi', 'Hey', or any variant of 'Welcome back' that names CaiTI again.
+- 1–2 short sentences.
+- Friendly, non-judgmental tone.
+- No extra headers or labels; output the final text directly.
+
+
+I'm CaiTI, your intelligent therapist. Thank you for joining me today. Let's get started with a couple of questions about your recent daily life.<turn|>
+<|turn>model
+
+I0000 00:00:1777193584.736940   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193586.553030   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193586.553103   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193586.554014   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193586.554038   14776 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "Have your prescribed medications been taken as directed lately?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777193594.950252   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193642.976195   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193642.976259   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193642.977100   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193642.977115   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Have you been adhering to the instructions for your prescribed medications recently?
+Answer: Not really<turn|>
+<|turn>model
+
+I0000 00:00:1777193660.276472   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193661.069342   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193661.069430   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193661.071129   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193661.071162   14776 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "How has your mood been? Have you been able to manage your moods?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777193671.070170   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193723.727274   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193723.727339   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193723.728217   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193723.728233   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Can you describe your mood over the recent period, and how effectively have you been managing those moods?
+Answer: I've been pretty happy,<turn|>
+<|turn>model
+
+I0000 00:00:1777193740.533813   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193741.173055   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193741.173141   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193741.174946   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193741.174978   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Can you describe your mood over the recent period, and how effectively have you been managing those moods?
+Answer: sometimes I feel sad<turn|>
+<|turn>model
+
+I0000 00:00:1777193757.986164   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193758.475573   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193758.475638   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193758.476473   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193758.476495   14776 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "How's your eating? Are you eating regularly?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777193768.339235   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193820.925474   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193820.925540   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193820.926411   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193820.926434   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Can you describe your eating patterns and whether you are consuming food consistently?
+Answer: I have not been eating properly<turn|>
+<|turn>model
+
+I0000 00:00:1777193837.713441   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193838.357518   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193838.357606   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193838.359453   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193838.359490   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Can you describe your eating patterns and whether you are consuming food consistently?
+Answer: I don't eat all meals<turn|>
+<|turn>model
+
+I0000 00:00:1777193855.166519   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193855.623805   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193855.623870   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193855.624751   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193855.624775   14776 session_basic.cc:301] <|turn>user
+Convert first-person to second-person statements.
+
+　Change from first-person sentence to second-person.
+
+    User: I feel so depressed daily.
+    Answer: You feel so depressed daily.
+    User: I am so happy.
+    Answer: You are so happy.
+    User: I am under a lot of pressure.
+    Answer: You are under a lot of pressure.
+    User:I have not been eating properly
+    Answer:<turn|>
+<|turn>model
+
+I0000 00:00:1777193858.338053   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193911.824271   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193911.824335   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193911.825183   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193911.825206   14776 session_basic.cc:301] <|turn>user
+You are a clinical reasoning agent.
+Decide whether the client's follow-up is related to the conversation topic
+or their original response.
+
+Input format:
+{"Topic": "...", "Original Question": "...", "Original Response": "...", "Follow-up Response": "..."}
+
+Output format (single line, no other text):
+DECISION: 0
+or
+DECISION: 1
+
+Rules:
+- DECISION: 0 if the follow-up elaborates on the topic or original response,
+  even loosely (e.g. describes cause, context, or an example).
+- DECISION: 1 only if the follow-up is clearly off-topic or unrelated.
+- Do NOT output analysis, questions, or any text other than the DECISION line.
+
+Example 1:
+{"Topic": "Managing mood", "Original Question": "How's your mood recently?", "Original Response": "I am sad recently.", "Follow-up Response": "I am sad because I am homesick. I haven't been back home for a few years due to Covid-19."}
+DECISION: 0
+
+Example 2:
+{"Topic": "Family support", "Original Question": "Do you feel your family is supportive?", "Original Response": "I don't feel my family is supportive.", "Follow-up Response": "I live away from my parents and family. We are in two different countries. We don't usually talk a lot."}
+DECISION: 0
+
+Example 3:
+{"Topic": "Taking medication as prescribed", "Original Question": "Are you taking your medication as prescribed?", "Original Response": "I don't want to follow the prescription.", "Follow-up Response": "I have been trying to exercise more and eat healthier. I want to try and handle my symptoms naturally before resorting to medication."}
+DECISION: 0
+
+Example 4:
+{"Topic": "Participating primary and mental health care", "Original Question": "Have you been going to your prescriber regularly?", "Original Response": "I haven't gone to my prescriber for a long time.", "Follow-up Response": "I've been trying to pick up running as a hobby. I find it helps clear my mind and relieve stress. Plus, it's a great way to stay fit and healthy."}
+DECISION: 1
+
+Example 5:
+{"Topic": "Organizing personal possessions and doing housework", "Original Question": "Have you been keeping up with your housework?", "Original Response": "I never mop the floor.", "Follow-up Response": "Recently, I started learning how to cook. I'm trying to make dishes from different cuisines. Yesterday, I made pasta for the first time and it turned out really good."}
+DECISION: 1
+
+
+{"Topic": 'eat', "Original Question": 'Can you describe your eating patterns and whether you are consuming food consistently?', "Original Response": 'I have not been eating properly', "Follow-up Response": "I just get stressed and I don't eat any food."}<turn|>
+<|turn>model
+
+I0000 00:00:1777193920.701381   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193921.419529   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193921.419616   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193921.421416   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193921.421447   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You are in the conversation with a client. You need to provide empathic validation and support to the client.
+
+You will be provided with:
+1. The conversation topic.
+2. The original response from the client.
+3. The follow-up response from the client to the question "Can you tell me more about it?".
+These will be provided in the format of '{"Topic": XXXX, "Original Question": XXXX, "Original Response": XXXX, "Follow-up Response": XXXX}'
+
+Goal:
+Provide empathic validation and support to the client based on the conversation topic, original response, and follow-up response.
+First express understanding of the client's follow-up response, then offer grounded, concrete support or strategies connected to what they said.
+Use the phrases and wording the client used rather than heavily rephrasing, so your response feels anchored to their experience.
+Do not read into the client's mind or make strong assumptions. Do not output any open-ended questions or invitations for further follow-up.
+
+Formatting:
+- ASCII characters only. Replace smart quotes, en/em dashes, and ellipses with ASCII equivalents (' " - ...).
+- REQUIRED LENGTH: 4 to 7 sentences. Not a single sentence, not two. This matches the CaiTI clinical reference style used in published demos (see Example 4 below for the target shape).
+- Structure your output as three parts, inline (no headers):
+  (a) empathic reflection that names, in the client's own phrasing, what is hard about their situation and why that reaction makes sense;
+  (b) a short normalising statement (one sentence) that de-pathologises the response;
+  (c) 3 to 5 grounded, concrete suggestions drawn from what they already said. Prefer imperative or "you might" phrasing. Do NOT end with an open-ended question or an invitation to share more.
+- Output format (one block of prose, prefixed with the label):
+VALIDATION: <your validation and support text here>
+
+Example 1:
+{"Topic": "Maintaining stable weight", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "I am a ISFP. I like to follow my heart. My personality leads me to just eat whenever I want. And I usually don't control how much I eat."}
+VALIDATION: I completely understand that as an ISFP, rigid rules may not be your preference. Nonetheless, it is worth being aware of how eating whenever you want can affect your health over time. If the recent weight gain is tied to this pattern, small adjustments to your diet and daily routine can make a meaningful difference without feeling like strict rules. Talking with a healthcare professional or dietitian can also help you build a more tailored, sustainable approach that still honours how you naturally operate.
+
+Example 2:
+{"Topic": "Maintaining stable weight", "Original Response": "My weight increased a lot recently.", "Follow-up Response": "I have upcoming deadlines. So I often do stress eating."}
+VALIDATION: It sounds like the pressure from your upcoming deadlines is really weighing on you, and the stress eating is one of the ways your body has been responding to that pressure. This is a very common reaction, and it does not make you weak; it makes sense that a stressed body reaches for comfort. You might notice it helps to identify the moments when stress peaks, keep some healthier snacks nearby, and protect regular meal times even during busy weeks. Leaning on a friend, family member, or therapist when deadlines pile up can also give you a healthier outlet than food alone.
+
+Example 3:
+{"Topic": "Managing mood", "Original Response": "I am sad recently.", "Follow-up Response": "My sadness stems from a variety of factors. I have been dealing with a lot of stress at work, and it is affecting my mood. I am also finding it hard to connect with my friends due to the pandemic, and this isolation has been making me feel quite depressed."}
+VALIDATION: It sounds like you are going through a really challenging time, with work stress and pandemic isolation compounding each other and weighing on your mood. It is important to acknowledge these feelings and to understand that feeling overwhelmed in these circumstances is completely understandable. Staying connected during a pandemic can be hard, but small steps such as scheduled video calls with people you trust, or joining online communities around interests you enjoy, can ease the isolation over time. Sharing what you are going through with a friend, family member, or a mental health professional can also offer relief and help you cope more sustainably.
+
+Example 4 (TARGET LENGTH AND STRUCTURE — match this):
+{"Topic": "Taking medication as prescribed", "Original Response": "I haven't been taking my medications.", "Follow-up Response": "I just always forget to take it, and I don't wanna take too much of it then not be able to get off of it."}
+VALIDATION: It makes sense that you always forget to take it, and also do not want to take too much or end up not being able to get off of it. Wanting control and being cautious are completely understandable. A few steps that can help: ask your prescriber to clarify the exact dose, what to do if you miss a dose, and how you would get off of it safely if needed - a clear taper plan. Many medications can be adjusted or tapered with a plan. For safety, avoid doubling up to catch up and do not stop suddenly without guidance. Make remembering easier: set one phone alarm, pair the dose with a daily habit like tooth brushing or morning coffee, use a simple pill box and keep it where you will see it. Use pharmacy supports like blister packs or auto refills to simplify things. Keep a brief note of when you take it and how you feel so you and your prescriber can fine tune it to match what you want. You are not stuck; you can go at a pace that respects your concerns while staying safe and getting the benefit you want.
+
+
+{"Topic": 'eat', "Original Question": 'Can you describe your eating patterns and whether you are consuming food consistently?', "Original Response": 'I have not been eating properly', "Follow-up Response": "I just get stressed and I don't eat any food."}<turn|>
+<|turn>model
+
+I0000 00:00:1777193938.570249   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777193953.393680   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777193953.393752   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777193953.394896   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777193953.394926   14776 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "Have the numbers on the scale moved much for you recently?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777193962.374698   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194071.576185   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194071.576251   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194071.577110   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194071.577126   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Have you observed any substantial shifts in your weight recently?
+Answer: Yes, I feel like I lost some weight<turn|>
+<|turn>model
+
+I0000 00:00:1777194088.465150   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194089.147379   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194089.147447   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194089.148523   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194089.148549   14776 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "Are you keeping up with visits to your doctor, therapist, or case manager?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777194100.512214   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194194.180748   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194194.180822   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194194.182061   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194194.182087   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Are you maintaining regular appointments with your physician, therapist, or case manager?
+Answer: I don't know<turn|>
+<|turn>model
+
+I0000 00:00:1777194211.029565   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194211.743177   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194211.743271   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194211.744929   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194211.744961   14776 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "Is your sleep schedule staying regular for you?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777194220.655247   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194276.257202   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194276.257295   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194276.259000   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194276.259036   14776 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "Have you taken days off recently?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777194287.978435   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194385.759804   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194385.759870   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194385.760738   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194385.760753   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Have you taken any time away from your usual routine in the past few days?
+Answer: That's enough questions for now<turn|>
+<|turn>model
+
+I0000 00:00:1777194402.591834   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194609.612663   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194609.612794   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194609.614671   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194609.614705   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You are trying to justify if the patient is effectively going through and responding to cognitive behavioural therapy (CBT) questions.
+
+
+
+You will be provided with:
+1. The statement of the patient towards one day-to-day functioning issue or mental health issue that he/she would like to work on through this CBT process.
+2. The user's answer towards the CBT question "Can you try to identify any unhelpful thoughts you have that contribute to this situation?". This is the step that the patient tries to recognize negative thoughts. These thoughts that go through the patient's mind when he/she experience this issue. These thoughts can be self-critical, overly pessimistic, or unrealistic.
+
+You will be provideed with several examples in the format of STATEMENT: xxxxx; UNHELPFUL_THOUGHTS: xxxxx;
+
+
+Usually the patient's statement and responses contain situation that is not valid or useful. As an AI assistant, you need to examine the validaity and utility of the patient's response.
+There are 13 possible common cognitive distortions that the patient might encounter. And you might want to pay attention to.
+1. Filtering: focusing on the negative but ignore the positive
+2. Polarized thinking/extreme thinking: seeing everything in all-or-nothing terms.
+3. Control fallacies: assumes only self or other takes all the responsibility and is to be blamed. Includes personalization (assuming self is responsible) and blaming (assuming others at fault). 
+4. Fallacy of fairness: assumes life should be fair
+5. Overgeneralization: assumes a rule from one experience, using one experience for all future experiences. 
+6. Emotional reasoning: “if I feel it, it must be true.” Using emotional “terms” for all the situations. 
+7. Fallacy of change: expects others to change
+8. “shoulds”: using personal rules to judge self and others if the rules broken
+9. Catastrophizing: expecting the worst case scenario.
+10. Heaven’s reward fallacy: expecting to be rewarded in some way.
+11. Always being right: being wrong is unacceptable, needs to be right all the time. 
+12. Personalization (like control fallacies): assuming self is responsible.
+13. Jumping to conclusions: make assumptions based on little evidence
+
+
+If any of these cognitive distortion is included in the UNHELPFUL_THOUGHTS, the user may still properly identifies the unhelpful thoughts. But outline the cognitive distortions in analysis.
+
+Your goal is:
+Justify if the user is identify the unhelpful thoughts properly in the statement(0: identified properly, 1: not properly identified).
+You also need to provide analysis to justify your decision. 
+
+
+Response format:
+DECISION: 0/1
+Provide response with [DECISION] only. Do not put excessive analysis and small talk in the response.
+
+
+
+
+
+Example 1:
+"STATEMENT: I have concern with your recent spending habits. I spent a lot of money. I spent a lot of money on clothing.; UNHELPFUL_THOUGHTS: I have issue on spending habits because I buy too much clothes.;"
+DECISION: 0
+
+
+Example 2:
+"STATEMENT: I haven't done any creative work recently. I just don't know what are the creative things I can do.; UNHELPFUL THOUGHTS: I'm just not a creative person. I don't have any good ideas, and even if I did, they wouldn't be worth pursuing. "
+DECISION:0
+
+
+Example 3:
+"STATEMENT: I have concern with my recent spending habits. I spent a lot of money. I spent a lot of money on clothing. RESPONSE: I like to go shopping "
+DECISION:1
+
+
+
+"STATEMENT: I just get stressed and I don't eat any food.; UNHELPFUL_THOUGHTS: Whenever I think about it and I'm very stressed, I just feel like I should not eat anything because I get very anxious and stressed about it.;"<turn|>
+<|turn>model
+
+I0000 00:00:1777194619.584007   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194688.511398   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194688.511491   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194688.513325   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194688.513362   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You are trying to justify if the patient is effectively going through and responding to cognitive behavioural therapy (CBT) questions.
+
+You will be provided with:
+1. The statement of the patient towards one day-to-day functioning issue or mental health issue that he/she would like to work on through this CBT process.
+2. The patient's response to recognize unhelpful thoughts in his/her statement (UNHELPFUL_THOUGHTS). These thoughts that go through the patient's mind when he/she experience this issue. These thoughts can be self-critical, overly pessimistic, or unrealistic.
+3. The patient's answer to the CBT question "Can you challenge your thought?". This is the step when the patient begin to challenge the UNHELPFUL_THOUGHTS in the STATEMENT after recognizing and analyzing these thoughts. Challenge means questioning the validity of these thoughts. Are there alternative, more balanced, or rational thoughts that might be more helpful in the situation?
+
+You will be provideed with several examples in the format of STATEMENT: xxxxx; UNHELPFUL_THOUGHTS: xxxxx; CHALLENGE: xxxx;
+
+Usually the patient's statement and responses contain situation that is not valid or useful. As an AI assistant, you need to examine the validaity and utility of the patient's response.
+There are 13 possible common cognitive distortions that the patient might encounter. And you might want to pay attention to.
+1. Filtering: focusing on the negative but ignore the positive
+2. Polarized thinking/extreme thinking: seeing everything in all-or-nothing terms.
+3. Control fallacies: assumes only self or other takes all the responsibility and is to be blamed. Includes personalization (assuming self is responsible) and blaming (assuming others at fault). 
+4. Fallacy of fairness: assumes life should be fair
+5. Overgeneralization: assumes a rule from one experience, using one experience for all future experiences. 
+6. Emotional reasoning: “if I feel it, it must be true.” Using emotional “terms” for all the situations. 
+7. Fallacy of change: expects others to change
+8. “shoulds”: using personal rules to judge self and others if the rules broken
+9. Catastrophizing: expecting the worst case scenario.
+10. Heaven’s reward fallacy: expecting to be rewarded in some way.
+11. Always being right: being wrong is unacceptable, needs to be right all the time. 
+12. Personalization (like control fallacies): assuming self is responsible.
+13. Jumping to conclusions: make assumptions based on little evidence
+
+
+Your goal is:
+Justify if the patient challenges the unhelpful thoughts (UNHELPFUL_THOUGHTS) properly. (0: properly challenge the unhelpful thoughts, 1: not challenge the unhelpful thoughts)
+Note that:
+1. The patient might identify the unhelpful thoughts in a wrong way (with cognitive distortions). In this case, the patient might challenge the STATEMENT or some unhelpful thoughts that related to this STATEMENT that is not explicitly identified, which is acceptable.
+2. It would be acceptable if the patient not fully challenge the validity and usability of the unhelpful thoughts/situation. As long as the CHALLENGE is related to the STATEMENT and UNHELPFUL THOUGHTS, it is acceptable.
+Make notes about the distortions in the analysis.
+You also need to provide analysis to justify your decision. 
+
+
+Response format:
+DECISION: 0/1
+Provide response with [DECISION] only. Do not put excessive analysis and small talk in the response.
+
+
+
+Example 1:
+"STATEMENT: I don't participate in community. I get anxious when there are a lot of people around me. I don't know what to say.; UNHELPFUL_THOUGHTS: When I'm in a social situation, I often have negative thoughts like: (1) Everyone is judging me and (2) I'll say something stupid and embarrass myself.; CHALLENGE: I can challenge these negative thoughts by asking myself: 'Is there any real evidence that people are constantly judging me? and have there been times when people genuinely seemed interested in talking to me?;"
+DECISION: 0
+
+
+Example 2:
+"STATEMENT: I don't participate in community. I get anxious when there are a lot of people around me. I don't know what to say.; UNHELPFUL_THOUGHTS: When I'm in a social situation, I often have negative thoughts like: (1) Everyone is judging me and (2) I'll say something stupid and embarrass myself.; CHALLENGE: I don't know how to challenge my thoughts;"
+DECISION: 1
+
+Example 3:
+"STATEMENT: I don't participate in community. I get anxious when there are a lot of people around me. I don't know what to say.; UNHELPFUL_THOUGHTS: When I'm in a social situation, I often have negative thoughts like: (1) Everyone is judging me and (2) I'll say something stupid and embarrass myself.; CHALLENGE: I am not cool to engage in the social events;"
+DECISION: 1
+
+Example 4:
+"STATEMENT: I don't smoke cigarettes, but I vape every day. I vape when I am working hard or debugging.; UNHELPFUL_THOUGHTS: I can't work or solve problems effectively without vaping.; CHALLENGE: There are several potential health impacts of vaping. It's bad for my lung.;"
+DECISION: 0
+
+
+
+"STATEMENT: I just get stressed and I don't eat any food.; UNHELPFUL_THOUGHTS: Whenever I think about it and I'm very stressed, I just feel like I should not eat anything because I get very anxious and stressed about it.; CHALLENGE: Whenever I feel anxious or stressed, I will do some deep breathing to calm myself so that I can feel okay to eat.;"<turn|>
+<|turn>model
+
+I0000 00:00:1777194705.544390   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194706.266392   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194706.266488   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194706.268180   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194706.268229   14776 session_basic.cc:301] <|turn>user
+You are a concise and supportive therapist-assistant.
+
+You will be provided with:
+1) The patient's brief STATEMENT of the situation
+2) The patient's identified UNHELPFUL_THOUGHTS
+3) The patient's CHALLENGE to those thoughts
+
+Your task is to rephrase the patient's CHALLENGE into a short recap that reminds the patient what they already did to challenge their thoughts. Be neutral, supportive, and concise.
+
+Rules:
+- 1-2 sentences only
+- No extra headers or labels, output the recap directly
+- Do not add new ideas beyond the user's content
+- Use second-person neutral tone (you/your)
+
+
+STATEMENT: I just get stressed and I don't eat any food.
+UNHELPFUL_THOUGHTS: Whenever I think about it and I'm very stressed, I just feel like I should not eat anything because I get very anxious and stressed about it.
+CHALLENGE: Whenever I feel anxious or stressed, I will do some deep breathing to calm myself so that I can feel okay to eat.<turn|>
+<|turn>model
+
+I0000 00:00:1777194714.672517   14776 session_basic.cc:485] RunDecodeSync
+I0000 00:00:1777194835.629719   14776 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777194835.629786   14776 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777194835.630606   14776 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777194835.630621   14776 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You are trying to justify if the patient is effectively going through and responding to cognitive behavioural therapy (CBT) questions.
+
+You will be provided with:
+1. The statement of the patient towards one day-to-day functioning issue or mental health issue that he/she would like to work on through this CBT process.
+2. The patient's response to recognize unhelpful thoughts in his/her statement (UNHELPFUL_THOUGHTS). These thoughts that go through the patient's mind when he/she experience this issue. These thoughts can be self-critical, overly pessimistic, or unrealistic.
+3. The patient's response to challenge the UNHELPFUL_THOUGHTS after recognizing and analyzing these thoughts. Challenge means questioning the validity of these thoughts. Are there alternative, more balanced, or rational thoughts that might be more helpful in the situation?
+4. The patient's answer to the CBT question "What is another way of thinking about this situation?". This is the step that the patient tires to reframe your unhelpful thoughts into more balanced, realistic, and constructive ones. This process is about changing the way the patient thinks about the situation, which can lead to changes in emotions and behaviors.
+
+
+You will be provideed with several examples in the format of STATEMENT: xxxxx; UNHELPFUL_THOUGHTS: xxxxx; CHALLENGE: xxxxx; REFRAME: xxxxx;
+
+Your goal is:
+Justify if the patient reframes the unhelpful thoughts properly. (0: properly reframe the unhelpful thoughts, 1: fail to reframe the unhelpful thoughts).
+You also need to provide analysis to justify your decision. 
+
+
+Response format:
+DECISION: 0/1
+Provide response with [DECISION] only. Do not put excessive analysis and small talk in the response.
+
+
+
+
+Example 1:
+"STATEMENT: I don't participate in community. I get anxious when there are a lot of people around me. I don't know what to say.; UNHELPFUL_THOUGHTS: When I'm in a social situation, I often have negative thoughts like: (1) Everyone is judging me and (2) I'll say something stupid and embarrass myself. CHALLENGE: I can challenge these negative thoughts by asking myself: 'Is there any real evidence that people are constantly judging me? and have there been times when people genuinely seemed interested in talking to me?'; REFRAME: People may have their own concerns and may not be focused on me all the time and I've had good conversations in the past without embarrassing myself.;"
+DECISION: 0
+
+Example 2:
+"STATEMENT: I don't participate in community. I get anxious when there are a lot of people around me. I don't know what to say.; UNHELPFUL_THOUGHTS: When I'm in a social situation, I often have negative thoughts like: (1) Everyone is judging me and (2) I'll say something stupid and embarrass myself. CHALLENGE: I can challenge these negative thoughts by asking myself: 'Is there any real evidence that people are constantly judging me? and have there been times when people genuinely seemed interested in talking to me?'; REFRAME: I'm finding it hard to reframe them. I still believe that: 'People are definitely judging me; I just know it.;"
+DECISION: 1
+
+
+"STATEMENT: I just get stressed and I don't eat any food.; UNHELPFUL_THOUGHTS: Whenever I think about it and I'm very stressed, I just feel like I should not eat anything because I get very anxious and stressed about it.; CHALLENGE: Whenever I feel anxious or stressed, I will do some deep breathing to calm myself so that I can feel okay to eat.; REFRAME: Now whenever I'm stressed or anxious I will remember that it's good to be healthy and eat food properly;"<turn|>
+<|turn>model
+
+I0000 00:00:1777194844.153468   14776 session_basic.cc:485] RunDecodeSync

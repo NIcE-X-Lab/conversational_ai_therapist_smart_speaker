@@ -140,7 +140,7 @@ class BackgroundMusicThread:
     def __init__(
         self,
         track_path: str = "assets/audio/ambient_music.mp3",
-        base_volume: float = 0.15,
+        base_volume: float = 0.85,
         speaking_volume: float = 0.02,
     ):
         self.track_path = track_path
@@ -591,6 +591,12 @@ class AudioRecorder:
 
         logger.info("Listening (waiting for speech)...")
         self._set_vad_state(True)
+        # Duck music for the entire listen window — not just after the
+        # user starts speaking.  The protocol is "music is loud when the
+        # therapist is NOT speaking AND the mic is NOT listening";
+        # waiting for the user to start counts as listening, otherwise
+        # the user tries to talk over full-volume music.
+        set_user_speaking(True)
 
         # Phase 1: Wait for voice activity
         for _ in range(wait_chunks):
@@ -600,7 +606,6 @@ class AudioRecorder:
                     has_speech = True
                     frames.append(data)
                     speech_chunk_count += 1
-                    set_user_speaking(True)  # duck music while user talks
                     logger.info("Speech detected, recording started.")
                     break
             except IOError as e:

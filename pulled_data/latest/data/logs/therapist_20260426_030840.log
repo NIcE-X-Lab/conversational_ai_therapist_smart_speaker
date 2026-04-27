@@ -1,0 +1,986 @@
+2026-04-26 03:08:43,246 arth-desktop ResourceAudit[9951] INFO [RESOURCE] baseline_rss=84.7MB child_rss=0.0MB threads=6
+2026-04-26 03:08:43,380 arth-desktop ResourceAudit[9951] INFO [RESOURCE] main_bootstrap rss=86.8MB child=0.0MB threads=6 trace_cur=1.5MB trace_peak=1.5MB
+2026-04-26 03:08:43,400 arth-desktop MainApp[9951] INFO [RSS AUDIT] Before startup checklist: PID=9951 RSS=86.8MB VMS=377.9MB Children(0)=0.0MB Total=86.8MB
+2026-04-26 03:08:43,425 arth-desktop GPIOManager[9951] INFO Jetson.GPIO loaded — physical hardware active.
+
+=======================================================
+  CaiTI System Boot — Connectivity Audit
+=======================================================
+  [x] GPIO Initialized (Pins 11, 13, 15, 18)
+  [x] LiteRT Model found (./models/litert/gemma-4-E2B-it.litertlm)
+  [x] LiteRT Model Size: 2463MB (gemma-4-E2B-it)
+  [x] Faster-Whisper configured (base.en)
+  [x] Piper Model found (./models/piper/en_US-amy-medium.onnx)
+  [x] Database Connected (data/therapist.db)
+  [x] Free disk: 799760MB available
+=======================================================
+
+2026-04-26 03:08:44,276 arth-desktop ResourceAudit[9951] INFO [RESOURCE] startup_checklist_complete rss=118.0MB child=0.0MB threads=6 trace_cur=7.1MB trace_peak=7.5MB
+2026-04-26 03:08:44,425 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PROC] startup_checklist_inventory child_processes=0 python_threads=1 keywords={'python': 23, 'piper': 0, 'ffmpeg': 0}
+2026-04-26 03:08:44,426 arth-desktop MainApp[9951] DEBUG [BOOT-AUDIT] All critical subsystems passed.
+2026-04-26 03:08:44,426 arth-desktop IORecord[9951] INFO [SESSION] Subject onboarded: 8080 (session id: 8080_20260426_030844)
+2026-04-26 03:08:44 arth-desktop IORecord[9951] INFO [SESSION] Subject onboarded: 8080 (session id: 8080_20260426_030844)
+2026-04-26 03:08:44,427 arth-desktop DBManager[9951] INFO Database initialized at data/therapist.db
+2026-04-26 03:08:44,446 arth-desktop IORecord[9951] WARNING [RECOVERY] Closed 1 dangling session(s) for user_id=1: [1]
+2026-04-26 03:08:44 arth-desktop IORecord[9951] WARNING [RECOVERY] Closed 1 dangling session(s) for user_id=1: [1]
+2026-04-26 03:08:44,468 arth-desktop IORecord[9951] DEBUG [RESULTS] Per-session CSVs: data/results/Report_8080_20260426_030844.csv, data/results/Notes_8080_20260426_030844.csv
+2026-04-26 03:08:44,469 arth-desktop IORecord[9951] DEBUG [DOSSIER] Initialized: /home/arth/project/data/sessions/session_8080_20260426_030844.json
+2026-04-26 03:08:44,504 arth-desktop ResourceAudit[9951] INFO [RESOURCE] record_init_complete rss=119.2MB child=0.0MB threads=6 trace_cur=7.6MB trace_peak=7.7MB
+2026-04-26 03:08:44,525 arth-desktop MainApp[9951] INFO [RSS AUDIT] After init_record (before audio stack): PID=9951 RSS=119.4MB VMS=636.9MB Children(0)=0.0MB Total=119.4MB
+2026-04-26 03:08:44,526 arth-desktop MainApp[9951] DEBUG API Server started on port 8000
+2026-04-26 03:08:44,660 arth-desktop ResourceAudit[9951] INFO [RESOURCE] api_thread_started rss=119.4MB child=0.0MB threads=7 trace_cur=8.1MB trace_peak=8.2MB
+2026-04-26 03:08:45,039 arth-desktop SpeechService[9951] DEBUG Initializing Unified Speech Interaction Service...
+2026-04-26 03:08:45,492 arth-desktop ResourceAudit[9951] INFO [RESOURCE_INIT] module=SpeechService/AudioRecorder rss_delta=+3.5MB rss_after=132.6MB elapsed=0.42s
+2026-04-26 03:08:45,531 arth-desktop STTGenerator[9951] INFO Loading Faster-Whisper model: base.en on cpu (compute_type=int8, beam_size=2, best_of=1)
+2026-04-26 03:08:48,362 arth-desktop ResourceAudit[9951] INFO [RESOURCE_INIT] module=STT/FasterWhisperModelInit rss_delta=+230.3MB rss_after=362.9MB elapsed=2.80s
+2026-04-26 03:08:48,363 arth-desktop STTGenerator[9951] INFO Faster-Whisper model loaded successfully. RSS delta: +230.3MB (now 362.9MB)
+2026-04-26 03:08:48,404 arth-desktop ResourceAudit[9951] INFO [RESOURCE_INIT] module=SpeechService/STTGenerator rss_delta=+230.3MB rss_after=362.9MB elapsed=2.87s
+2026-04-26 03:08:48,472 arth-desktop ResourceAudit[9951] INFO [RESOURCE_INIT] module=SpeechService/TTSGenerator rss_delta=+0.0MB rss_after=362.9MB elapsed=0.03s
+2026-04-26 03:08:48,536 arth-desktop ResourceAudit[9951] INFO [RESOURCE_INIT] module=SpeechService/BackgroundMusic rss_delta=+0.0MB rss_after=362.9MB elapsed=0.03s
+2026-04-26 03:08:48,599 arth-desktop ResourceAudit[9951] INFO [RESOURCE_INIT] module=SpeechService/AudioPlayer rss_delta=+0.0MB rss_after=362.9MB elapsed=0.03s
+/home/arth/project/.venv/lib/python3.10/site-packages/Jetson/GPIO/gpio.py:316: UserWarning: Jetson.GPIO ignores setup()'s pull_up_down parameter
+  warnings.warn("Jetson.GPIO ignores setup()'s pull_up_down parameter")
+/home/arth/project/.venv/lib/python3.10/site-packages/Jetson/GPIO/gpio_cdev.py:373: UserWarning: Could not open /dev/mem for pinmux check. If you want pinmux checks, make sure your user has permissions to read /dev/mem and that it exists. Error: [Errno 13] Permission denied: '/dev/mem'
+  warnings.warn('Could not open /dev/mem for pinmux check. If you want pinmux checks, make sure your user has permissions to read /dev/mem and that it exists. Error: ' + str(e))
+2026-04-26 03:08:52,650 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:08:52,652 arth-desktop GPIOManager[9951] INFO GPIO configured. Listening LED: 18, Buttons: [11, 13, 15, 16]
+2026-04-26 03:08:52,761 arth-desktop ResourceAudit[9951] INFO [RESOURCE_INIT] module=SpeechService/GPIOManager rss_delta=+0.9MB rss_after=363.8MB elapsed=4.13s
+2026-04-26 03:08:52,899 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PROC] speech_service_init_complete child_processes=0 python_threads=3 keywords={'python': 23, 'piper': 0, 'ffmpeg': 0}
+pygame 2.6.1 (SDL 2.28.4, Python 3.10.12)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+2026-04-26 03:08:53,007 arth-desktop AudioRecorder[9951] INFO Background music duration probe: assets/audio/ambient_therapy.mp3 = 18647.5s
+[src/libmpg123/id3.c:process_comment():584] error: No comment text / valid description?
+2026-04-26 03:08:53,030 arth-desktop MainApp[9951] INFO [RSS AUDIT] After SpeechService init (Whisper+SER+TTS loaded): PID=9951 RSS=363.8MB VMS=1488.0MB Children(0)=0.0MB Total=363.8MB
+2026-04-26 03:08:53,031 arth-desktop SpeechService[9951] DEBUG Speech Interaction Service started.
+2026-04-26 03:08:53,031 arth-desktop MainApp[9951] DEBUG Unified SpeechInteractionService started.
+2026-04-26 03:08:53,076 arth-desktop ResourceAudit[9951] INFO [RESOURCE] speech_service_started rss=372.2MB child=0.0MB threads=21 trace_cur=21.5MB trace_peak=21.5MB
+2026-04-26 03:08:53,098 arth-desktop MainApp[9951] INFO [RSS AUDIT] After SpeechService thread started (baseline): PID=9951 RSS=374.2MB VMS=2567.6MB Children(0)=0.0MB Total=374.2MB
+2026-04-26 03:08:53,119 arth-desktop MainApp[9951] DEBUG [GHOST HUNT] No child processes > 50.0MB. Clean.
+2026-04-26 03:08:53,232 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PROC] post_init_ghost_hunt child_processes=0 python_threads=5 keywords={'python': 23, 'piper': 0, 'ffmpeg': 0}
+2026-04-26 03:08:53,439 arth-desktop AudioRecorder[9951] INFO Background music segment start: offset=12106.0s
+2026-04-26 03:08:53,440 arth-desktop AudioRecorder[9951] INFO Background music started: assets/audio/ambient_therapy.mp3
+2026-04-26 03:08:53,546 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:08:53,547 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:08:53,548 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:08:53,576 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:08:54,980 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:08:54,980 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:08:54,981 arth-desktop AudioRecorder[9951] INFO Speech too short (3 chunks < 10 min). Discarding as noise.
+2026-04-26 03:08:55,497 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:08:55,497 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:08:55,498 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:00,456 arth-desktop AudioRecorder[9951] INFO No speech detected, stopping recording window.
+2026-04-26 03:09:00,458 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:00,459 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:00,953 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:00,954 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:00,955 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:05,961 arth-desktop AudioRecorder[9951] INFO No speech detected, stopping recording window.
+2026-04-26 03:09:05,964 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:05,964 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:06,481 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:06,482 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:06,483 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:08,250 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:09:09,244 arth-desktop AudioRecorder[9951] INFO Trailing speech detected, extending recording.
+2026-04-26 03:09:09,247 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:09,248 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:09,248 arth-desktop AudioRecorder[9951] INFO Recording complete: 35 chunks, 11 speech chunks.
+2026-04-26 03:09:09,252 arth-desktop AudioRecorder[9951] INFO Saved audio to wake_temp.wav (RMS=0.0083)
+2026-04-26 03:09:09,332 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-26 03:09:10,563 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-26 03:09:10,611 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+228.8MB rss_peak=601.4MB total_peak=601.4MB elapsed=1.28s samples=13
+2026-04-26 03:09:10,611 arth-desktop InferenceGuard[9951] INFO Clear Cache command: After STT phase
+2026-04-26 03:09:10,705 arth-desktop STTGenerator[9951] INFO Transcription: 
+2026-04-26 03:09:10,707 arth-desktop SpeechService[9951] DEBUG Wake transcription: 
+2026-04-26 03:09:11,212 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:11,213 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:11,214 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:11,252 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:09:12,620 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:12,622 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:12,622 arth-desktop AudioRecorder[9951] INFO Speech too short (2 chunks < 10 min). Discarding as noise.
+2026-04-26 03:09:13,130 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:13,130 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:13,131 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:13,681 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:09:15,039 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:15,040 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:15,040 arth-desktop AudioRecorder[9951] INFO Speech too short (3 chunks < 10 min). Discarding as noise.
+2026-04-26 03:09:15,559 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:15,560 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:15,560 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:19,814 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:09:21,199 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:21,201 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:21,201 arth-desktop AudioRecorder[9951] INFO Recording complete: 47 chunks, 14 speech chunks.
+2026-04-26 03:09:21,205 arth-desktop AudioRecorder[9951] INFO Saved audio to wake_temp.wav (RMS=0.0083)
+2026-04-26 03:09:21,279 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-26 03:09:22,439 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-26 03:09:22,482 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.3MB rss_peak=640.4MB total_peak=640.4MB elapsed=1.20s samples=12
+2026-04-26 03:09:22,483 arth-desktop InferenceGuard[9951] INFO Clear Cache command: After STT phase
+2026-04-26 03:09:22,582 arth-desktop STTGenerator[9951] INFO Transcription: 
+2026-04-26 03:09:22,583 arth-desktop SpeechService[9951] DEBUG Wake transcription: 
+2026-04-26 03:09:23,072 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:23,072 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:23,073 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:23,312 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:09:24,345 arth-desktop AudioRecorder[9951] INFO Trailing speech detected, extending recording.
+2026-04-26 03:09:24,349 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:24,350 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:24,350 arth-desktop AudioRecorder[9951] INFO Recording complete: 35 chunks, 32 speech chunks.
+2026-04-26 03:09:24,354 arth-desktop AudioRecorder[9951] INFO Saved audio to wake_temp.wav (RMS=0.0783)
+2026-04-26 03:09:24,423 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-26 03:09:25,571 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-26 03:09:25,667 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.4MB rss_peak=640.7MB total_peak=640.7MB elapsed=1.25s samples=13
+2026-04-26 03:09:25,668 arth-desktop InferenceGuard[9951] INFO Clear Cache command: After STT phase
+2026-04-26 03:09:25,771 arth-desktop STTGenerator[9951] INFO Transcription: Hey Katie
+2026-04-26 03:09:25,773 arth-desktop SpeechService[9951] DEBUG Wake transcription: hey katie
+2026-04-26 03:09:25,774 arth-desktop SpeechService[9951] INFO [SESSION] Wake phrase 'Hey CaiTI' detected — starting onboarding.
+2026-04-26 03:09:25 arth-desktop SpeechService[9951] INFO [SESSION] Wake phrase 'Hey CaiTI' detected — starting onboarding.
+2026-04-26 03:09:25,774 arth-desktop SpeechService[9951] INFO [SESSION] Onboarding — capturing subject name.
+2026-04-26 03:09:25 arth-desktop SpeechService[9951] INFO [SESSION] Onboarding — capturing subject name.
+2026-04-26 03:09:25,774 arth-desktop SpeechService[9951] DEBUG Agent Action: Hello, I'm CaiTI.
+2026-04-26 03:09:25,774 arth-desktop TTSGenerator[9951] INFO Generating TTS for: 'Hello, I'm CaiTI.' -> active_ai_response.wav
+2026-04-26 03:09:27,740 arth-desktop TTSGenerator[9951] INFO TTS generation successful.
+2026-04-26 03:09:27,741 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:27,741 arth-desktop AudioPlayer[9951] INFO Pygame mixer ready: (22050, -16, 2)
+2026-04-26 03:09:27,742 arth-desktop AudioPlayer[9951] INFO Playing active_ai_response.wav via pygame mixer (1.6s)
+2026-04-26 03:09:29,395 arth-desktop AudioPlayer[9951] INFO Playback finished.
+2026-04-26 03:09:30,597 arth-desktop SpeechService[9951] DEBUG Agent Action: Who am I speaking with today?
+2026-04-26 03:09:30,598 arth-desktop TTSGenerator[9951] INFO Generating TTS for: 'Who am I speaking with today?' -> active_ai_response.wav
+2026-04-26 03:09:32,587 arth-desktop TTSGenerator[9951] INFO TTS generation successful.
+2026-04-26 03:09:32,588 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:32,589 arth-desktop AudioPlayer[9951] INFO Playing active_ai_response.wav via pygame mixer (1.8s)
+2026-04-26 03:09:34,446 arth-desktop AudioPlayer[9951] INFO Playback finished.
+2026-04-26 03:09:34,447 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:34,966 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:34,968 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:34,969 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:35,006 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:09:39,219 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:39,220 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:39,220 arth-desktop AudioRecorder[9951] INFO Recording complete: 141 chunks, 10 speech chunks.
+2026-04-26 03:09:39,221 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:39,224 arth-desktop AudioRecorder[9951] INFO Saved audio to active_user_input.wav (RMS=0.0077)
+2026-04-26 03:09:39,316 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-26 03:09:41,746 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-26 03:09:41,825 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+134.8MB rss_peak=638.3MB total_peak=638.3MB elapsed=2.51s samples=26
+2026-04-26 03:09:41,825 arth-desktop InferenceGuard[9951] INFO Clear Cache command: After STT phase
+2026-04-26 03:09:41,918 arth-desktop STTGenerator[9951] INFO Transcription: Okay.
+2026-04-26 03:09:41,919 arth-desktop SpeechService[9951] DEBUG User heard: Okay.
+2026-04-26 03:09:41,920 arth-desktop SpeechService[9951] WARNING [NAME GUARD] Invalid name 'Okay.' (attempt 1/3).
+2026-04-26 03:09:41 arth-desktop SpeechService[9951] WARNING [NAME GUARD] Invalid name 'Okay.' (attempt 1/3).
+2026-04-26 03:09:41,920 arth-desktop SpeechService[9951] DEBUG Agent Action: I'm sorry, I missed that. What was your name again?
+2026-04-26 03:09:41,921 arth-desktop TTSGenerator[9951] INFO Generating TTS for: 'I'm sorry, I missed that. What was your name again?' -> active_ai_response.wav
+2026-04-26 03:09:44,002 arth-desktop TTSGenerator[9951] INFO TTS generation successful.
+2026-04-26 03:09:44,002 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:44,003 arth-desktop AudioPlayer[9951] INFO Playing active_ai_response.wav via pygame mixer (4.6s)
+2026-04-26 03:09:48,670 arth-desktop AudioPlayer[9951] INFO Playback finished.
+2026-04-26 03:09:48,671 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:49,167 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:09:49,168 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:09:49,168 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:09:49,926 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:09:53,474 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:09:53,475 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:53,475 arth-desktop AudioRecorder[9951] INFO Recording complete: 120 chunks, 29 speech chunks.
+2026-04-26 03:09:53,475 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:09:53,478 arth-desktop AudioRecorder[9951] INFO Saved audio to active_user_input.wav (RMS=0.0669)
+2026-04-26 03:09:53,552 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-26 03:09:54,686 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-26 03:09:54,732 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.5MB rss_peak=653.1MB total_peak=653.1MB elapsed=1.18s samples=12
+2026-04-26 03:09:54,733 arth-desktop InferenceGuard[9951] INFO Clear Cache command: After STT phase
+2026-04-26 03:09:54,836 arth-desktop STTGenerator[9951] INFO Transcription: Kendall?
+2026-04-26 03:09:54,837 arth-desktop SpeechService[9951] DEBUG User heard: Kendall?
+2026-04-26 03:09:54,837 arth-desktop SpeechService[9951] DEBUG [NAME GUARD] Accepted raw transcript 'Kendall?' as valid name.
+2026-04-26 03:09:54,839 arth-desktop SpeechService[9951] INFO [SESSION] Initializing session for subject: Kendall
+2026-04-26 03:09:54 arth-desktop SpeechService[9951] INFO [SESSION] Initializing session for subject: Kendall
+2026-04-26 03:09:54,840 arth-desktop IORecord[9951] DEBUG Overriding SUBJECT_BASE_ID with Kendall
+2026-04-26 03:09:54,840 arth-desktop IORecord[9951] INFO [SESSION] Subject onboarded: Kendall (session id: Kendall_20260426_030954)
+2026-04-26 03:09:54 arth-desktop IORecord[9951] INFO [SESSION] Subject onboarded: Kendall (session id: Kendall_20260426_030954)
+2026-04-26 03:09:54,841 arth-desktop DBManager[9951] INFO Database initialized at data/therapist.db
+2026-04-26 03:09:54,865 arth-desktop IORecord[9951] DEBUG [RESULTS] Per-session CSVs: data/results/Report_Kendall_20260426_030954.csv, data/results/Notes_Kendall_20260426_030954.csv
+2026-04-26 03:09:54,867 arth-desktop IORecord[9951] DEBUG [DOSSIER] Saved 0 interactions to /home/arth/project/data/sessions/session_8080_20260426_030844.json
+2026-04-26 03:09:54,867 arth-desktop IORecord[9951] DEBUG [DOSSIER] Initialized: /home/arth/project/data/sessions/session_Kendall_20260426_030954.json
+2026-04-26 03:09:54,868 arth-desktop SpeechService[9951] DEBUG [VRAM HANDOFF] Pre-session: suspending STT before pipeline starts.
+2026-04-26 03:09:55,004 arth-desktop InferenceGuard[9951] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-26 03:09:55,095 arth-desktop STTGenerator[9951] INFO STT model suspended. RSS freed: 54.4MB
+2026-04-26 03:09:55,095 arth-desktop SpeechService[9951] DEBUG Agent Action: Hello, Kendall. I'm CaiTI, your intelligent therapist. Thank you for joining me today.
+2026-04-26 03:09:55,095 arth-desktop TTSGenerator[9951] INFO Generating TTS for: 'Hello, Kendall. I'm CaiTI, your intelligent therapist. Thank you for joining me today.' -> active_ai_response.wav
+2026-04-26 03:09:55,296 arth-desktop MainApp[9951] INFO [SESSION] Clinical pipeline starting (DB session_id=4).
+2026-04-26 03:09:55 arth-desktop MainApp[9951] INFO [SESSION] Clinical pipeline starting (DB session_id=4).
+2026-04-26 03:09:55,297 arth-desktop HandlerRL[9951] INFO [PIPELINE] Screening loop starting (Q-learning questioner over 37 dimensions).
+2026-04-26 03:09:55 arth-desktop HandlerRL[9951] INFO [PIPELINE] Screening loop starting (Q-learning questioner over 37 dimensions).
+2026-04-26 03:09:55,297 arth-desktop HandlerRL[9951] DEBUG Initializing RL handler setup: loading records and question library.
+2026-04-26 03:09:55,297 arth-desktop IORecord[9951] DEBUG init_record already ran this session (SESSION_ID=4); skipping duplicate init.
+2026-04-26 03:09:55,300 arth-desktop RLQTables[9951] DEBUG Initializing Q-table for item RL states using item importance.
+2026-04-26 03:09:55,302 arth-desktop RLQTables[9951] DEBUG Built Q-table with shape (38, 38) and actions: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37']
+2026-04-26 03:09:55,340 arth-desktop RLQTables[9951] INFO [RL] Q-table seeded with therapist item_importance priors: [0, 5, 98, 99, 5, 4, 4, 4, 2, 2, 5, 97, 5, 5, 5, 2, 2, 1, 3, 3, 4, 4, 4, 3, 3, 1, 4, 2, 2, 2, 4, 4, 3, 1, 1, 1, 4, 4]
+2026-04-26 03:09:55 arth-desktop RLQTables[9951] INFO [RL] Q-table seeded with therapist item_importance priors: [0, 5, 98, 99, 5, 4, 4, 4, 2, 2, 5, 97, 5, 5, 5, 2, 2, 1, 3, 3, 4, 4, 4, 3, 3, 1, 4, 2, 2, 2, 4, 4, 3, 1, 1, 1, 4, 4]
+2026-04-26 03:09:55,341 arth-desktop HandlerRL[9951] INFO [RL] No prior Q-table for subject Kendall; initialising from item_importance priors.
+2026-04-26 03:09:55 arth-desktop HandlerRL[9951] INFO [RL] No prior Q-table for subject Kendall; initialising from item_importance priors.
+2026-04-26 03:09:55,341 arth-desktop HandlerRL[9951] DEBUG Warm-start disabled (rl.warm_start_enabled=false); skipping.
+2026-04-26 03:09:55,341 arth-desktop HandlerRL[9951] DEBUG RL handler setup complete.
+2026-04-26 03:09:55,359 arth-desktop IORecord[9951] DEBUG Logged Reasoning (reasoner_decision) to DB.
+2026-04-26 03:09:55,359 arth-desktop LLMClient[9951] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=general, model=gemma-4-E2B-it)
+2026-04-26 03:09:55,360 arth-desktop LLMClient[9951] DEBUG [LiteRT] Loading model from ./models/litert/gemma-4-E2B-it.litertlm (backend=cpu)
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1777187395.387173    9951 litert_lm_loader.cc:126] LitertLmLoader::Initialize
+I0000 00:00:1777187395.387283    9951 litert_lm_loader.cc:149] mmap_status is ok
+I0000 00:00:1777187395.387305    9951 litert_lm_loader.cc:155] status: OK
+I0000 00:00:1777187395.387309    9951 litert_lm_loader.cc:156] major_version: 1
+I0000 00:00:1777187395.387328    9951 litert_lm_loader.cc:157] minor_version: 5
+I0000 00:00:1777187395.387331    9951 litert_lm_loader.cc:158] patch_version: 0
+I0000 00:00:1777187395.387336    9951 litert_lm_loader.cc:209] section_index: 0
+I0000 00:00:1777187395.387339    9951 litert_lm_loader.cc:210] section_data_type: LlmMetadataProto
+I0000 00:00:1777187395.387342    9951 litert_lm_loader.cc:212] section_begin_offset: 16384
+I0000 00:00:1777187395.387345    9951 litert_lm_loader.cc:213] section_end_offset: 28576
+I0000 00:00:1777187395.387347    9951 litert_lm_loader.cc:209] section_index: 1
+I0000 00:00:1777187395.387349    9951 litert_lm_loader.cc:210] section_data_type: SP_Tokenizer
+I0000 00:00:1777187395.387352    9951 litert_lm_loader.cc:212] section_begin_offset: 32768
+I0000 00:00:1777187395.387354    9951 litert_lm_loader.cc:213] section_end_offset: 4721781
+I0000 00:00:1777187395.387358    9951 litert_lm_loader.cc:190] model_type: tf_lite_embedder
+I0000 00:00:1777187395.387363    9951 litert_lm_loader.cc:209] section_index: 2
+I0000 00:00:1777187395.387366    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387368    9951 litert_lm_loader.cc:212] section_begin_offset: 4734976
+I0000 00:00:1777187395.387370    9951 litert_lm_loader.cc:213] section_end_offset: 108546696
+I0000 00:00:1777187395.387373    9951 litert_lm_loader.cc:190] model_type: tf_lite_per_layer_embedder
+I0000 00:00:1777187395.387376    9951 litert_lm_loader.cc:209] section_index: 3
+I0000 00:00:1777187395.387378    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387380    9951 litert_lm_loader.cc:212] section_begin_offset: 108560384
+I0000 00:00:1777187395.387382    9951 litert_lm_loader.cc:213] section_end_offset: 1393078776
+I0000 00:00:1777187395.387385    9951 litert_lm_loader.cc:190] model_type: tf_lite_audio_encoder_hw
+I0000 00:00:1777187395.387389    9951 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777187395.387391    9951 litert_lm_loader.cc:209] section_index: 4
+I0000 00:00:1777187395.387393    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387395    9951 litert_lm_loader.cc:212] section_begin_offset: 1393082368
+I0000 00:00:1777187395.387397    9951 litert_lm_loader.cc:213] section_end_offset: 1487134648
+I0000 00:00:1777187395.387400    9951 litert_lm_loader.cc:190] model_type: tf_lite_audio_adapter
+I0000 00:00:1777187395.387402    9951 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777187395.387404    9951 litert_lm_loader.cc:209] section_index: 5
+I0000 00:00:1777187395.387407    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387409    9951 litert_lm_loader.cc:212] section_begin_offset: 1487142912
+I0000 00:00:1777187395.387411    9951 litert_lm_loader.cc:213] section_end_offset: 1496584156
+I0000 00:00:1777187395.387413    9951 litert_lm_loader.cc:190] model_type: tf_lite_end_of_audio
+I0000 00:00:1777187395.387416    9951 litert_lm_loader.cc:209] section_index: 6
+I0000 00:00:1777187395.387418    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387420    9951 litert_lm_loader.cc:212] section_begin_offset: 1496596480
+I0000 00:00:1777187395.387422    9951 litert_lm_loader.cc:213] section_end_offset: 1496603252
+I0000 00:00:1777187395.387424    9951 litert_lm_loader.cc:190] model_type: tf_lite_vision_encoder
+I0000 00:00:1777187395.387427    9951 litert_lm_loader.cc:209] section_index: 7
+I0000 00:00:1777187395.387429    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387431    9951 litert_lm_loader.cc:212] section_begin_offset: 1496612864
+I0000 00:00:1777187395.387433    9951 litert_lm_loader.cc:213] section_end_offset: 1715702984
+I0000 00:00:1777187395.387436    9951 litert_lm_loader.cc:190] model_type: tf_lite_vision_adapter
+I0000 00:00:1777187395.387438    9951 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777187395.387441    9951 litert_lm_loader.cc:209] section_index: 8
+I0000 00:00:1777187395.387443    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387445    9951 litert_lm_loader.cc:212] section_begin_offset: 1715716096
+I0000 00:00:1777187395.387448    9951 litert_lm_loader.cc:213] section_end_offset: 1720443208
+I0000 00:00:1777187395.387450    9951 litert_lm_loader.cc:190] model_type: tf_lite_end_of_vision
+I0000 00:00:1777187395.387453    9951 litert_lm_loader.cc:209] section_index: 9
+I0000 00:00:1777187395.387455    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387457    9951 litert_lm_loader.cc:212] section_begin_offset: 1720451072
+I0000 00:00:1777187395.387459    9951 litert_lm_loader.cc:213] section_end_offset: 1720457844
+I0000 00:00:1777187395.387461    9951 litert_lm_loader.cc:190] model_type: tf_lite_prefill_decode
+I0000 00:00:1777187395.387465    9951 litert_lm_loader.cc:209] section_index: 10
+I0000 00:00:1777187395.387467    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387469    9951 litert_lm_loader.cc:212] section_begin_offset: 1720467456
+I0000 00:00:1777187395.387471    9951 litert_lm_loader.cc:213] section_end_offset: 2538742640
+I0000 00:00:1777187395.387474    9951 litert_lm_loader.cc:190] model_type: tf_lite_mtp_drafter
+I0000 00:00:1777187395.387476    9951 litert_lm_loader.cc:203] section_backend_constraint: cpu
+I0000 00:00:1777187395.387478    9951 litert_lm_loader.cc:209] section_index: 11
+I0000 00:00:1777187395.387480    9951 litert_lm_loader.cc:210] section_data_type: TFLiteModel
+I0000 00:00:1777187395.387482    9951 litert_lm_loader.cc:212] section_begin_offset: 2538749952
+I0000 00:00:1777187395.387485    9951 litert_lm_loader.cc:213] section_end_offset: 2583082648
+I0000 00:00:1777187395.387564    9951 engine_impl.cc:306] New model files have LlmModelType, loading tokenizer asynchronously
+W0000 00:00:1777187395.387657    9951 litert_lm_loader.h:144] TFLite model type: TF_LITE_PREFILL_DECODE not found for backend constraints. Skipping.
+W0000 00:00:1777187395.387674    9951 litert_lm_loader.h:144] TFLite model type: TF_LITE_VISION_ENCODER not found for backend constraints. Skipping.
+I0000 00:00:1777187395.387693    9951 engine_settings.cc:97] The Main backend constraint is not set.
+I0000 00:00:1777187395.387700    9951 engine_settings.cc:337] The validated engine settings: EngineSettings: 
+  MainExecutorSettings: backend: CPU
+backend_config:
+kv_increment_size: 16
+prefill_chunk_size: -1
+number_of_threads: 4
+
+max_tokens: 4096
+activation_data_type: Not set
+max_num_images: 0
+lora_rank: 0
+cache_dir: /tmp/litert-lm-cache
+cache_file: Not set
+litert_dispatch_lib_dir: Not set
+model_assets: model_path: ./models/litert/gemma-4-E2B-it.litertlm
+fake_weights_mode: FAKE_WEIGHTS_NONE
+
+advanced_settings: prefill_batch_sizes: []
+num_output_candidates: 1
+configure_magic_numbers: true
+verify_magic_numbers: false
+clear_kv_cache_before_prefill: true
+num_logits_to_print_after_decode: 0
+gpu_madvise_original_shared_tensors: true
+is_benchmark: false
+preferred_device_substr: 
+num_threads_to_upload: -1
+num_threads_to_compile: -1
+convert_weights_on_gpu: true
+wait_for_weights_conversion_complete_in_benchmark: true
+optimize_shader_compilation: true
+cache_compiled_shaders_only: false
+share_constant_tensors: true
+sampler_handles_input: true
+allow_src_quantized_fc_conv_ops: true
+hint_waiting_for_completion: false
+gpu_context_low_priority: false
+enable_speculative_decoding: false
+disable_delegate_clustering: true
+
+  LlmMetadata: goo.gle/debugstr   
+start_token {
+  token_ids {
+    ids: 2
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 1
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 50
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 106
+  }
+}
+sampler_params {
+  type: TOP_P
+  k: 1
+  p: 0.95
+  temperature: 1
+  seed: 0
+}
+llm_model_type {
+  gemma4 {
+    start_of_image_token {
+      token_str: "<|image>"
+    }
+    end_of_image_token {
+      token_str: "<image|>"
+    }
+    start_of_audio_token {
+      token_str: "<|audio>"
+    }
+    end_of_audio_token {
+      token_str: "<audio|>"
+    }
+    code_fence_start: "<|tool_call>"
+    code_fence_end: "<tool_call|>"
+    open_quote: "<|\"|>"
+    close_quote: "<|\"|>"
+    function_response_start: "<|tool_response>"
+    use_template_for_fc_format: true
+    patch_width: 16
+    patch_height: 16
+    max_num_patches: 2520
+  }
+}
+jinja_prompt_template: "{%- macro format_parameters(properties, required) -%}\n    {%- set standard_keys = [\'description\', \'type\', \'properties\', \'required\', \'nullable\'] -%}\n    {%- set ns = namespace(found_first=false) -%}\n    {%- for key, value in properties | dictsort -%}\n        {%- set add_comma = false -%}\n        {%- if key not in standard_keys -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {{ key }}:{\n            {%- if value[\'description\'] -%}\n                description:<|\"|>{{ value[\'description\'] }}<|\"|>\n                {%- set add_comma = true -%}\n            {%- endif -%}\n            {%- if value[\'nullable\'] %}\n                {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                nullable:true\n            {%- endif -%}\n            {%- if value[\'type\'] | upper == \'STRING\' -%}\n                {%- if value[\'enum\'] -%}\n                    {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                    enum:{{ format_argument(value[\'enum\']) }}\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'OBJECT\' -%}\n                ,properties:{\n                {%- if value[\'properties\'] is defined and value[\'properties\'] is mapping -%}\n                    {{- format_parameters(value[\'properties\'], value[\'required\'] | default([])) -}}\n                {%- elif value is mapping -%}\n                    {{- format_parameters(value, value[\'required\'] | default([])) -}}\n                {%- endif -%}\n                }\n                {%- if value[\'required\'] -%}\n                    ,required:[\n                    {%- for item in value[\'required\'] | default([]) -%}\n                        <|\"|>{{- item -}}<|\"|>\n                        {%- if not loop.last %},{% endif -%}\n                    {%- endfor -%}\n                    ]\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'ARRAY\' -%}\n                {%- if value[\'items\'] is mapping and value[\'items\'] -%}\n                    ,items:{\n                    {%- set ns_items = namespace(found_first=false) -%}\n                    {%- for item_key, item_value in value[\'items\'] | dictsort -%}\n                        {%- if item_value is not none -%}\n                            {%- if ns_items.found_first %},{% endif -%}\n                            {%- set ns_items.found_first = true -%}\n                            {%- if item_key == \'properties\' -%}\n                                properties:{\n                                {%- if item_value is mapping -%}\n                                    {{- format_parameters(item_value, value[\'items\'][\'required\'] | default([])) -}}\n                                {%- endif -%}\n                                }\n                            {%- elif item_key == \'required\' -%}\n                                required:[\n                                {%- for req_item in item_value -%}\n                                    <|\"|>{{- req_item -}}<|\"|>\n                                    {%- if not loop.last %},{% endif -%}\n                                {%- endfor -%}\n                                ]\n                            {%- elif item_key == \'type\' -%}\n                                {%- if item_value is string -%}\n                                    type:{{ format_argument(item_value | upper) }}\n                                {%- else -%}\n                                    type:{{ format_argument(item_value | map(\'upper\') | list) }}\n                                {%- endif -%}\n                            {%- else -%}\n                                {{ item_key }}:{{ format_argument(item_value) }}\n                            {%- endif -%}\n                        {%- endif -%}\n                    {%- endfor -%}\n                    }\n                {%- endif -%}\n            {%- endif -%}\n            {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n            type:<|\"|>{{ value[\'type\'] | upper }}<|\"|>}\n        {%- endif -%}\n    {%- endfor -%}\n{%- endmacro -%}\n{%- macro format_function_declaration(tool_data) -%}\n    declaration:{{- tool_data[\'function\'][\'name\'] -}}{description:<|\"|>{{- tool_data[\'function\'][\'description\'] -}}<|\"|>\n    {%- set params = tool_data[\'function\'][\'parameters\'] -%}\n    {%- if params -%}\n        ,parameters:{\n        {%- if params[\'properties\'] -%}\n            properties:{ {{- format_parameters(params[\'properties\'], params[\'required\']) -}} },\n        {%- endif -%}\n        {%- if params[\'required\'] -%}\n            required:[\n            {%- for item in params[\'required\'] -%}\n                <|\"|>{{- item -}}<|\"|>\n                {{- \',\' if not loop.last -}}\n            {%- endfor -%}\n            ],\n        {%- endif -%}\n        {%- if params[\'type\'] -%}\n            type:<|\"|>{{- params[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    {%- if \'response\' in tool_data[\'function\'] -%}\n        {%- set response_declaration = tool_data[\'function\'][\'response\'] -%}\n        ,response:{\n        {%- if response_declaration[\'description\'] -%}\n            description:<|\"|>{{- response_declaration[\'description\'] -}}<|\"|>,\n        {%- endif -%}\n        {%- if response_declaration[\'type\'] | upper == \'OBJECT\' -%}\n            type:<|\"|>{{- response_declaration[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    }\n{%- endmacro -%}\n{%- macro format_argument(argument, escape_keys=True) -%}\n    {%- if argument is string -%}\n        {{- \'<|\"|>\' + argument + \'<|\"|>\' -}}\n    {%- elif argument is boolean -%}\n        {{- \'true\' if argument else \'false\' -}}\n    {%- elif argument is mapping -%}\n        {{- \'{\' -}}\n        {%- set ns = namespace(found_first=false) -%}\n        {%- for key, value in argument | dictsort -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {%- if escape_keys -%}\n                {{- \'<|\"|>\' + key + \'<|\"|>\' -}}\n            {%- else -%}\n                {{- key -}}\n            {%- endif -%}\n            :{{- format_argument(value, escape_keys=escape_keys) -}}\n        {%- endfor -%}\n        {{- \'}\' -}}\n    {%- elif argument is sequence -%}\n        {{- \'[\' -}}\n        {%- for item in argument -%}\n            {{- format_argument(item, escape_keys=escape_keys) -}}\n            {%- if not loop.last %},{% endif -%}\n        {%- endfor -%}\n        {{- \']\' -}}\n    {%- else -%}\n        {{- argument -}}\n    {%- endif -%}\n{%- endmacro -%}\n{%- macro strip_thinking(text) -%}\n    {%- set ns = namespace(result=\'\') -%}\n    {%- for part in text.split(\'<channel|>\') -%}\n        {%- if \'<|channel>\' in part -%}\n            {%- set ns.result = ns.result + part.split(\'<|channel>\')[0] -%}\n        {%- else -%}\n            {%- set ns.result = ns.result + part -%}\n        {%- endif -%}\n    {%- endfor -%}\n    {{- ns.result | trim -}}\n{%- endmacro -%}\n\n{%- set ns = namespace(prev_message_type=None) -%}\n{%- set loop_messages = messages -%}\n{{ bos_token }}\n{#- Handle System/Tool Definitions Block -#}\n{%- if (enable_thinking is defined and enable_thinking) or tools or messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n    {{- \'<|turn>system\\n\' -}}\n\n    {#- Inject Thinking token at the very top of the FIRST system turn -#}\n    {%- if enable_thinking is defined and enable_thinking -%}\n        {{- \'<|think|>\' -}}\n    {%- endif -%}\n\n    {%- if messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n        {%- if messages[0][\'content\'] is string -%}\n            {{- messages[0][\'content\'] | trim -}}\n        {%- elif messages[0][\'content\'] is sequence -%}\n            {%- for item in messages[0][\'content\'] -%}\n                {%- if item[\'type\'] == \'text\' -%}\n                    {{- item[\'text\'] | trim -}}\n                {%- endif -%}\n            {%- endfor -%}\n        {%- endif -%}\n        {%- set loop_messages = messages[1:] -%}\n    {%- endif -%}\n\n    {%- if tools -%}\n        {{- \'\\n\\n\' -}}\n        {%- for tool in tools %}\n            {{- \'<|tool>\' -}}\n            {{- format_function_declaration(tool) | trim -}}\n            {{- \'<tool|>\' -}}\n        {%- endfor %}\n    {%- endif -%}\n\n    {{- \'<turn|>\\n\' -}}\n{%- endif %}\n\n{#- Loop through messages -#}\n{%- for message in loop_messages -%}\n    {%- set role = \'model\' if message[\'role\'] == \'assistant\' else message[\'role\'] -%}\n        {%- if role != \'tool\' -%}\n            {{- \'<|turn>\' + role + \'\\n\' }}\n        {%- endif -%}\n\n            {%- if message[\'tool_calls\'] -%}\n                {%- for tool_call in message[\'tool_calls\'] -%}\n                    {%- set function = tool_call[\'function\'] -%}\n                    {{- \'<|tool_call>call:\' + function[\'name\'] + \'{\' -}}\n                    {%- if function[\'arguments\'] is mapping -%}\n                        {%- set ns_args = namespace(found_first=false) -%}\n                        {%- for key, value in function[\'arguments\'] | dictsort -%}\n                            {%- if ns_args.found_first %},{% endif -%}\n                            {%- set ns_args.found_first = true -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                        {%- endfor -%}\n                    {%- elif function[\'arguments\'] is string -%}\n                        {{- function[\'arguments\'] -}}\n                    {%- endif -%}\n                    {{- \'}<tool_call|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_call\' -%}\n            {%- endif -%}\n\n            {%- if role == \'tool\' and message[\'content\'] is sequence -%}\n                {#- Tool Response handling -#}\n                {%- for item in message[\'content\'] -%}\n                    {{- \'<|tool_response>\' -}}\n                    {%- if item[\'response\'] is mapping -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{\' -}}\n                        {%- for key, value in item[\'response\'] | dictsort -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                            {%- if not loop.last %},{% endif -%}\n                        {%- endfor -%}\n                        {{- \'}\' -}}\n                    {%- else -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{value:\' + format_argument(item[\'response\'], escape_keys=False) + \'}\' -}}\n                    {%- endif -%}\n                    {{- \'<tool_response|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_response\' -%}\n            {%- else -%}\n                {%- if message[\'content\'] is string -%}\n                    {%- if role == \'model\' -%}\n                        {{- strip_thinking(message[\'content\']) -}}\n                    {%- else -%}\n                        {{- message[\'content\'] | trim -}}\n                    {%- endif -%}\n                {%- elif message[\'content\'] is sequence -%}\n                    {%- for item in message[\'content\'] -%}\n                        {%- if item[\'type\'] == \'text\' -%}\n                            {%- if role == \'model\' -%}\n                                {{- strip_thinking(item[\'text\']) -}}\n                            {%- else -%}\n                                {{- item[\'text\'] | trim -}}\n                            {%- endif -%}\n                        {%- elif item[\'type\'] == \'image\' -%}\n                            {{- \'\\n\\n<|image|>\\n\\n\' -}}\n                        {%- elif item[\'type\'] == \'audio\' -%}\n                            {{- \'<|audio|>\' -}}\n                        {%- endif -%}\n                    {%- endfor -%}\n                {%- endif -%}\n                {%- set ns.prev_message_type = None -%} \n            {%- endif -%}\n        {%- if ns.prev_message_type == None -%}\n            {{- \'<turn|>\\n\' -}}\n        {%- endif -%}\n{%- endfor -%}\n\n{%- if add_generation_prompt -%}\n    {%- if ns.prev_message_type != \'tool_response\' -%}\n        {{- \'<|turn>model\\n\' -}}\n    {%- endif -%}\n{%- endif -%}"
+channels {
+  channel_name: "thought"
+  start: "<|channel>thought\n"
+  end: "<channel|>"
+}
+  BenchmarkParams: Not set
+  VisionExecutorSettings: Not set
+  AudioExecutorSettings: Not set
+
+I0000 00:00:1777187395.389419    9951 model_resources_litert_lm.cc:67] model_type: TF_LITE_PREFILL_DECODE
+I0000 00:00:1777187395.389430    9951 model_resources_litert_lm.cc:68] litert model size: 818275184
+INFO: [environment.cc:30] Creating LiteRT environment with options
+WARNING: [auto_registration.cc:192] NPU accelerator could not be loaded and registered: kLiteRtStatusErrorInvalidArgument.
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtGpuAccelerator.so).
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtWebGpuAccelerator.so).
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaab0d9f8e80, name=GPU WebGPU
+INFO: [auto_registration.cc:287] Dynamically loaded GPU accelerator(libLiteRtWebGpuAccelerator.so) registered.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaab0e7ddeb0, name=CpuAccelerator
+INFO: [auto_registration.cc:325] CPU accelerator registered.
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=976, num_signatures=4
+INFO: [magic_number_utils.cc:105]   signature=decode, subgraph_index=0, num_tensors=2703, num_inputs=35, num_outputs=32, num_ops=2068
+INFO: [magic_number_utils.cc:105]   signature=prefill_1024, subgraph_index=1, num_tensors=1454, num_inputs=35, num_outputs=30, num_ops=1107
+INFO: [magic_number_utils.cc:105]   signature=prefill_128, subgraph_index=2, num_tensors=1454, num_inputs=35, num_outputs=30, num_ops=1107
+INFO: [magic_number_utils.cc:105]   signature=verify, subgraph_index=3, num_tensors=2887, num_inputs=35, num_outputs=32, num_ops=2243
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [magic_number_utils.cc:425] 439 tensors of signature decode have been updated for magic number  32003 to target number 4096
+INFO: [magic_number_utils.cc:425] 271 tensors of signature prefill_1024 have been updated for magic number  32003 to target number 4096
+INFO: [magic_number_utils.cc:425] 270 tensors of signature prefill_128 have been updated for magic number  32003 to target number 4096
+INFO: [magic_number_utils.cc:425] 444 tensors of signature verify have been updated for magic number  32003 to target number 4096
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+ERROR: third_party/tensorflow/lite/delegates/xnnpack/weight_cache.cc:460: could not open file ('/tmp/litert-lm-cache/gemma-4-E2B-it.litertlm.xnnpack_cache'): No such file or directory.
+ERROR: XNNPack weight cache could neither be loaded from or saved to '/tmp/litert-lm-cache/gemma-4-E2B-it.litertlm.xnnpack_cache'. Check that this location is readable and writable.
+INFO: [environment.cc:30] Creating LiteRT environment with options
+WARNING: [auto_registration.cc:192] NPU accelerator could not be loaded and registered: kLiteRtStatusErrorInvalidArgument.
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtGpuAccelerator.so).
+INFO: [auto_registration.cc:279] Loading GPU accelerator(libLiteRtWebGpuAccelerator.so).
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaab83688a00, name=GPU WebGPU
+INFO: [auto_registration.cc:287] Dynamically loaded GPU accelerator(libLiteRtWebGpuAccelerator.so) registered.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0xaaab836955a0, name=CpuAccelerator
+INFO: [auto_registration.cc:325] CPU accelerator registered.
+I0000 00:00:1777187415.526028    9951 model_resources_litert_lm.cc:67] model_type: TF_LITE_END_OF_AUDIO
+I0000 00:00:1777187415.526084    9951 model_resources_litert_lm.cc:68] litert model size: 6772
+I0000 00:00:1777187415.526172    9951 model_resources_litert_lm.cc:67] model_type: TF_LITE_END_OF_VISION
+I0000 00:00:1777187415.526179    9951 model_resources_litert_lm.cc:68] litert model size: 6772
+I0000 00:00:1777187415.526330    9951 model_resources_litert_lm.cc:67] model_type: TF_LITE_EMBEDDER
+I0000 00:00:1777187415.526339    9951 model_resources_litert_lm.cc:68] litert model size: 103811720
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=embedder, subgraph_index=0, num_tensors=16, num_inputs=1, num_outputs=1, num_ops=8
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+I0000 00:00:1777187415.528009    9951 embedding_lookup_text.cc:345] EmbeddingLookupText initialized: signature=embedder, rank=3, floats_per_token=1536
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=eoa, subgraph_index=0, num_tensors=1, num_inputs=0, num_outputs=1, num_ops=0
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+INFO: [compiled_model.cc:1486] Tracked constant output tensor eoa_embedding with locked address
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=eoi, subgraph_index=0, num_tensors=1, num_inputs=0, num_outputs=1, num_ops=0
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+INFO: [compiled_model.cc:1486] Tracked constant output tensor eoi_embedding with locked address
+I0000 00:00:1777187415.528524    9951 model_resources_litert_lm.cc:67] model_type: TF_LITE_PER_LAYER_EMBEDDER
+I0000 00:00:1777187415.528537    9951 model_resources_litert_lm.cc:68] litert model size: 1284518392
+INFO: [magic_number_utils.cc:97] Loaded: num_subgraphs=1, num_signatures=1
+INFO: [magic_number_utils.cc:105]   signature=per_layer_embedder, subgraph_index=0, num_tensors=83, num_inputs=1, num_outputs=1, num_ops=42
+INFO: [magic_number_utils.cc:109] Magic number configs: num_configs=1
+INFO: [magic_number_utils.cc:116]   config[0]: magic_number=32003, target_number=4096, signature_prefix=null
+INFO: [compiled_model.cc:719] Flatbuffer model initialized directly from incoming litert model.
+I0000 00:00:1777187415.591083    9951 embedding_lookup_text.cc:345] EmbeddingLookupText initialized: signature=per_layer_embedder, rank=4, floats_per_token=8960
+W0000 00:00:1777187415.591286    9951 litert_lm_loader.h:144] TFLite model type: TF_LITE_PREFILL_DECODE not found for backend constraints. Skipping.
+W0000 00:00:1777187415.591306    9951 litert_lm_loader.h:144] TFLite model type: TF_LITE_VISION_ENCODER not found for backend constraints. Skipping.
+I0000 00:00:1777187415.591338    9951 engine_settings.cc:97] The Main backend constraint is not set.
+I0000 00:00:1777187415.591346    9951 engine_settings.cc:337] The validated engine settings: EngineSettings: 
+  MainExecutorSettings: backend: CPU
+backend_config:
+kv_increment_size: 16
+prefill_chunk_size: -1
+number_of_threads: 4
+
+max_tokens: 4096
+activation_data_type: Not set
+max_num_images: 0
+lora_rank: 0
+cache_dir: /tmp/litert-lm-cache
+cache_file: Not set
+litert_dispatch_lib_dir: Not set
+model_assets: model_path: ./models/litert/gemma-4-E2B-it.litertlm
+fake_weights_mode: FAKE_WEIGHTS_NONE
+
+advanced_settings: prefill_batch_sizes: []
+num_output_candidates: 1
+configure_magic_numbers: true
+verify_magic_numbers: false
+clear_kv_cache_before_prefill: true
+num_logits_to_print_after_decode: 0
+gpu_madvise_original_shared_tensors: true
+is_benchmark: false
+preferred_device_substr: 
+num_threads_to_upload: -1
+num_threads_to_compile: -1
+convert_weights_on_gpu: true
+wait_for_weights_conversion_complete_in_benchmark: true
+optimize_shader_compilation: true
+cache_compiled_shaders_only: false
+share_constant_tensors: true
+sampler_handles_input: true
+allow_src_quantized_fc_conv_ops: true
+hint_waiting_for_completion: false
+gpu_context_low_priority: false
+enable_speculative_decoding: false
+disable_delegate_clustering: true
+
+  LlmMetadata: goo.gle/debugstr   
+start_token {
+  token_ids {
+    ids: 2
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 1
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 50
+  }
+}
+stop_tokens {
+  token_ids {
+    ids: 106
+  }
+}
+sampler_params {
+  type: TOP_P
+  k: 1
+  p: 0.95
+  temperature: 1
+  seed: 0
+}
+llm_model_type {
+  gemma4 {
+    start_of_image_token {
+      token_str: "<|image>"
+    }
+    end_of_image_token {
+      token_str: "<image|>"
+    }
+    start_of_audio_token {
+      token_str: "<|audio>"
+    }
+    end_of_audio_token {
+      token_str: "<audio|>"
+    }
+    code_fence_start: "<|tool_call>"
+    code_fence_end: "<tool_call|>"
+    open_quote: "<|\"|>"
+    close_quote: "<|\"|>"
+    function_response_start: "<|tool_response>"
+    use_template_for_fc_format: true
+    patch_width: 16
+    patch_height: 16
+    max_num_patches: 2520
+  }
+}
+jinja_prompt_template: "{%- macro format_parameters(properties, required) -%}\n    {%- set standard_keys = [\'description\', \'type\', \'properties\', \'required\', \'nullable\'] -%}\n    {%- set ns = namespace(found_first=false) -%}\n    {%- for key, value in properties | dictsort -%}\n        {%- set add_comma = false -%}\n        {%- if key not in standard_keys -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {{ key }}:{\n            {%- if value[\'description\'] -%}\n                description:<|\"|>{{ value[\'description\'] }}<|\"|>\n                {%- set add_comma = true -%}\n            {%- endif -%}\n            {%- if value[\'nullable\'] %}\n                {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                nullable:true\n            {%- endif -%}\n            {%- if value[\'type\'] | upper == \'STRING\' -%}\n                {%- if value[\'enum\'] -%}\n                    {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n                    enum:{{ format_argument(value[\'enum\']) }}\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'OBJECT\' -%}\n                ,properties:{\n                {%- if value[\'properties\'] is defined and value[\'properties\'] is mapping -%}\n                    {{- format_parameters(value[\'properties\'], value[\'required\'] | default([])) -}}\n                {%- elif value is mapping -%}\n                    {{- format_parameters(value, value[\'required\'] | default([])) -}}\n                {%- endif -%}\n                }\n                {%- if value[\'required\'] -%}\n                    ,required:[\n                    {%- for item in value[\'required\'] | default([]) -%}\n                        <|\"|>{{- item -}}<|\"|>\n                        {%- if not loop.last %},{% endif -%}\n                    {%- endfor -%}\n                    ]\n                {%- endif -%}\n            {%- elif value[\'type\'] | upper == \'ARRAY\' -%}\n                {%- if value[\'items\'] is mapping and value[\'items\'] -%}\n                    ,items:{\n                    {%- set ns_items = namespace(found_first=false) -%}\n                    {%- for item_key, item_value in value[\'items\'] | dictsort -%}\n                        {%- if item_value is not none -%}\n                            {%- if ns_items.found_first %},{% endif -%}\n                            {%- set ns_items.found_first = true -%}\n                            {%- if item_key == \'properties\' -%}\n                                properties:{\n                                {%- if item_value is mapping -%}\n                                    {{- format_parameters(item_value, value[\'items\'][\'required\'] | default([])) -}}\n                                {%- endif -%}\n                                }\n                            {%- elif item_key == \'required\' -%}\n                                required:[\n                                {%- for req_item in item_value -%}\n                                    <|\"|>{{- req_item -}}<|\"|>\n                                    {%- if not loop.last %},{% endif -%}\n                                {%- endfor -%}\n                                ]\n                            {%- elif item_key == \'type\' -%}\n                                {%- if item_value is string -%}\n                                    type:{{ format_argument(item_value | upper) }}\n                                {%- else -%}\n                                    type:{{ format_argument(item_value | map(\'upper\') | list) }}\n                                {%- endif -%}\n                            {%- else -%}\n                                {{ item_key }}:{{ format_argument(item_value) }}\n                            {%- endif -%}\n                        {%- endif -%}\n                    {%- endfor -%}\n                    }\n                {%- endif -%}\n            {%- endif -%}\n            {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}\n            type:<|\"|>{{ value[\'type\'] | upper }}<|\"|>}\n        {%- endif -%}\n    {%- endfor -%}\n{%- endmacro -%}\n{%- macro format_function_declaration(tool_data) -%}\n    declaration:{{- tool_data[\'function\'][\'name\'] -}}{description:<|\"|>{{- tool_data[\'function\'][\'description\'] -}}<|\"|>\n    {%- set params = tool_data[\'function\'][\'parameters\'] -%}\n    {%- if params -%}\n        ,parameters:{\n        {%- if params[\'properties\'] -%}\n            properties:{ {{- format_parameters(params[\'properties\'], params[\'required\']) -}} },\n        {%- endif -%}\n        {%- if params[\'required\'] -%}\n            required:[\n            {%- for item in params[\'required\'] -%}\n                <|\"|>{{- item -}}<|\"|>\n                {{- \',\' if not loop.last -}}\n            {%- endfor -%}\n            ],\n        {%- endif -%}\n        {%- if params[\'type\'] -%}\n            type:<|\"|>{{- params[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    {%- if \'response\' in tool_data[\'function\'] -%}\n        {%- set response_declaration = tool_data[\'function\'][\'response\'] -%}\n        ,response:{\n        {%- if response_declaration[\'description\'] -%}\n            description:<|\"|>{{- response_declaration[\'description\'] -}}<|\"|>,\n        {%- endif -%}\n        {%- if response_declaration[\'type\'] | upper == \'OBJECT\' -%}\n            type:<|\"|>{{- response_declaration[\'type\'] | upper -}}<|\"|>}\n        {%- endif -%}\n    {%- endif -%}\n    }\n{%- endmacro -%}\n{%- macro format_argument(argument, escape_keys=True) -%}\n    {%- if argument is string -%}\n        {{- \'<|\"|>\' + argument + \'<|\"|>\' -}}\n    {%- elif argument is boolean -%}\n        {{- \'true\' if argument else \'false\' -}}\n    {%- elif argument is mapping -%}\n        {{- \'{\' -}}\n        {%- set ns = namespace(found_first=false) -%}\n        {%- for key, value in argument | dictsort -%}\n            {%- if ns.found_first %},{% endif -%}\n            {%- set ns.found_first = true -%}\n            {%- if escape_keys -%}\n                {{- \'<|\"|>\' + key + \'<|\"|>\' -}}\n            {%- else -%}\n                {{- key -}}\n            {%- endif -%}\n            :{{- format_argument(value, escape_keys=escape_keys) -}}\n        {%- endfor -%}\n        {{- \'}\' -}}\n    {%- elif argument is sequence -%}\n        {{- \'[\' -}}\n        {%- for item in argument -%}\n            {{- format_argument(item, escape_keys=escape_keys) -}}\n            {%- if not loop.last %},{% endif -%}\n        {%- endfor -%}\n        {{- \']\' -}}\n    {%- else -%}\n        {{- argument -}}\n    {%- endif -%}\n{%- endmacro -%}\n{%- macro strip_thinking(text) -%}\n    {%- set ns = namespace(result=\'\') -%}\n    {%- for part in text.split(\'<channel|>\') -%}\n        {%- if \'<|channel>\' in part -%}\n            {%- set ns.result = ns.result + part.split(\'<|channel>\')[0] -%}\n        {%- else -%}\n            {%- set ns.result = ns.result + part -%}\n        {%- endif -%}\n    {%- endfor -%}\n    {{- ns.result | trim -}}\n{%- endmacro -%}\n\n{%- set ns = namespace(prev_message_type=None) -%}\n{%- set loop_messages = messages -%}\n{{ bos_token }}\n{#- Handle System/Tool Definitions Block -#}\n{%- if (enable_thinking is defined and enable_thinking) or tools or messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n    {{- \'<|turn>system\\n\' -}}\n\n    {#- Inject Thinking token at the very top of the FIRST system turn -#}\n    {%- if enable_thinking is defined and enable_thinking -%}\n        {{- \'<|think|>\' -}}\n    {%- endif -%}\n\n    {%- if messages[0][\'role\'] in [\'system\', \'developer\'] -%}\n        {%- if messages[0][\'content\'] is string -%}\n            {{- messages[0][\'content\'] | trim -}}\n        {%- elif messages[0][\'content\'] is sequence -%}\n            {%- for item in messages[0][\'content\'] -%}\n                {%- if item[\'type\'] == \'text\' -%}\n                    {{- item[\'text\'] | trim -}}\n                {%- endif -%}\n            {%- endfor -%}\n        {%- endif -%}\n        {%- set loop_messages = messages[1:] -%}\n    {%- endif -%}\n\n    {%- if tools -%}\n        {{- \'\\n\\n\' -}}\n        {%- for tool in tools %}\n            {{- \'<|tool>\' -}}\n            {{- format_function_declaration(tool) | trim -}}\n            {{- \'<tool|>\' -}}\n        {%- endfor %}\n    {%- endif -%}\n\n    {{- \'<turn|>\\n\' -}}\n{%- endif %}\n\n{#- Loop through messages -#}\n{%- for message in loop_messages -%}\n    {%- set role = \'model\' if message[\'role\'] == \'assistant\' else message[\'role\'] -%}\n        {%- if role != \'tool\' -%}\n            {{- \'<|turn>\' + role + \'\\n\' }}\n        {%- endif -%}\n\n            {%- if message[\'tool_calls\'] -%}\n                {%- for tool_call in message[\'tool_calls\'] -%}\n                    {%- set function = tool_call[\'function\'] -%}\n                    {{- \'<|tool_call>call:\' + function[\'name\'] + \'{\' -}}\n                    {%- if function[\'arguments\'] is mapping -%}\n                        {%- set ns_args = namespace(found_first=false) -%}\n                        {%- for key, value in function[\'arguments\'] | dictsort -%}\n                            {%- if ns_args.found_first %},{% endif -%}\n                            {%- set ns_args.found_first = true -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                        {%- endfor -%}\n                    {%- elif function[\'arguments\'] is string -%}\n                        {{- function[\'arguments\'] -}}\n                    {%- endif -%}\n                    {{- \'}<tool_call|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_call\' -%}\n            {%- endif -%}\n\n            {%- if role == \'tool\' and message[\'content\'] is sequence -%}\n                {#- Tool Response handling -#}\n                {%- for item in message[\'content\'] -%}\n                    {{- \'<|tool_response>\' -}}\n                    {%- if item[\'response\'] is mapping -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{\' -}}\n                        {%- for key, value in item[\'response\'] | dictsort -%}\n                            {{- key -}}:{{- format_argument(value, escape_keys=False) -}}\n                            {%- if not loop.last %},{% endif -%}\n                        {%- endfor -%}\n                        {{- \'}\' -}}\n                    {%- else -%}\n                        {{- \'response:\' + item[\'name\'] | default(\'unknown\') + \'{value:\' + format_argument(item[\'response\'], escape_keys=False) + \'}\' -}}\n                    {%- endif -%}\n                    {{- \'<tool_response|>\' -}}\n                {%- endfor -%}\n                {%- set ns.prev_message_type = \'tool_response\' -%}\n            {%- else -%}\n                {%- if message[\'content\'] is string -%}\n                    {%- if role == \'model\' -%}\n                        {{- strip_thinking(message[\'content\']) -}}\n                    {%- else -%}\n                        {{- message[\'content\'] | trim -}}\n                    {%- endif -%}\n                {%- elif message[\'content\'] is sequence -%}\n                    {%- for item in message[\'content\'] -%}\n                        {%- if item[\'type\'] == \'text\' -%}\n                            {%- if role == \'model\' -%}\n                                {{- strip_thinking(item[\'text\']) -}}\n                            {%- else -%}\n                                {{- item[\'text\'] | trim -}}\n                            {%- endif -%}\n                        {%- elif item[\'type\'] == \'image\' -%}\n                            {{- \'\\n\\n<|image|>\\n\\n\' -}}\n                        {%- elif item[\'type\'] == \'audio\' -%}\n                            {{- \'<|audio|>\' -}}\n                        {%- endif -%}\n                    {%- endfor -%}\n                {%- endif -%}\n                {%- set ns.prev_message_type = None -%} \n            {%- endif -%}\n        {%- if ns.prev_message_type == None -%}\n            {{- \'<turn|>\\n\' -}}\n        {%- endif -%}\n{%- endfor -%}\n\n{%- if add_generation_prompt -%}\n    {%- if ns.prev_message_type != \'tool_response\' -%}\n        {{- \'<|turn>model\\n\' -}}\n    {%- endif -%}\n{%- endif -%}"
+channels {
+  channel_name: "thought"
+  start: "<|channel>thought\n"
+  end: "<channel|>"
+}
+  BenchmarkParams: Not set
+  VisionExecutorSettings: Not set
+  AudioExecutorSettings: Not set
+
+I0000 00:00:1777187415.591504    9951 threadpool.cc:41] ThreadPool 'engine': Running up to 1 threads.
+2026-04-26 03:10:15,593 arth-desktop LLMClient[9951] DEBUG [Heartbeat] LLM inference in progress... Time elapsed: 20s. Role: general. Model: gemma-4-E2B-it.
+2026-04-26 03:10:15,594 arth-desktop LLMClient[9951] DEBUG [LiteRT] Model loaded. RSS delta: +3034.7MB (now 3496.4MB)
+2026-04-26 03:10:15,595 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/general
+I0000 00:00:1777187415.597888    9951 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777187415.597923    9951 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777187415.598690    9951 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777187415.598704    9951 session_basic.cc:301] <|turn>user
+You are a warm, concise, and professional therapist-assistant.
+
+Identity Rules:
+- AI_NAME: CaiTI
+- USER_NAME: Kendall
+- You are CaiTI. The user is USER_NAME.
+- Never confuse the two identities.
+
+Task: Generate a brief transition sentence that moves a new user from the opening handshake into the first session.
+Rules:
+- The user has ALREADY been greeted with 'Hello, <their name>. I'm CaiTI, your intelligent therapist. Thank you for joining me today.' — do NOT repeat any of that. Start with a short warm sentence that moves the session forward (e.g. 'Let's begin with a few quick check-ins about your recent day-to-day.' or 'I'd like to start with a couple of questions about how you've been.').
+- Do NOT open with 'Hello', 'Hi', 'Hey', or any variant of 'Welcome back' that names CaiTI again.
+- 1–2 short sentences.
+- Friendly, non-judgmental tone.
+- No extra headers or labels; output the final text directly.
+
+
+I'm CaiTI, your intelligent therapist. Thank you for joining me today. Let's get started with a couple of questions about your recent daily life.<turn|>
+<|turn>model
+
+I0000 00:00:1777187425.918591    9951 session_basic.cc:485] RunDecodeSync
+2026-04-26 03:10:27,697 arth-desktop LLMClient[9951] DEBUG [Heartbeat] LLM inference in progress... Time elapsed: 32s. Role: general. Model: gemma-4-E2B-it.
+2026-04-26 03:10:27,698 arth-desktop TTSGenerator[9951] INFO TTS generation successful.
+2026-04-26 03:10:27,698 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/general
+2026-04-26 03:10:27,699 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:10:27,700 arth-desktop LLMClient[9951] DEBUG Received response for LLM (client.responses) after 32.34s (role=general)
+2026-04-26 03:10:27,702 arth-desktop AudioPlayer[9951] INFO Playing active_ai_response.wav via pygame mixer (8.3s)
+2026-04-26 03:10:27,703 arth-desktop RLQTables[9951] DEBUG Choosing action for state 0 (epsilon=1.000)
+2026-04-26 03:10:27,704 arth-desktop RLQTables[9951] DEBUG Mask before: [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-26 03:10:27,707 arth-desktop RLQTables[9951] DEBUG Q-values after masking: [0.0,5.0,98.0,99.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,97.0,5.0,5.0,5.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+2026-04-26 03:10:27,711 arth-desktop RLQTables[9951] INFO [RL] Exploiting: best dims ['3'] with Q-value 99.0
+2026-04-26 03:10:27 arth-desktop RLQTables[9951] INFO [RL] Exploiting: best dims ['3'] with Q-value 99.0
+2026-04-26 03:10:27,712 arth-desktop RLQTables[9951] INFO [RL] Action chosen: dim=3 (medication)
+2026-04-26 03:10:27 arth-desktop RLQTables[9951] INFO [RL] Action chosen: dim=3 (medication)
+2026-04-26 03:10:27,729 arth-desktop IORecord[9951] DEBUG Logged Reasoning (rl_decision) to DB.
+2026-04-26 03:10:27,729 arth-desktop Questioner[9951] INFO [QUESTIONER] Starting turn for dim state S=3.
+2026-04-26 03:10:27 arth-desktop Questioner[9951] INFO [QUESTIONER] Starting turn for dim state S=3.
+2026-04-26 03:10:27,730 arth-desktop ResponseAnalyzer[9951] INFO [PIPELINE] Rephraser — varying question wording for this turn.
+2026-04-26 03:10:27 arth-desktop ResponseAnalyzer[9951] INFO [PIPELINE] Rephraser — varying question wording for this turn.
+2026-04-26 03:10:27,730 arth-desktop ResponseAnalyzer[9951] DEBUG Original question: Have you been taking medication according to doctor's recommendation?
+2026-04-26 03:10:27,730 arth-desktop LLMClient[9951] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rephraser, model=gemma-4-E2B-it)
+2026-04-26 03:10:27,731 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rephraser
+I0000 00:00:1777187427.734109    9951 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777187427.734166    9951 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777187427.734966    9951 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777187427.734980    9951 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "Have you been taking medication according to doctor's recommendation?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777187436.056472    9951 session_basic.cc:485] RunDecodeSync
+2026-04-26 03:10:37,587 arth-desktop AudioPlayer[9951] INFO Playback finished.
+2026-04-26 03:10:37,588 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rephraser
+2026-04-26 03:10:37,589 arth-desktop LLMClient[9951] DEBUG Received response for LLM (client.responses) after 9.86s (role=rephraser)
+2026-04-26 03:10:37,589 arth-desktop SpeechService[9951] INFO [SESSION] Routing first agent utterance through intermission pipeline.
+2026-04-26 03:10:37 arth-desktop SpeechService[9951] INFO [SESSION] Routing first agent utterance through intermission pipeline.
+2026-04-26 03:10:37,590 arth-desktop Questioner[9951] DEBUG [REPHRASER] 'Have you been taking medication according to doctor's recommendation?' -> 'Are you adhering to the medication regimen prescribed by your physician?'
+2026-04-26 03:10:37,590 arth-desktop SpeechService[9951] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+2026-04-26 03:10:37,590 arth-desktop IORecord[9951] DEBUG Combining pending prefix with next question.
+2026-04-26 03:10:37,592 arth-desktop SpeechService[9951] INFO [INTERMISSION] Pre-wait activity: SCREENING
+2026-04-26 03:10:37 arth-desktop SpeechService[9951] INFO [INTERMISSION] Pre-wait activity: SCREENING
+2026-04-26 03:10:37,593 arth-desktop SpeechService[9951] INFO [PHQ4] Asking screening question: gad_1
+2026-04-26 03:10:37 arth-desktop SpeechService[9951] INFO [PHQ4] Asking screening question: gad_1
+2026-04-26 03:10:37,593 arth-desktop SpeechService[9951] DEBUG Agent Action: While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by...
+2026-04-26 03:10:37,594 arth-desktop TTSGenerator[9951] INFO Generating TTS for: 'While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by feeling nervous, anxious, or on edge?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.' -> active_ai_response.wav
+2026-04-26 03:10:37,608 arth-desktop IORecord[9951] INFO [AGENT] I'd like to start with a couple of questions about how you've been feeling lately.
+
+Are you adhering to the medication regimen prescribed by your physician?
+2026-04-26 03:10:37 arth-desktop IORecord[9951] INFO [AGENT] I'd like to start with a couple of questions about how you've been feeling lately.
+
+Are you adhering to the medication regimen prescribed by your physician?
+2026-04-26 03:10:37,608 arth-desktop IORecord[9951] DEBUG Waiting for user answer...
+2026-04-26 03:10:40,447 arth-desktop TTSGenerator[9951] INFO TTS generation successful.
+2026-04-26 03:10:40,448 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:10:40,449 arth-desktop AudioPlayer[9951] INFO Playing active_ai_response.wav via pygame mixer (14.9s)
+2026-04-26 03:10:55,374 arth-desktop AudioPlayer[9951] INFO Playback finished.
+2026-04-26 03:10:56,156 arth-desktop STTGenerator[9951] INFO STT model resumed. RSS delta: +143.9MB
+2026-04-26 03:10:56,157 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:10:56,681 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:10:56,682 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:10:56,682 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:10:56,721 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:11:00,168 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:11:00,171 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:00,171 arth-desktop AudioRecorder[9951] INFO Recording complete: 116 chunks, 36 speech chunks.
+2026-04-26 03:11:00,172 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:00,175 arth-desktop AudioRecorder[9951] INFO Saved audio to active_user_input.wav (RMS=0.0992)
+2026-04-26 03:11:00,294 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-26 03:11:01,634 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-26 03:11:01,743 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+206.1MB rss_peak=4592.8MB total_peak=4592.8MB elapsed=1.45s samples=11
+2026-04-26 03:11:01,743 arth-desktop InferenceGuard[9951] INFO Clear Cache command: After STT phase
+2026-04-26 03:11:01,841 arth-desktop STTGenerator[9951] INFO Transcription: I don't want to answer.
+2026-04-26 03:11:01,847 arth-desktop SpeechService[9951] DEBUG User heard: I don't want to answer.
+2026-04-26 03:11:01,968 arth-desktop InferenceGuard[9951] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-26 03:11:02,060 arth-desktop STTGenerator[9951] INFO STT model suspended. RSS freed: 94.5MB
+2026-04-26 03:11:02,061 arth-desktop SpeechService[9951] INFO [PHQ4] Declined by user (user_skip_phrase); falling through to breathing.
+2026-04-26 03:11:02 arth-desktop SpeechService[9951] INFO [PHQ4] Declined by user (user_skip_phrase); falling through to breathing.
+2026-04-26 03:11:02,078 arth-desktop SpeechService[9951] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=True, llm_done=True).
+2026-04-26 03:11:02,079 arth-desktop SpeechService[9951] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-26 03:11:02 arth-desktop SpeechService[9951] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-26 03:11:03,281 arth-desktop SpeechService[9951] DEBUG Agent Action: I'd like to start with a couple of questions about how you've been feeling lately.
+
+Are you adhering to the medication r...
+2026-04-26 03:11:03,282 arth-desktop TTSGenerator[9951] INFO Generating TTS for: 'I'd like to start with a couple of questions about how you've been feeling lately.
+
+Are you adhering to the medication regimen prescribed by your physician?' -> active_ai_response.wav
+2026-04-26 03:11:05,722 arth-desktop TTSGenerator[9951] INFO TTS generation successful.
+2026-04-26 03:11:05,723 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:05,725 arth-desktop AudioPlayer[9951] INFO Playing active_ai_response.wav via pygame mixer (7.8s)
+2026-04-26 03:11:13,487 arth-desktop AudioPlayer[9951] INFO Playback finished.
+2026-04-26 03:11:14,694 arth-desktop STTGenerator[9951] INFO STT model resumed. RSS delta: +25.3MB
+2026-04-26 03:11:14,695 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:11:15,208 arth-desktop AudioRecorder[9951] INFO Audio stream started and OS buffer flushed.
+2026-04-26 03:11:15,210 arth-desktop AudioRecorder[9951] INFO Listening (waiting for speech)...
+2026-04-26 03:11:15,211 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:11:15,238 arth-desktop AudioRecorder[9951] INFO Speech detected, recording started.
+2026-04-26 03:11:18,599 arth-desktop AudioRecorder[9951] INFO Audio stream stopped.
+2026-04-26 03:11:18,600 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:18,601 arth-desktop AudioRecorder[9951] INFO Recording complete: 113 chunks, 33 speech chunks.
+2026-04-26 03:11:18,601 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:18,605 arth-desktop AudioRecorder[9951] INFO Saved audio to active_user_input.wav (RMS=0.0524)
+2026-04-26 03:11:18,723 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-26 03:11:20,131 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-26 03:11:20,241 arth-desktop ResourceAudit[9951] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+199.4MB rss_peak=4613.2MB total_peak=4613.2MB elapsed=1.52s samples=12
+2026-04-26 03:11:20,242 arth-desktop InferenceGuard[9951] INFO Clear Cache command: After STT phase
+2026-04-26 03:11:20,336 arth-desktop STTGenerator[9951] INFO Transcription: questions for today.
+2026-04-26 03:11:20,339 arth-desktop SpeechService[9951] DEBUG User heard: questions for today.
+2026-04-26 03:11:20,343 arth-desktop IORecord[9951] INFO [USER] questions for today.
+2026-04-26 03:11:20 arth-desktop IORecord[9951] INFO [USER] questions for today.
+2026-04-26 03:11:20,348 arth-desktop SpeechService[9951] DEBUG [VRAM HANDOFF] Pre-unload: RAM: Mem:           7.4Gi       4.5Gi       260Mi        14Mi       2.7Gi       2.8Gi | GPU Load: 0.0% | MemAvail: 2821MB
+2026-04-26 03:11:20,470 arth-desktop InferenceGuard[9951] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-26 03:11:20,560 arth-desktop Questioner[9951] DEBUG Classifying user segments. Total segments: 1
+2026-04-26 03:11:20,561 arth-desktop STTGenerator[9951] INFO STT model suspended. RSS freed: 113.7MB
+2026-04-26 03:11:20,562 arth-desktop ResponseAnalyzer[9951] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-26 03:11:20 arth-desktop ResponseAnalyzer[9951] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-26 03:11:20,562 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:20,563 arth-desktop ResponseAnalyzer[9951] DEBUG Original question: Are you adhering to the medication regimen prescribed by your physician?
+2026-04-26 03:11:20,563 arth-desktop SpeechService[9951] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+2026-04-26 03:11:20,563 arth-desktop ResponseAnalyzer[9951] DEBUG User input: questions for today
+2026-04-26 03:11:20,564 arth-desktop LLMClient[9951] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-26 03:11:20,565 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+I0000 00:00:1777187480.570709    9951 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777187480.570840    9951 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777187480.572624    9951 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777187480.572654    9951 session_basic.cc:301] <|turn>user
+You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
+You will be provided with:
+1. All dimension names.
+2. The example user inputs with their dimensions and scores. The example will be provided in the following format: {"in": "[USER_INPUT]", "res": "DIMENSION, SCORE"}
+
+Your goal is:
+To assign the user input with DIMENSION and SCORE.
+
+Input format:
+- You may receive either a plain user input (the user's utterance), or a paired context:
+  Question: <original question>
+  Answer: <user answer>
+- When a question is provided, ALWAYS classify the user's answer in the context of the given question.
+
+All dimension names are:{
+    weight, mood, medication, care, house, talk, emo, safe, risk, sleep, eat, work, work_dayoff,
+    showup, finance, nutrition, problem, support, family, drug, ciga, alcohol, hobbies, creativity, community, 
+    support, social, comfortable, protection, productivity, work_motivation, coping, sib, arrest,legal, hygiene, sports, 
+    Yes, No, Maybe, Question, Stop
+}
+
+The definition of each dimension are:
+    weight: Maintaining stable weight
+    mood: Managing mood 
+    medication: Taking medication as prescribed
+    care: Participating primary and mental health care
+    house: Organizing personal possessions and doing housework
+    talk: Talking to other people
+    emo: Expressing feelings to other people
+    safe: Managing personal safety
+    risk: Managing risk
+    sleep: Following regular schedule for bedtime and sleeping enough
+    eat: Maintaining regular schedule for eating
+    work: Managing work/school
+    work_dayoff: Having work-life balance
+    showup: Showing up for appointments and obligations
+    finance: Managing finance and items of value 
+    nutrition: Getting adequate nutrition
+    problem: Problem solving and decision making capability
+    support: Family support
+    family: Family relationship
+    alcohol: Alcohol abuse
+    ciga: Tobacco abuse
+    drug: Other substances abuse
+    hobbies: Enjoying personal choices for leisure activities
+    creativity: Creativity
+    community: Participation in community
+    social: Support from social network and relationships with friends and colleagues
+    comfortable: Managing boundaries in close relationship
+    protection: Managing sexual safety
+    productivity: Productivity at work or school
+    work_motivation: Motivation at work or school
+    coping: Coping skills to de-stress
+    sib: Exhibiting control over self-harming behavior
+    arrest: Law-abiding
+    legal: Managing legal issue
+    hygiene: Maintaining personal hygiene
+    sports: Doing exercises and sports
+    Yes: The user expressed acceptance, agreement, or affirmation to the question.
+    No: The user expressed rejection, disagreement, or negation to the question.
+    Maybe: The user expressed uncertainty, hesitation, or ambivalence about the question.
+    Question: The user expressed a question or inquiry about the question.
+    Stop: The user expressed a desire to end the conversation or terminate the interaction.
+
+
+
+There are some dimensions that may be confusing, to distinguish them:
+1. eat cares if the user eats regularly and nutrition cares more about whether the user eats enough good food for nutrition.
+2. mood cares about the feeling of the user, while emo cares about whether the user is able to express their feelings to others.
+3. safe concerns the safety of users' lives, while risk cares if the user is taking any risks. 
+
+If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
+
+The score ranges from 0 to 2, where:
+0 indicates that the user performs well in this dimension;
+1 indicates that the user has some problems in this dimension, but no immediate action is needed;
+2 indicates a need for heightened attention from health-care providers;
+
+If the user input does not belong to any of these dimension, the "DIMENSION, SCORE" will be: "Other, 0" 
+
+The example user inputs with their dimensions and scores: 
+{"in":"Yes, I do.", "res": "Yes, 0"}
+{"in":"My weight doesn't change.", "res": "weight, 0"}
+{"in":"I didn't measure my weight recently.", "res": "weight, 2"}
+{"in":"My weight has increased a lot these days.", "res": "weight, 2"}
+{"in":"I get some weight these days.", "res": "weight, 1"}
+{"in":"My emotions are out of my control.", "res": "mood, 2"}
+{"in":"I don't have a therapist.", "res": "care, 0"}
+{"in":"I don't have a psychiatrist.", "res": "care, 0"}
+{"in":"I haven't visited my prescriber for a while.", "res": "medication, 2"}
+{"in":"I haven't gone to my case manager for a while.", "res": "care, 2"}
+{"in":"I often don't eat regularly.", "res": "eat, 2"}
+{"in":"I occasionally miss breakfast.", "res": "eat, 1"}
+{"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
+{"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+
+
+Question: Are you adhering to the medication regimen prescribed by your physician?
+Answer: questions for today<turn|>
+<|turn>model
+
+I0000 00:00:1777187497.299180    9951 session_basic.cc:485] RunDecodeSync
+2026-04-26 03:11:37,805 arth-desktop LLMClient[9951] DEBUG [Heartbeat] LLM inference in progress... Time elapsed: 17s. Role: analyzer. Model: gemma-4-E2B-it.
+2026-04-26 03:11:37,806 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-26 03:11:37,806 arth-desktop LLMClient[9951] DEBUG Received response for LLM (client.responses) after 17.24s (role=analyzer)
+2026-04-26 03:11:37,807 arth-desktop SpeechService[9951] INFO [INTERMISSION] Pre-wait activity: SCREENING
+2026-04-26 03:11:37 arth-desktop SpeechService[9951] INFO [INTERMISSION] Pre-wait activity: SCREENING
+2026-04-26 03:11:37,810 arth-desktop ResponseBridge[9951] DEBUG Normalizing dimension and score: dim=medication, score=0
+2026-04-26 03:11:37,810 arth-desktop SpeechService[9951] INFO [PHQ4] Asking screening question: gad_2
+2026-04-26 03:11:37 arth-desktop SpeechService[9951] INFO [PHQ4] Asking screening question: gad_2
+2026-04-26 03:11:37,811 arth-desktop Questioner[9951] DEBUG Segment classified: 'questions for today' -> (dim: medication, val: 0)
+2026-04-26 03:11:37,811 arth-desktop SpeechService[9951] DEBUG Agent Action: Give me just a moment. In the meantime, I'd like to ask... Over the last 2 weeks, how often have you been bothered by no...
+2026-04-26 03:11:37,811 arth-desktop Questioner[9951] INFO [DLA] Classification result: [('medication', 0)]
+2026-04-26 03:11:37 arth-desktop Questioner[9951] INFO [DLA] Classification result: [('medication', 0)]
+2026-04-26 03:11:37,812 arth-desktop TTSGenerator[9951] INFO Generating TTS for: 'Give me just a moment. In the meantime, I'd like to ask... Over the last 2 weeks, how often have you been bothered by not being able to stop or control worrying?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.' -> active_ai_response.wav
+2026-04-26 03:11:37,829 arth-desktop IORecord[9951] DEBUG Logged Reasoning (semantic_scores) to DB.
+2026-04-26 03:11:37,830 arth-desktop Questioner[9951] DEBUG Evaluating result for item 3, question 1.
+2026-04-26 03:11:37,830 arth-desktop Questioner[9951] DEBUG Processing dla_result entry: medication, 0
+2026-04-26 03:11:37,830 arth-desktop Questioner[9951] INFO [SCORE] dim=medication score=0 (via Response Analyzer)
+2026-04-26 03:11:37 arth-desktop Questioner[9951] INFO [SCORE] dim=medication score=0 (via Response Analyzer)
+2026-04-26 03:11:37,839 arth-desktop Questioner[9951] DEBUG Appended note to question_lib[3][1]['notes'].
+2026-04-26 03:11:37,839 arth-desktop Questioner[9951] INFO [QUESTIONER] Finished dim S=3. Reward (mean (paper §5.1 / legacy)): 0.00
+2026-04-26 03:11:37 arth-desktop Questioner[9951] INFO [QUESTIONER] Finished dim S=3. Reward (mean (paper §5.1 / legacy)): 0.00
+2026-04-26 03:11:37,839 arth-desktop RLQTables[9951] DEBUG Getting environment feedback: S=0, A=3, reward=0.0, terminate_flag=0, item_mask=[0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+2026-04-26 03:11:37,839 arth-desktop RLQTables[9951] INFO [RL] Reward this turn: 0.0 (next state: dim=3)
+2026-04-26 03:11:37 arth-desktop RLQTables[9951] INFO [RL] Reward this turn: 0.0 (next state: dim=3)
+2026-04-26 03:11:37,842 arth-desktop HandlerRL[9951] DEBUG Q update applied at action: Q(S=0,A=3) 99.0 -> 94.05000000000001 (target=89.10000000000001)
+2026-04-26 03:11:37,843 arth-desktop RLQTables[9951] DEBUG Choosing action for state 3 (epsilon=1.000)
+2026-04-26 03:11:37,844 arth-desktop RLQTables[9951] DEBUG Mask before: [0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-26 03:11:37,846 arth-desktop RLQTables[9951] DEBUG Q-values after masking: [0.0,5.0,98.0,0.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,97.0,5.0,5.0,5.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+2026-04-26 03:11:37,849 arth-desktop RLQTables[9951] INFO [RL] Exploiting: best dims ['2'] with Q-value 98.0
+2026-04-26 03:11:37 arth-desktop RLQTables[9951] INFO [RL] Exploiting: best dims ['2'] with Q-value 98.0
+2026-04-26 03:11:37,850 arth-desktop RLQTables[9951] INFO [RL] Action chosen: dim=2 (mood)
+2026-04-26 03:11:37 arth-desktop RLQTables[9951] INFO [RL] Action chosen: dim=2 (mood)
+2026-04-26 03:11:37,859 arth-desktop IORecord[9951] DEBUG Logged Reasoning (rl_decision) to DB.
+2026-04-26 03:11:37,859 arth-desktop Questioner[9951] INFO [QUESTIONER] Starting turn for dim state S=2.
+2026-04-26 03:11:37 arth-desktop Questioner[9951] INFO [QUESTIONER] Starting turn for dim state S=2.
+2026-04-26 03:11:37,860 arth-desktop ResponseAnalyzer[9951] INFO [PIPELINE] Rephraser — varying question wording for this turn.
+2026-04-26 03:11:37 arth-desktop ResponseAnalyzer[9951] INFO [PIPELINE] Rephraser — varying question wording for this turn.
+2026-04-26 03:11:37,860 arth-desktop ResponseAnalyzer[9951] DEBUG Original question: How's your mood recently?
+2026-04-26 03:11:37,860 arth-desktop LLMClient[9951] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rephraser, model=gemma-4-E2B-it)
+2026-04-26 03:11:37,861 arth-desktop InferenceGuard[9951] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rephraser
+I0000 00:00:1777187497.864137    9951 model_data_processor_factory.cc:361] Creating Gemma4DataProcessor
+W0000 00:00:1777187497.864196    9951 mel_filterbank.cc:137] Missing 10 bands  starting at 0 in mel-frequency design. Perhaps too many channels or not enough frequency resolution in spectrum. (fft_length: 257 sample_rate: 16000 mel_channel_count: 128 lower_frequency_limit: 0 upper_frequency_limit: 8000
+I0000 00:00:1777187497.864981    9951 session_basic.cc:299] RunPrefill: 
+I0000 00:00:1777187497.864997    9951 session_basic.cc:301] <|turn>user
+You are a therapist-assistant with strong psychology and mental-health knowledge.
+
+You will be provided with a therapist-validated screening question:
+{"Original Question": "..."}
+
+Your ONLY task is STRUCTURAL rephrasing:
+- Vary sentence structure (word order, clause arrangement).
+- Vary vocabulary (synonyms that preserve clinical meaning).
+- PRESERVE the clinical intent, the screening dimension, and the time frame.
+
+STRICT RULES:
+- Do NOT change what the question is asking about.
+- Do NOT add or remove conditions, timeframes, or scope.
+- Do NOT reframe into a different clinical construct.
+- Do NOT soften, broaden, or narrow the clinical target.
+- Do NOT ask a different question, even if it seems more natural.
+- Output exactly ONE rephrased question.
+
+Response format:
+REPHRASER: <rephrased question>
+
+Example 1:
+{"Original Question": "Do you have coping skills to help you calm down?"}
+REPHRASER: Do you have strategies that help you calm yourself when you are upset?
+
+Example 2:
+{"Original Question": "Are you involved in any legal issues recently?"}
+REPHRASER: Are you dealing with any legal issues right now?
+
+Example 3:
+{"Original Question": "How's your mood recently?"}
+REPHRASER: How would you describe your mood recently?
+
+Example 4:
+{"Original Question": "Have your weight changed significantly recently?"}
+REPHRASER: Have you noticed any significant changes in your weight lately?
+
+
+{"Original Question": "How's your mood recently?"}<turn|>
+<|turn>model
+
+I0000 00:00:1777187507.620621    9951 session_basic.cc:485] RunDecodeSync
+2026-04-26 03:11:48,799 arth-desktop LLMClient[9951] DEBUG [Heartbeat] LLM inference in progress... Time elapsed: 11s. Role: rephraser. Model: gemma-4-E2B-it.
+2026-04-26 03:11:48,799 arth-desktop InferenceGuard[9951] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rephraser
+2026-04-26 03:11:48,800 arth-desktop LLMClient[9951] DEBUG Received response for LLM (client.responses) after 10.94s (role=rephraser)
+2026-04-26 03:11:48,800 arth-desktop Questioner[9951] DEBUG [REPHRASER] 'How's your mood recently?' -> 'What has been your mood like recently?'
+2026-04-26 03:11:48,801 arth-desktop TTSGenerator[9951] INFO TTS generation successful.
+2026-04-26 03:11:48,801 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:48,803 arth-desktop AudioPlayer[9951] INFO Playing active_ai_response.wav via pygame mixer (15.2s)
+2026-04-26 03:11:48,816 arth-desktop IORecord[9951] INFO [AGENT] What has been your mood like recently?
+2026-04-26 03:11:48 arth-desktop IORecord[9951] INFO [AGENT] What has been your mood like recently?
+2026-04-26 03:11:48,817 arth-desktop IORecord[9951] DEBUG Waiting for user answer...
+2026-04-26 03:11:57,040 arth-desktop MainApp[9951] INFO Application interrupted.
+2026-04-26 03:11:57,068 arth-desktop AudioPlayer[9951] INFO Playback finished.
+2026-04-26 03:11:57,193 arth-desktop AudioRecorder[9951] INFO Background music stopped.
+2026-04-26 03:11:57,195 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-26 03:11:58,320 arth-desktop GPIOManager[9951] DEBUG GPIO cleanup error (stub?): release unlocked lock
+2026-04-26 03:11:58,323 arth-desktop STTGenerator[9951] INFO STT model resumed. RSS delta: +28.2MB
+2026-04-26 03:11:58,323 arth-desktop GPIOManager[9951] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-26 03:11:58,323 arth-desktop SpeechService[9951] ERROR Error in speech service loop: [Errno -9996] Invalid input device (no default output device)
+2026-04-26 03:11:58,324 arth-desktop ResourceAudit[9951] INFO [Baseline RAM]: 0.08 GB used at process baseline
+2026-04-26 03:11:58,325 arth-desktop ResourceAudit[9951] INFO [Static Load]: +0.45 GB consumed on module init (STT/FasterWhisperModelInit)
+2026-04-26 03:11:58,325 arth-desktop ResourceAudit[9951] INFO [Dynamic Spike]: +0.22 GB during peak zone (STT/FasterWhisper)
+2026-04-26 03:11:58,326 arth-desktop ResourceAudit[9951] INFO [The Culprit]: Static STT model load dominates resident memory before first user turn.
+2026-04-26 03:11:58,326 arth-desktop ResourceAudit[9951] INFO [Refactor/CAP Recommendation]: Keep Faster-Whisper at int8/base.en or smaller and avoid loading extra SER backends in parallel.
+2026-04-26 03:11:58,330 arth-desktop ResourceAudit[9951] INFO [RESOURCE_REPORT] data/logs/resource_map_latest.json
+2026-04-26 03:11:58,439 arth-desktop ResourceAudit[9951] INFO [Baseline RAM]: 0.08 GB used at process baseline
+2026-04-26 03:11:58,441 arth-desktop ResourceAudit[9951] INFO [Static Load]: +0.45 GB consumed on module init (STT/FasterWhisperModelInit)
+2026-04-26 03:11:58,441 arth-desktop ResourceAudit[9951] INFO [Dynamic Spike]: +0.22 GB during peak zone (STT/FasterWhisper)
+2026-04-26 03:11:58,441 arth-desktop ResourceAudit[9951] INFO [The Culprit]: Static STT model load dominates resident memory before first user turn.
+2026-04-26 03:11:58,442 arth-desktop ResourceAudit[9951] INFO [Refactor/CAP Recommendation]: Keep Faster-Whisper at int8/base.en or smaller and avoid loading extra SER backends in parallel.
+2026-04-26 03:11:58,448 arth-desktop ResourceAudit[9951] INFO [RESOURCE_REPORT] data/logs/resource_map_latest.json
+2026-04-26 03:11:58,490 arth-desktop TherapistReport[9951] INFO [REPORT] Wrote clinical report: /home/arth/project/data/clinical/clinical_report_Kendall_4.csv (1 scored dims, 0 interventions, 7 turns, 0 crisis rows)
+2026-04-26 03:11:58,507 arth-desktop IORecord[9951] DEBUG [DOSSIER] Saved 2 interactions to /home/arth/project/data/sessions/session_Kendall_20260426_030954.json

@@ -16,6 +16,8 @@
 #   JETSON_PROJECT_DIR  default ~/project
 #   SKIP_SYNC=1         skip step 1 (e.g. no code changed)
 #   SKIP_KILL=1         skip step 2 (dangerous; only if you know the Jetson is idle)
+#   LAUNCHER=start_therapist.sh   use clinician-view launcher (default: jetson_run.sh).
+#                                  Accepts the bare name of any *.sh in the project root.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,7 +52,14 @@ else
         echo "[laptop_deploy] WARN: jetson_kill reported survivors (see above)"
 fi
 
-echo "[step 3/3] ssh jetson_run.sh (streaming)"
+LAUNCHER="${LAUNCHER:-jetson_run.sh}"
+# Basic validation: must be a script in the project root, no path separators.
+if [[ "$LAUNCHER" == *"/"* ]]; then
+    echo "[laptop_deploy] ERROR: LAUNCHER must be a bare filename, got: $LAUNCHER" >&2
+    exit 2
+fi
+
+echo "[step 3/3] ssh $LAUNCHER (streaming)"
 echo "           Ctrl+C here to detach; the remote process keeps running."
 echo ""
-ssh -t $SSH_OPTS "$JETSON_HOST" "bash $REMOTE_DIR/jetson_run.sh"
+ssh -t $SSH_OPTS "$JETSON_HOST" "bash $REMOTE_DIR/$LAUNCHER"

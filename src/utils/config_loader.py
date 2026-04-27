@@ -29,17 +29,49 @@ APP = _CFG["app"]
 PATHS = _CFG["paths"]
 RL = _CFG["rl"]
 
+# Config-level default subject_id is a *boot-time fallback* only. The real
+# subject identity is captured per session during onboarding ("Who am I
+# speaking with today?"), then composed into "<name>_<YYYYMMDD_HHMMSS>"
+# inside io_record.init_record() so every session — even two for the same
+# person — lands in its own file entry. reset_session() installs that
+# composed id into io_record.SUBJECT_ID.
 SUBJECT_ID = str(APP["subject_id"])
 
-def _expand(path: str) -> str:
-    return path.replace("${subject_id}", SUBJECT_ID)
+# Raw, unexpanded templates — filled in by format_result_paths() at the
+# moment a session starts so artefacts are session-scoped.
+REPORT_FILE_TEMPLATE = PATHS["report_file"]
+NOTES_FILE_TEMPLATE = PATHS["notes_file"]
+
+
+def _expand(path: str, subject_id: str = SUBJECT_ID) -> str:
+    """Fill ${subject_id} in a config path with the composed session id."""
+    return path.replace("${subject_id}", str(subject_id or SUBJECT_ID))
+
+
+def format_result_paths(subject_id: str) -> tuple[str, str]:
+    """Return (report_path, notes_path) for a given composed subject id.
+
+    The `subject_id` passed in is expected to already carry the session
+    timestamp (e.g. "alice_20260425_190621") — io_record.init_record is
+    responsible for that composition. That single transform is what
+    makes each session a distinct file entry.
+    """
+    return (
+        _expand(REPORT_FILE_TEMPLATE, subject_id),
+        _expand(NOTES_FILE_TEMPLATE, subject_id),
+    )
+
 
 DATA_DIR = _expand(PATHS["data_dir"])
 LOG_DIR = _expand(PATHS["logs_dir"])
 RESULT_DIR = _expand(PATHS["result_dir"])
 QUESTION_LIB_FILENAME = _expand(PATHS["question_lib_filename"])
-REPORT_FILE = _expand(PATHS["report_file"])
-NOTES_FILE = _expand(PATHS["notes_file"])
+# REPORT_FILE / NOTES_FILE retain a boot-time fallback expansion so any
+# diagnostic caller that imports them gets a valid (pre-session) path.
+# All production writers go through io_record.REPORT_FILE / NOTES_FILE,
+# which are rewritten at init_record() per onboarded subject.
+REPORT_FILE = _expand(REPORT_FILE_TEMPLATE, SUBJECT_ID)
+NOTES_FILE = _expand(NOTES_FILE_TEMPLATE, SUBJECT_ID)
 RECORD_CSV = _expand(PATHS["record_csv"])
 
 ITEM_N_STATES = int(RL["item_n_states"])
@@ -55,6 +87,31 @@ NUMBER_QUESTIONS = RL["number_questions"]
 REPHRASE_AT_RUNTIME = bool(RL.get("rephrase_at_runtime", True))
 REPHRASE_PROBABILITY = float(RL.get("rephrase_probability", 0.95))
 
+# Legacy-parity gates. All default False so the runtime flow mirrors
+# the demo video; flip via config.yaml to re-enable the paper/research
+# extensions one at a time.  See config.yaml for detailed descriptions
+# and re-enablement checklists.
+#
+# Pipeline-shape gates (G5/G8/G9):
+#   REASK_DIMENSION_N         — paper §4.2 Dimension_N re-ask
+#   MULTI_DIM_BACKFILL_ENABLED — paper §4.1 multi-dim back-fill (2 passes)
+#   REFLECTIVE_SUMMARIZER_ENABLED — paper §5.2 MI reflective summarizer
+#
+# Session-lifecycle gates (G11-G15):
+#   WARM_START_ENABLED        — returning-user Q-table nudge + recall greeting
+#   SESSION_ANALYSIS_ENABLED  — post-session SUMMARY + preferences + safety LLM pass
+#   SOAP_REPORT_ENABLED       — SOAP-format clinician note at session end
+#   DIMENSION_OPTOUTS_ENABLED — per-user `disabled_dim:<label>` preference masking
+#   SESSION_CAP_ENABLED       — 60-minute hard session-length cap
+REASK_DIMENSION_N = bool(RL.get("reask_dimension_n", False))
+MULTI_DIM_BACKFILL_ENABLED = bool(RL.get("multi_dim_backfill_enabled", False))
+REFLECTIVE_SUMMARIZER_ENABLED = bool(RL.get("reflective_summarizer_enabled", False))
+WARM_START_ENABLED = bool(RL.get("warm_start_enabled", False))
+SESSION_ANALYSIS_ENABLED = bool(RL.get("session_analysis_enabled", False))
+SOAP_REPORT_ENABLED = bool(RL.get("soap_report_enabled", False))
+DIMENSION_OPTOUTS_ENABLED = bool(RL.get("dimension_optouts_enabled", False))
+SESSION_CAP_ENABLED = bool(RL.get("session_cap_enabled", False))
+
 # Per-dimension reward aggregation mode: "mean" = paper §5.1 / legacy
 # prototype arithmetic mean; "hybrid" = (max+mean)/2, our default, keeps
 # sensitivity to high-severity single segments. Any unknown value falls
@@ -69,13 +126,45 @@ LITERT_MODEL_PATH = os.environ.get(
     "LITERT_MODEL_PATH", "./models/litert/gemma-4-E2B-it.litertlm"
 )
 LITERT_BACKEND = os.environ.get("LITERT_BACKEND", "cpu").strip().lower()
-# Paper-aligned sizing: the RV Validator / Guide prompts alone are ~500
-# tokens (long system prompt + multi-example few-shot), and the expected
-# output is 3-5 sentences (~120 tokens).  2048 ctx + 512 max_tokens gives
-# the Validator, CBT stages, and closing reflections room to produce the
-# paragraph-length outputs the paper demonstrates.
-LITERT_CONTEXT_LENGTH = int(os.environ.get("LITERT_CONTEXT_LENGTH", "2048"))
-LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "512"))
+# Engine-level capacity. litert_lm.Engine takes `max_num_tokens` at
+# construction (applies to every call until teardown); there is no
+# per-call override on send_message in this version of the library.
+# We set it generously (4096) so paragraph-length Validator / CBT-Guide
+# outputs — the ones that mirror the demo's "It makes sense that you
+# always forget... A few steps that can help... Ask your prescriber..."
+# style — are never clipped mid-sentence.  Smaller roles (Reasoner,
+# Analyzer) self-limit via their prompts ("DECISION: 0/1 only"), so the
+# generous ceiling does not cost latency there.
+LITERT_CONTEXT_LENGTH = int(os.environ.get("LITERT_CONTEXT_LENGTH", "4096"))
+LITERT_MAX_TOKENS = int(os.environ.get("LITERT_MAX_TOKENS", "4096"))
+
+# Informational per-role soft budgets. Today Gemma-4-E2B is the sole
+# backend and cannot take per-call max-token overrides, so these values
+# are not wired through to the engine — they document intended output
+# length per role for future multi-engine deployments where the map in
+# `src/models/llm_client.py::ROLE_MODEL_MAP` is split across models.
+#
+# Budgets are chosen to match the demo video's observed output length:
+#   RV_VALIDATOR    : 3-5 sentence MI reflection + concrete strategies
+#   RV_GUIDE        : long enumerations ("you think X; you fear Y; ...")
+#   CBT_GUIDE       : long enumerations for Stage-1 unhelpful thoughts
+#   CBT_REASONER    : single "DECISION: 0/1" line
+#   RV_REASONER     : single "DECISION: 0/1" line
+#   ANALYZER        : terse (dim, score) pair
+#   REPHRASER       : 1-2 sentence structural rewrite
+#   REFLECTIVE_SUMM : 1st->3rd person restatement, 1 sentence
+#   GENERAL         : greeting / closing / session-analysis summary
+ROLE_MAX_TOKENS: dict[str, int] = {
+    "rv_validator": 512,
+    "rv_guide": 512,
+    "cbt_guide": 512,
+    "cbt_reasoner": 96,
+    "rv_reasoner": 96,
+    "analyzer": 96,
+    "rephraser": 160,
+    "reflective_summarizer": 160,
+    "general": 400,
+}
 
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
 LLM_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "90"))

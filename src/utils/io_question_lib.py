@@ -2,7 +2,6 @@
 import json
 import csv
 import os
-from src.utils.config_loader import REPORT_FILE, NOTES_FILE
 
 def load_question_lib(path: str):
     with open(path, "r", encoding="utf-8") as f:
@@ -15,9 +14,18 @@ def save_question_lib(path: str, question_lib: dict):
 def generate_results(
     question_lib: dict,
     new_response: list,
-    report_file: str = REPORT_FILE,
-    notes_file: str = NOTES_FILE
+    report_file: str | None = None,
+    notes_file: str | None = None,
 ):
+    # Default destinations come from io_record so they reflect the
+    # *current* session's onboarded subject + timestamp, not the
+    # boot-time fallback baked into config_loader at import time.
+    if report_file is None or notes_file is None:
+        from src.utils import io_record
+        if report_file is None:
+            report_file = io_record.REPORT_FILE
+        if notes_file is None:
+            notes_file = io_record.NOTES_FILE
     os.makedirs(os.path.dirname(report_file), exist_ok=True)
     os.makedirs(os.path.dirname(notes_file), exist_ok=True)
 

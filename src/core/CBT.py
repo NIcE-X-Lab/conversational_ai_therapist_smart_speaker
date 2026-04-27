@@ -2,30 +2,217 @@
 import re
 
 from src.models.llm_client import llm_complete, LLMRole
-from src.core.therapy_content import CBT_ESCALATION_MESSAGE
+from src.core.therapy_content import CBT_ESCALATION_ENABLED, CBT_ESCALATION_MESSAGE
 
 
 def _parse_decision(raw: str, default: str = "1") -> str:
-    """Strictly parse a Reasoner's 'DECISION: 0/1' line.
+    """Parse a Reasoner's DECISION output using legacy substring semantics.
 
-    The legacy parser `"0" if "0" in raw else "1"` false-passed any stray
-    zero in prose ("there are 0 signs of distortion...").  The paper spec
-    (p.10, Fig.9) requires the Reasoner to emit a single-line decision;
-    we enforce it here and fail-closed to `default` (unhelpful thought
-    NOT properly identified → retry) on ambiguity.
+    Demo-parity note: the legacy prototype / paper used plain substring
+    detection (`"0" if "0" in raw else "1"`). Gemma-4-E2B on-device does
+    not always emit the literal `DECISION:` header that the paper's
+    GPT-4 Reasoner reliably produced; under a strict regex parser that
+    drops us into unnecessary retry loops and the demo's single-shot
+    CBT Stage-1/2/3 flow breaks.
+    Kept here as a dedicated function (not inlined) so the trade-off is
+    documented and easy to tighten again if a stricter backend is wired
+    in via ROLE_MODEL_MAP.
+    """
+    return "0" if (raw and "0" in raw) else "1"
+
+
+# ── Number-word parsing for CBT Stage 0 selection ────────────────────────────
+# Maps cardinal + ordinal English number words 1-10 to their integer value,
+# so a spoken reply like "Three." / "the third one" / "I'd like option two"
+# resolves cleanly.  STT rarely emits numerals for small integers on
+# Jetson-deployed faster-whisper, so without this mapping CBT Stage 0
+# fails for voice users (observed in session 14 / Sally, 2026-04-25 —
+# "Three." → regex-digit match fails → CBT aborted).
+_NUMBER_WORDS: dict[str, int] = {
+    # cardinals
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    # ordinals (informal spoken selections)
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+    "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+}
+
+
+def _extract_choice_number(answer: str) -> int | None:
+    """Parse a spoken CBT Stage 0 selection into an integer 1-based index.
+
+    Accepts (in order of preference):
+      1. Any embedded digit(s) via regex, e.g. "2" / "option 3" / "I pick 4."
+      2. Any cardinal / ordinal word from ``_NUMBER_WORDS``, e.g. "three",
+         "the third one", "number four please".
+    Returns None when no number can be resolved.
+    """
+    if not answer:
+        return None
+    ans = str(answer).strip().lower()
+    if not ans:
+        return None
+
+    # Prefer explicit digits when present — the user dictated a numeral.
+    digit_match = re.findall(r"\d+", ans)
+    if digit_match:
+        try:
+            return int(digit_match[0])
+        except ValueError:
+            pass
+
+    # Word-form fallback: tokenize on non-alpha, match first known word.
+    for tok in re.findall(r"[a-z]+", ans):
+        if tok in _NUMBER_WORDS:
+            return _NUMBER_WORDS[tok]
+    return None
+
+
+# ── CBT Guide output sanitizer ───────────────────────────────────────────────
+# Gemma-4-E2B sometimes echoes the full few-shot template back (including
+# the prompt labels STATEMENT / UNHELPFUL_THOUGHTS / CHALLENGE / REFRAME)
+# instead of returning only the target label's content.  The legacy demo
+# used GPT-3.5/4 which reliably emitted just the target label, so this
+# sanitizer is a Gemma-specific cleanup step — not a divergence from the
+# clinical contract, just a small-LLM output hygiene step.
+#
+# The few-shot examples are written in first-person ("I can challenge
+# this thought by asking myself...") because they illustrate what the
+# user could *internally* say.  When spoken aloud by CaiTI, those first-
+# person lines confuse the listener — is CaiTI speaking as them?  A
+# simple pronoun swap lifts the framing to second-person so the user
+# hears it as an offered example.
+_GUIDE_LABELS = ("UNHELPFUL_THOUGHTS", "CHALLENGE", "REFRAME")
+
+_FIRST_TO_SECOND_PERSON = [
+    # Order matters — longer/more-specific patterns first so "I can" doesn't
+    # pre-empt bare "I".  Word boundaries (\b) prevent mangling names like
+    # "Ian" or words like "India".
+    # Contractions first.
+    (r"\bI'm\b", "you're"),
+    (r"\bI'd\b", "you'd"),
+    (r"\bI'll\b", "you'll"),
+    (r"\bI've\b", "you've"),
+    # Modal / auxiliary + verb combinations commonly seen in CBT example
+    # phrasing ("I can challenge", "I could ask myself", etc.).
+    (r"\bI\s+can\b", "you can"),
+    (r"\bI\s+could\b", "you could"),
+    (r"\bI\s+might\b", "you might"),
+    (r"\bI\s+should\b", "you should"),
+    (r"\bI\s+would\b", "you would"),
+    (r"\bI\s+need\b", "you need"),
+    (r"\bI\s+want\b", "you want"),
+    (r"\bI\s+have\b", "you have"),
+    (r"\bI\s+am\b", "you are"),
+    (r"\bI\s+was\b", "you were"),
+    (r"\bI\s+will\b", "you will"),
+    (r"\bI\s+do\b", "you do"),
+    (r"\bI\s+did\b", "you did"),
+    # Bare "I <verb>" — catches past-tense / present-tense verbs that
+    # didn't match the modal patterns above.  Requires "I " followed by
+    # an alphabetic word so "I." and "I?" are left alone.
+    (r"\bI\s+(?=[a-z])", "you "),
+    # Question-initial "Have I...", "Am I...", "Can I...", "Did I..." →
+    # "Have you...", etc.  This must run AFTER the bare "I " rule so
+    # "Have I noticed" becomes "Have you noticed" (via "I noticed" →
+    # "you noticed") rather than a messy double-swap.
+    (r"(^|[.!?]\s+)I\s", r"\1You "),
+    # Object / possessive pronouns.
+    (r"\bmyself\b", "yourself"),
+    (r"\bmine\b", "yours"),
+    (r"\bmy\b", "your"),
+    (r"\bme\b", "you"),
+]
+
+
+def _sanitize_guide_text(raw: str, target_label: str) -> str:
+    """Clean an LLM Guide output for user-facing speech.
+
+    Handles three Gemma failure modes observed in Hudson's session 16
+    (2026-04-26):
+      1. The model echoes the prompt's STATEMENT / UNHELPFUL_THOUGHTS
+         lines verbatim before the actual guidance.  These confuse the
+         listener ("STATEMENT: I just feel like..." sounds like CaiTI is
+         reading back what the user said, not offering help).
+      2. The model includes the target label header as a prefix
+         (e.g. "CHALLENGE: ...") — fine in the DB note but awkward in
+         speech.
+      3. The few-shot examples are first-person; Gemma mimics that
+         register, so the offered guidance sounds like CaiTI is
+         narrating the user's internal monologue.
+
+    Strategy: find the target label (e.g. "CHALLENGE:") and keep only
+    what follows.  If no target label is present, drop any stray
+    STATEMENT / UNHELPFUL_THOUGHTS lines and use the remainder.  Then
+    swap first-person pronouns to second-person.  Finally, prefix with
+    "Here's an example you could try:" so the user knows this is offered
+    guidance, not a statement or a question being asked of them.
     """
     if not raw:
-        return default
-    # Prefer the last `DECISION:` line to tolerate small preamble drift.
-    for line in reversed(raw.strip().splitlines()):
-        m = re.search(r"DECISION\s*[:=]\s*([01])", line, re.IGNORECASE)
-        if m:
-            return m.group(1)
-    # Fallback: a bare first-line "0" or "1" token (no prose).
-    first = raw.strip().splitlines()[0].strip() if raw.strip() else ""
-    if first in ("0", "1"):
-        return first
-    return default
+        return ""
+
+    text = str(raw).strip()
+
+    # 1. Extract content after the target label when present.  Stage-N
+    # Reasoner / Guide outputs may come as "CHALLENGE: <content>" or
+    # with the label at the start of the last line after a prefix of
+    # echoed STATEMENT / UNHELPFUL_THOUGHTS lines.
+    label_upper = target_label.upper()
+    match = re.search(
+        rf"{label_upper}\s*:\s*(.+?)(?:\n\n|\Z)",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if match:
+        body = match.group(1).strip()
+    else:
+        # No target label — strip any leading STATEMENT / UNHELPFUL_THOUGHTS
+        # line so the user doesn't hear their own words played back.
+        lines = text.splitlines()
+        cleaned_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if any(stripped.upper().startswith(f"{lbl}:") for lbl in _GUIDE_LABELS):
+                continue
+            if stripped.upper().startswith("STATEMENT:"):
+                continue
+            cleaned_lines.append(line)
+        body = "\n".join(cleaned_lines).strip()
+
+    if not body:
+        # Sanitization dropped everything — fall back to the raw text
+        # minus any labels, so the user at least hears *something*.
+        body = re.sub(
+            rf"^(?:{'|'.join(_GUIDE_LABELS + ('STATEMENT',))})\s*:\s*",
+            "",
+            text,
+            flags=re.IGNORECASE | re.MULTILINE,
+        ).strip()
+
+    # 2. First-person → second-person pronoun swap (Gemma mimics the
+    # few-shot example register; lift to clinician voice).
+    for pattern, replacement in _FIRST_TO_SECOND_PERSON:
+        body = re.sub(pattern, replacement, body)
+
+    # 2a. Recapitalise sentence-initial "you" / "your" / "you're" etc.
+    # left lowercase by the pronoun swap.  `re.sub` with a lambda so we
+    # don't have to enumerate every pronoun form.
+    body = re.sub(
+        r"(^|[.!?]\s+)(you|your|yours|you're|you'd|you'll|you've|yourself)\b",
+        lambda m: m.group(1) + m.group(2)[0].upper() + m.group(2)[1:],
+        body,
+    )
+
+    # 3. Prefix with a framing line so the user knows this is an
+    # offered example and not the next CBT prompt.  The actual CBT
+    # re-ask question is still spoken separately right after.
+    framings = {
+        "UNHELPFUL_THOUGHTS": "Here are some unhelpful thoughts you could consider: ",
+        "CHALLENGE": "Here's an example challenge you could try: ",
+        "REFRAME": "Here's an example reframe you could try: ",
+    }
+    prefix = framings.get(label_upper, "Here's an example: ")
+    return prefix + body
 
 # Set up logger for this module
 from src.utils.log_util import get_logger
@@ -250,23 +437,29 @@ You will be provided with:
 
 
 Your goal is:
-Try to recognize negative thoughts. These thoughts that go through the patient's mind when he/she experience this issue. These thoughts can be self-critical, overly pessimistic, or unrealistic. You are trying to understand the patient's unhelpful thoughts, , so please answer the questions using the second person.
+Enumerate MULTIPLE distinct unhelpful thoughts that go through the patient's mind when they experience this issue. These thoughts can be self-critical, overly pessimistic, or unrealistic. Address the patient in the second person ("you think ...", "you fear ...").
+
+REQUIRED OUTPUT LENGTH: enumerate 3 to 5 distinct unhelpful thoughts, each as its own clause separated by semicolons. Do NOT output a single one-sentence guess. Each clause should start with a verb that names a cognitive distortion pattern: "you think ...", "you fear ...", "you worry ...", "you see ... as ...", "you assume ...". This matches the CaiTI clinical reference enumeration style.
 
 
 Response format:
-UNHELPFUL_THOUGHTS: xxxx
+UNHELPFUL_THOUGHTS: <clause 1>; <clause 2>; <clause 3>; <clause 4>; <optional clause 5>.
 
-You will be provideed with several examples with the statement and example unhelpful thoughts in the format of "STATEMENT: xxxxx, UNHELPFUL_THOUGHTS: xxxxxx". 
+You will be provided with several examples with the statement and example unhelpful thoughts in the format of "STATEMENT: xxxxx, UNHELPFUL_THOUGHTS: xxxxxx".
 
 
 
 Example 1:
-STATEMENT: I have not taken days off recently. Paper deadline is coming up! I don't even have time to sleep. 
-UNHELPFUL_THOUGHTS: Your unhelpful thoughts might be taking days off will hinder your progress on meeting the paper deadline.
+STATEMENT: I have not taken days off recently. Paper deadline is coming up! I don't even have time to sleep.
+UNHELPFUL_THOUGHTS: You think taking a day off will set your paper back irrecoverably; you fear that anything less than nonstop effort means you are slacking; you worry that your colleagues will judge you if you rest while the deadline is close; you see sleep as competing with productivity rather than supporting it; you assume that one missed work day cannot be recovered later.
 
 Example 2:
 STATEMENT: I don't chat a lot with my colleagues. I can talk to them about work, but I can't talk to them about life. I can't seem to find common ground for life conversations with them. My personal life is quite dull and lacks the variety of personal and family activities that they have.
-UNHELPFUL_THOUGHTS: Everyone will think you are boring so you don't chat with your colleagues might be your unhelpful thought.
+UNHELPFUL_THOUGHTS: You think your life is too dull to be interesting to anyone; you fear they will find you boring the moment the conversation leaves work topics; you worry that not having big family or activity stories means you have nothing worth sharing; you see small-talk skill as something you either have or lack entirely; you assume a few awkward exchanges prove you cannot connect socially at all.
+
+Example 3 (TARGET SHAPE — enumerate this many clauses in this register):
+STATEMENT: I just always forget to take my medication, and I don't wanna take too much of it, then not be able to get off of it.
+UNHELPFUL_THOUGHTS: You think you always forget, so it feels hopeless to try to be consistent; you fear that if you take it regularly, you will get dependent and won't be able to stop; you worry that even taking the prescribed amount is too much and will harm you; you see needing medication as a loss of control or a personal weakness; you assume a few missed doses mean you can't do this at all.
 '''
 
 GUIDE_CBT_STAGE2_PROMPT  = '''You are an AI assistant who has rich psychology and mental health commonsense knowledge and strong reasoning abilities.
@@ -397,7 +590,7 @@ def run_cbt(question_lib, crisis_callback=None):
     When the callback reports True, we pause CBT and exit — continuing
     clinical work while a crisis is unaddressed is not safe.
     """
-    logger.info("Starting CBT flow (3-stage: Recognize/Challenge/Reframe).")
+    logger.info("[CBT] Starting CBT flow (3-stage: Recognize / Challenge / Reframe).")
 
     def _crisis_intervened() -> bool:
         """Call the handler's scan+deliver hook; True means pause CBT."""
@@ -425,20 +618,24 @@ def run_cbt(question_lib, crisis_callback=None):
                 idx += 1
 
     if not candidates:
-        logger.info("No dimensions with score=2. Skipping CBT.")
+        logger.info("[CBT] No Score-2 dimensions found — skipping CBT protocol.")
         log_question("We do not have a dimension at score 2 to work on today. We will conclude here.")
         return
 
     # Present Score-2 dimensions and await user selection.
+    # G6 — legacy/demo wording restored verbatim: "you have issue in:",
+    # "Which dimension would you like to work on today? Tell me the
+    # dimension number. For example: 1". Matches mexa_llmtherapist_demo.mp4
+    # at 4:40 and legacy-prototype/src/CBT.py:353-361.
     lines = [
         "Thank you for answering the questions.",
-        "According to your previous responses, you have concerns in:",
+        "According to your previous responses, you have issue in:",
     ]
     for k, _, _, _, name0 in candidates:
         lines.append(f"{k}) {name0}")
     lines.append(
-        "Which area would you like to work on today? "
-        "Tell me the number. For example: 1"
+        "Which dimension would you like to work on today? "
+        "Tell me the dimension number. For example: 1"
     )
     log_question(" \n".join(lines))
     resp = get_resp_log()
@@ -451,12 +648,14 @@ def run_cbt(question_lib, crisis_callback=None):
 
     def _pick_candidate(answer: str):
         ans = str(answer).strip().lower()
-        m = re.findall(r"\d+", ans)
-        if m:
-            n = int(m[0])
+        # Numeric path: accepts both digit ("3") and word ("three") forms.
+        n = _extract_choice_number(ans)
+        if n is not None:
             for (k0, i0, j0, lbl0, name0) in candidates:
                 if k0 == n:
                     return (i0, j0, lbl0, name0)
+        # Dimension-name fallback: user spoke the dim label / human name
+        # instead of a number ("medication", "mood").
         for (_, i0, j0, lbl0, name0) in candidates:
             if name0.lower() in ans or lbl0.lower() in ans:
                 return (i0, j0, lbl0, name0)
@@ -483,7 +682,7 @@ def run_cbt(question_lib, crisis_callback=None):
             return
 
     i_sel, j_sel, label_sel, name_sel = chosen
-    logger.info(f"CBT dimension chosen: [{label_sel}] ({name_sel}) at ({i_sel},{j_sel}).")
+    logger.info(f"[CBT] Dimension selected: {label_sel} ({name_sel}) — entering Stage 1 (Recognize).")
     _log_cbt_intervention(
         stage="dimension_selected",
         outcome="started",
@@ -536,13 +735,14 @@ def run_cbt(question_lib, crisis_callback=None):
         f"From our record, you mentioned that: {statement}"
     )
     set_question_prefix(recap)
+    logger.info("[CBT] Stage 1 (Recognize) — prompting user to identify unhelpful thoughts.")
     log_question("Can you try to identify any unhelpful thoughts you have that contribute to this situation?")
     unhelpful = get_resp_log()
     if isinstance(unhelpful, str) and "SESSION_END" in unhelpful:
-        logger.info("Session End signal received in CBT stage 1.")
+        logger.info("[SESSION] End signal received in CBT Stage 1 — closing session.")
         return
     if isinstance(unhelpful, str) and unhelpful.strip().lower().find("stop") != -1:
-        logger.info("User requested stop at CBT stage 1.")
+        logger.info("[CBT] User requested stop at Stage 1 — pausing CBT.")
         return
     # C7: user may have just mentioned a critical-dim concern. Pause CBT if so.
     if _crisis_intervened():
@@ -555,8 +755,12 @@ def run_cbt(question_lib, crisis_callback=None):
     retry = 0
     while dec1 == "1" and retry < 2:
         guide1 = stage1_guide(statement)
-        log_question(guide1)
-        log_question("Please provide your UNHELPFUL_THOUGHTS again, in one sentence.")
+        log_question(_sanitize_guide_text(guide1, "UNHELPFUL_THOUGHTS"))
+        # Legacy prompt was "Please provide your UNHELPFUL_THOUGHTS again,
+        # in one sentence." — the ALL-CAPS label with an underscore sounds
+        # awful through Piper TTS ("UNHELPFUL underscore THOUGHTS").  Same
+        # meaning, natural voice.
+        log_question("Please share those unhelpful thoughts again, in one sentence.")
         unhelpful = get_resp_log()
         if isinstance(unhelpful, str) and "SESSION_END" in unhelpful:
             logger.info("Session End signal received in CBT stage 1 retry.")
@@ -570,7 +774,10 @@ def run_cbt(question_lib, crisis_callback=None):
     if dec1 == "1":
         # Paper p.15: direct the user to seek professional help after 3 failed
         # attempts at a CBT stage.
-        log_question(CBT_ESCALATION_MESSAGE)
+        # G7 — legacy/demo never speaks the 988/SAMHSA hotline on CBT
+        # stage failure. Gated off by CBT_ESCALATION_ENABLED.
+        if CBT_ESCALATION_ENABLED:
+            log_question(CBT_ESCALATION_MESSAGE)
         log_question("It seems difficult to identify the unhelpful thoughts right now. Let's pause CBT and revisit later.")
         # record brief CBT notes
         question_lib[str(i_sel)][str(j_sel)]["notes"].append([
@@ -578,13 +785,13 @@ def run_cbt(question_lib, crisis_callback=None):
             f"CBT_statement: {statement}",
             f"CBT_unhelpful_thoughts: {unhelpful}",
             "CBT_stage: 1_failed",
-            "CBT_escalation_delivered: true",
+            f"CBT_escalation_delivered: {'true' if CBT_ESCALATION_ENABLED else 'false'}",
         ])
         _log_cbt_intervention(
             stage="recognize",
             outcome="failed",
             dim_label=label_sel,
-            detail={"statement": statement, "unhelpful": unhelpful, "escalation_delivered": True},
+            detail={"statement": statement, "unhelpful": unhelpful, "escalation_delivered": CBT_ESCALATION_ENABLED},
         )
         return
 
@@ -594,13 +801,14 @@ def run_cbt(question_lib, crisis_callback=None):
     if _crisis_intervened():
         logger.warning("[CBT] Crisis intervention fired before Stage 2 entry; pausing CBT.")
         return
+    logger.info("[CBT] Stage 2 (Challenge) — prompting user to challenge unhelpful thoughts.")
     log_question("Now, how could you challenge those unhelpful thoughts? Please write a brief challenge.")
     challenge = get_resp_log()
     if isinstance(challenge, str) and "SESSION_END" in challenge:
-        logger.info("Session End signal received in CBT stage 2.")
+        logger.info("[SESSION] End signal received in CBT Stage 2 — closing session.")
         return
     if isinstance(challenge, str) and challenge.strip().lower().find("stop") != -1:
-        logger.info("User requested stop at CBT stage 2.")
+        logger.info("[CBT] User requested stop at Stage 2 — pausing CBT.")
         return
     if _crisis_intervened():
         logger.warning("[CBT] Crisis intervention fired in Stage 2; pausing CBT.")
@@ -611,8 +819,11 @@ def run_cbt(question_lib, crisis_callback=None):
     retry = 0
     while dec2 == "1" and retry < 2:
         guide2 = stage2_guide(statement, unhelpful)
-        log_question(guide2)
-        log_question("Please try to CHALLENGE the unhelpful thoughts again, in one sentence.")
+        log_question(_sanitize_guide_text(guide2, "CHALLENGE"))
+        # Legacy said "Please try to CHALLENGE the unhelpful thoughts
+        # again, in one sentence." — the ALL-CAPS label is awkward spoken
+        # aloud.  Keep the clinical meaning; soften the surface form.
+        log_question("Please try to challenge the unhelpful thoughts again, in one sentence.")
         challenge = get_resp_log()
         if isinstance(challenge, str) and "SESSION_END" in challenge:
             logger.info("Session End signal received in CBT stage 2 retry.")
@@ -624,7 +835,10 @@ def run_cbt(question_lib, crisis_callback=None):
         dec2 = _parse_decision(dec2_raw)
         retry += 1
     if dec2 == "1":
-        log_question(CBT_ESCALATION_MESSAGE)
+        # G7 — legacy/demo never speaks the 988/SAMHSA hotline on CBT
+        # stage failure. Gated off by CBT_ESCALATION_ENABLED.
+        if CBT_ESCALATION_ENABLED:
+            log_question(CBT_ESCALATION_MESSAGE)
         log_question("Challenging the thought seems difficult now. Let's pause CBT and revisit later.")
         question_lib[str(i_sel)][str(j_sel)]["notes"].append([
             f"CBT_dimension: {label_sel}",
@@ -632,13 +846,13 @@ def run_cbt(question_lib, crisis_callback=None):
             f"CBT_unhelpful_thoughts: {unhelpful}",
             f"CBT_challenge: {challenge}",
             "CBT_stage: 2_failed",
-            "CBT_escalation_delivered: true",
+            f"CBT_escalation_delivered: {'true' if CBT_ESCALATION_ENABLED else 'false'}",
         ])
         _log_cbt_intervention(
             stage="challenge",
             outcome="failed",
             dim_label=label_sel,
-            detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "escalation_delivered": True},
+            detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "escalation_delivered": CBT_ESCALATION_ENABLED},
         )
         return
 
@@ -649,13 +863,14 @@ def run_cbt(question_lib, crisis_callback=None):
         return
     recap3 = recap_stage3_challenge(statement, unhelpful, challenge)
     set_question_prefix(recap3.strip())
+    logger.info("[CBT] Stage 3 (Reframe) — prompting user to reframe unhelpful thoughts into a balanced one.")
     log_question("Finally, can you reframe the unhelpful thought into a more balanced, constructive one?")
     reframe = get_resp_log()
     if isinstance(reframe, str) and "SESSION_END" in reframe:
-        logger.info("Session End signal received in CBT stage 3.")
+        logger.info("[SESSION] End signal received in CBT Stage 3 — closing session.")
         return
     if isinstance(reframe, str) and reframe.strip().lower().find("stop") != -1:
-        logger.info("User requested stop at CBT stage 3.")
+        logger.info("[CBT] User requested stop at Stage 3 — pausing CBT.")
         return
     if _crisis_intervened():
         logger.warning("[CBT] Crisis intervention fired in Stage 3; pausing CBT.")
@@ -666,8 +881,9 @@ def run_cbt(question_lib, crisis_callback=None):
     retry = 0
     while dec3 == "1" and retry < 2:
         guide3 = stage3_guide(statement, unhelpful, challenge)
-        log_question(guide3)
-        log_question("Please REFRAME again in one or two sentences.")
+        log_question(_sanitize_guide_text(guide3, "REFRAME"))
+        # Legacy said "Please REFRAME again in one or two sentences."
+        log_question("Please try to reframe that again, in one or two sentences.")
         reframe = get_resp_log()
         if isinstance(reframe, str) and "SESSION_END" in reframe:
             logger.info("Session End signal received in CBT stage 3 retry.")
@@ -679,7 +895,10 @@ def run_cbt(question_lib, crisis_callback=None):
         dec3 = _parse_decision(dec3_raw)
         retry += 1
     if dec3 == "1":
-        log_question(CBT_ESCALATION_MESSAGE)
+        # G7 — legacy/demo never speaks the 988/SAMHSA hotline on CBT
+        # stage failure. Gated off by CBT_ESCALATION_ENABLED.
+        if CBT_ESCALATION_ENABLED:
+            log_question(CBT_ESCALATION_MESSAGE)
         log_question("Reframing seems hard right now. Let's pause CBT and revisit later.")
         question_lib[str(i_sel)][str(j_sel)]["notes"].append([
             f"CBT_dimension: {label_sel}",
@@ -688,13 +907,13 @@ def run_cbt(question_lib, crisis_callback=None):
             f"CBT_challenge: {challenge}",
             f"CBT_reframe: {reframe}",
             "CBT_stage: 3_failed",
-            "CBT_escalation_delivered: true",
+            f"CBT_escalation_delivered: {'true' if CBT_ESCALATION_ENABLED else 'false'}",
         ])
         _log_cbt_intervention(
             stage="reframe",
             outcome="failed",
             dim_label=label_sel,
-            detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "reframe": reframe, "escalation_delivered": True},
+            detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "reframe": reframe, "escalation_delivered": CBT_ESCALATION_ENABLED},
         )
         return
 
@@ -713,6 +932,7 @@ def run_cbt(question_lib, crisis_callback=None):
         dim_label=label_sel,
         detail={"statement": statement, "unhelpful": unhelpful, "challenge": challenge, "reframe": reframe},
     )
+    logger.info(f"[CBT] All 3 stages completed successfully on dim '{label_sel}'.")
     log_question("Great work today. We completed the CBT steps for this topic. Thank you for your effort.")
 
 

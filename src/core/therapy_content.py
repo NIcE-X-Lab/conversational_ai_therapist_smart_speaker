@@ -101,11 +101,27 @@ MEDITATIONS = [
 WAITING_MUSIC_PATH = "assets/waiting_music.wav"
 
 
-# ── Crisis override (paper's latent safety layer) ──────────────────────────────
-# If any of these dimensions is scored at 2, the standard RL loop is bypassed
-# and a Safety Guide is delivered BEFORE the usual CBT routing.  The dimensions
-# cover self-injurious behaviour, personal safety, external risk-taking, and
-# hard substance abuse — matching the paper's "hard-stop" safety valve.
+# ── Crisis override (FUTURE ADDITION — OFF by default) ────────────────────────
+# When enabled, any CRITICAL_DIMS score of 2 short-circuits the RL loop and
+# delivers SAFETY_RESOURCES_MESSAGE before CBT. Covers self-injurious
+# behaviour, personal safety, external risk-taking, and hard substance abuse.
+#
+# INTENTIONALLY DISABLED FOR NOW (user's Divergence 3): the demo video does
+# not route through this path, and the on-device Gemma scorer is not yet
+# calibrated reliably enough to avoid false-positive crisis triggers in the
+# middle of an ordinary screening conversation. All scaffolding below
+# (CRITICAL_DIMS, SAFETY_RESOURCES_MESSAGE, safety delivery helpers,
+# clinical-flag logging) stays in place so flipping this flag back to True
+# re-enables the path with zero other edits.
+#
+# Before re-enabling, validate:
+#   1. Critical-dim scorer FP rate on a held-out set < 2%.
+#   2. Safety-delivery audit trail (file fallback + DB row) still lands
+#      when TTS queue is backpressured.
+#   3. Crisis-routed CBT path (_cbt_crisis_hook in handler_rl) does not
+#      double-deliver SAFETY_RESOURCES_MESSAGE on back-to-back triggers.
+CRISIS_OVERRIDE_ENABLED = False
+
 CRITICAL_DIMS = frozenset({"sib", "safe", "risk", "drug", "alcohol"})
 
 SAFETY_RESOURCES_MESSAGE = (
@@ -124,6 +140,15 @@ SAFETY_RESOURCES_MESSAGE = (
 # Paper p.15: after 3 invalid attempts at any CBT stage, the user should be
 # "directed to seek professional help".  This is spoken before the standard
 # "pause and revisit later" line whenever a stage exhausts its retry budget.
+#
+# G7 — Gated OFF by default for legacy parity. The legacy prototype (and
+# the demo recording) did NOT inject this hotline referral on CBT stage
+# failure — it only said "Let's pause CBT and revisit later." Turn this
+# flag on once Gemma's CBT Reasoner reliability has been validated and
+# the SAMHSA/988 scripting has been reviewed by the study PI, so that
+# participants never hear a hotline injection from a flaky LLM verdict.
+CBT_ESCALATION_ENABLED = False
+
 CBT_ESCALATION_MESSAGE = (
     "This kind of work can be difficult, and it is completely okay to find it "
     "hard today. A trained therapist can offer the kind of support that goes "

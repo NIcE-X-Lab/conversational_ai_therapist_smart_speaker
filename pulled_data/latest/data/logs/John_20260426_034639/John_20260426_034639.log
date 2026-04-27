@@ -1,0 +1,36 @@
+Timestamp,Type,Speaker,Text
+"2026-04-26T03:46:39.476069","internal","system","Session initialized. User: John_20260426_034639, DB ID: 8"
+"2026-04-26T03:47:21.856525","turn","agent","I'd like to start with a couple of questions about how you've been feeling lately.
+
+Are you adhering to the prescribed schedule and dosage for your medications?"
+"2026-04-26T03:48:09.602743","turn","user","Yes, I generally meet all my medications."
+"2026-04-26T03:48:27.247369","turn","agent","Have your moods been something you can manage lately?"
+"2026-04-26T03:49:20.917627","turn","user","Yes, I can typically manage my mood well."
+"2026-04-26T03:49:50.239087","turn","agent","During the last seven days, have your eating patterns been consistent in terms of timing?"
+"2026-04-26T03:50:41.068632","turn","user","Yes, it's usually mostly consistent."
+"2026-04-26T03:51:09.642254","turn","agent","What has your sleep quality been like recently?"
+"2026-04-26T03:51:54.192528","turn","user","I hate sleeping, I can never sleep properly in peace."
+"2026-04-26T03:52:15.434925","turn","agent","You mentioned that you hate sleeping, you can never sleep properly in peace. Can you tell me more?"
+"2026-04-26T03:53:17.782099","turn","user","I'm not able to sleep properly, I get a lot of nightmares."
+"2026-04-26T03:54:09.440488","turn","agent","It sounds incredibly frustrating and distressing to not be able to sleep properly and to experience nightmares, which must feel very draining. It is completely understandable that when you are struggling to rest, those difficult experiences become much more intense. You might try establishing a consistent, calming bedtime routine before you get into bed to signal to your body that it is time to wind down. You could also try practicing some simple relaxation techniques, like deep breathing exercises, right before you try to sleep. If nightmares are frequent, keeping a journal by your bed to briefly write down what happens might help you process those events later. Consider speaking with a sleep specialist or a therapist who can offer specific strategies for managing those nighttime experiences.
+
+Have you taken any time away from your usual routine in the past few days?"
+"2026-04-26T03:56:35.224728","turn","user","No, I have not."
+"2026-04-26T03:57:03.426446","turn","agent","Please briefly describe any changes you've made to your usual routine in the past few days."
+"2026-04-26T03:58:03.077267","turn","user","I'm done answering questions now."
+"2026-04-26T03:58:20.661157","turn","agent","Thank you for answering the questions. 
+According to your previous responses, you have issue in: 
+1) Following Regular Schedule for Bedtime and Sleeping Enough 
+Which dimension would you like to work on today? Tell me the dimension number. For example: 1"
+"2026-04-26T04:00:11.691124","turn","user","One."
+"2026-04-26T04:00:11.951298","turn","agent","Let us work on dimension 'Following Regular Schedule for Bedtime and Sleeping Enough'. From our record, you mentioned that: I'm not able to sleep properly, I get a lot of nightmares.
+
+Can you try to identify any unhelpful thoughts you have that contribute to this situation?"
+"2026-04-26T04:01:23.423177","turn","user","Having the nightmare scare me so I think if I sleep I'll get more scared."
+"2026-04-26T04:01:32.706309","turn","agent","Now, how could you challenge those unhelpful thoughts? Please write a brief challenge."
+"2026-04-26T04:03:51.555790","turn","user","When I think about these thoughts, I will do deep breathing and guide myself into thinking more positively about sleeping."
+"2026-04-26T04:04:19.698482","turn","agent","You have identified a strategy to manage these thoughts by using deep breathing and guiding yourself toward more positive thoughts about sleeping.
+
+Finally, can you reframe the unhelpful thought into a more balanced, constructive one?"
+"2026-04-26T04:05:30.258608","turn","user","I will positively think about sleeping and not be scared anymore by breathing before I go to bed."
+"2026-04-26T04:05:39.412413","turn","agent","Great work today. We completed the CBT steps for this topic. Thank you for your effort."

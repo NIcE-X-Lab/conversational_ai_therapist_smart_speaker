@@ -71,7 +71,12 @@ if [[ -n "$d_state" ]]; then
     exit 1
 fi
 
-remaining=$(pgrep -c -f 'python.*main\.py' 2>/dev/null || echo 0)
+# Count survivors via pgrep + wc so `$remaining` is always a clean single
+# integer regardless of pgrep's exit-code quirks across distros.  On the
+# Jetson, `pgrep -c` occasionally emits "0\n0" which crashed the old
+# `[[ "$remaining" -gt 0 ]]` test with "syntax error in expression".
+remaining=$(pgrep -f 'python.*main\.py' 2>/dev/null | wc -l | tr -d '[:space:]')
+remaining="${remaining:-0}"
 if [[ "$remaining" -gt 0 ]]; then
     echo "[jetson_kill] WARNING: $remaining CaiTI Python process(es) survived."
     exit 1

@@ -192,7 +192,7 @@ def classify_dimension_and_score(user_input: str, original_question: str) -> str
 
     Paper role: ANALYZER (fine-tuned GPT-3.5-Turbo in paper).
     """
-    logger.info("Classifying user input for dimension and score.")
+    logger.info("[PIPELINE] Response Analyzer — classifying user input (Dim, Score).")
     logger.debug(f"Original question: {original_question}")
     logger.debug(f"User input: {user_input}")
     # Provide both the question and the answer to improve contextual classification
@@ -300,7 +300,7 @@ def reflective_summarizer(original_question: str, user_response: str) -> str:
 
     Paper role: REFLECTIVE_SUMMARIZER (GPT-4 in paper).
     """
-    logger.info("Generating reflective summary for user response.")
+    logger.info("[PIPELINE] Reflective Summarizer — 1st -> 3rd person rewrite for follow-up.")
     logger.debug(f"Original question: {original_question}, User response: {user_response}")
     payload = f'{{"Original Question": "{original_question}", "User Response": "{user_response}"}}'
     return llm_complete(REFLECTIVE_SUMMERIZER_PROMPT, payload, role=LLMRole.REFLECTIVE_SUMMARIZER)
@@ -316,7 +316,7 @@ def rephrase_question(original_question: str) -> str:
     On any empty / unparseable model output, returns the `original_question`
     unchanged so the screening hot path never breaks due to an LLM quirk.
     """
-    logger.info("Rephrasing question for therapist style.")
+    logger.info("[PIPELINE] Rephraser — varying question wording for this turn.")
     logger.debug(f"Original question: {original_question}")
     payload = f'{{"Original Question": "{original_question}"}}'
     raw = llm_complete(REPHRASER_PROMPT, payload, role=LLMRole.REPHRASER)

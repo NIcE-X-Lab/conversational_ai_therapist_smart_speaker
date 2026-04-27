@@ -1,0 +1,103 @@
+[   6.77 ->   10.40] Any user ID will work here for now.
+[  10.40 ->   14.48] The back end is not configured to read this yet.
+[  14.48 ->   18.96] So you can do either type input,
+[  18.96 ->   22.52] just EVD bugging or the hands-free mode,
+[  22.52 ->   25.60] where it's more like in the natural conversation,
+[  25.60 ->   29.40] except the latency of the API is quite large.
+[  29.40 ->   33.16] But this will start listening once the bot finish playing.
+[  33.16 ->   34.72] So let's start.
+[  34.72 ->   54.74] Hi, I'm Katie, and I'm here to support you.
+[  54.94 ->   56.26] Thanks for being here.
+[  56.26 ->   57.90] Let's start with a few quick questions
+[  57.90 ->   60.09] about your recent day-to-day.
+[  60.09 ->   61.65] How are your eating habits?
+[  61.65 ->   64.19] Are you eating regularly?
+[  64.19 ->   76.60] Yes, I am eating well.
+[  76.60 ->   78.08] How's your mood lately?
+[  78.08 ->   80.54] And how do you feel about it?
+[  80.54 ->   96.14] I'm feeling all right.
+[  96.14 ->   99.70] Have you been taking your medications lately?
+[  99.70 ->  114.82] No, not really.
+[ 114.82 ->  117.30] It seems that you haven't been taking medication
+[ 117.30 ->  119.62] according to doctor's recommendation.
+[ 119.62 ->  122.90] Can you elaborate on it?
+[ 123.66 ->  127.58] I just always get to take it, and I'm also like,
+[ 127.58 ->  130.10] I don't want to take too much of it,
+[ 130.10 ->  178.84] then not be able to get off of it.
+[ 178.84 ->  181.48] It makes sense that you always forget to take it,
+[ 181.48 ->  183.40] and also do not want to take too much
+[ 183.40 ->  186.14] or end up not being able to get off of it.
+[ 186.14 ->  188.10] Wanting control and being cautious
+[ 188.10 ->  190.40] are completely understandable.
+[ 190.40 ->  192.53] A few steps that can help.
+[ 192.53 ->  195.73] Ask your prescriber to clarify the exact dose,
+[ 195.73 ->  197.29] what to do if you miss a dose,
+[ 197.37 ->  199.93] and how you would get off of it safely if needed.
+[ 199.93 ->  202.06] A clear taper plan.
+[ 202.06 ->  206.10] Many medications can be adjusted or tapered with a plan.
+[ 206.10 ->  209.06] For safety, avoid doubling up to catch up
+[ 209.06 ->  212.10] and do not stop suddenly without guidance.
+[ 212.10 ->  213.86] Make remembering easier.
+[ 213.86 ->  217.34] Set one phone alarm, pair the dose with a daily habit,
+[ 217.34 ->  219.46] tooth brushing or morning coffee.
+[ 219.46 ->  223.26] Use a simple pill box and keep it where you will see it.
+[ 223.26 ->  225.90] Use pharmacy supports like blister packs
+[ 225.90 ->  229.06] or auto refills to simplify things.
+[ 229.06 ->  232.06] Keep a brief note of when you take it and how you feel
+[ 232.06 ->  234.46] so you and your prescriber can fine tune it
+[ 234.46 ->  236.26] to match what you want.
+[ 236.26 ->  237.74] You are not stuck.
+[ 237.74 ->  240.14] You can go at a pace that respects your concerns
+[ 240.14 ->  243.86] while staying safe and getting the benefit you want.
+[ 243.86 ->  248.30] Do you smoke cigarettes or use a vape and how often?
+[ 248.30 ->  255.36] No, I don't.
+[ 255.36 ->  259.55] Are you attending your appointments and other commitments?
+[ 259.55 ->  268.03] Yes, most of them.
+[ 268.03 ->  271.16] Have you been working out lately?
+[ 271.16 ->  281.82] I think we've spoken enough today.
+[ 281.82 ->  284.10] Thank you for answering the questions.
+[ 284.10 ->  286.22] According to your previous responses,
+[ 286.22 ->  291.26] you have issue in one, taking medication as prescribed.
+[ 291.26 ->  294.10] Which dimension would you like to work on today?
+[ 294.10 ->  295.82] Tell me the dimension number.
+[ 295.82 ->  304.31] For example, one.
+[ 304.31 ->  308.80] Let us work on dimension, taking medication as prescribed.
+[ 308.80 ->  312.56] From our record, you mentioned that I just always
+[ 312.56 ->  313.80] forget to take it.
+[ 313.80 ->  316.80] And I'm also like, I don't want to take too much of it
+[ 316.80 ->  319.00] than not be able to get off of it.
+[ 319.00 ->  322.04] Can you try to identify any unhelpful thoughts you have
+[ 322.04 ->  326.42] that contribute to this situation?
+[ 326.42 ->  349.49] I'm not sure what you mean by unhelpful thoughts.
+[ 349.49 ->  351.49] Unhelpful thoughts.
+[ 351.49 ->  354.61] You think you always forget so it feels hopeless
+[ 354.61 ->  356.29] to try to be consistent.
+[ 356.29 ->  358.53] You fear that if you take it regularly,
+[ 358.53 ->  361.41] you'll get dependent and won't be able to stop.
+[ 361.41 ->  363.81] You worry that even taking the prescribed amount
+[ 363.81 ->  366.73] is too much and will harm you.
+[ 366.73 ->  369.49] You see needing medication as a loss of control
+[ 369.49 ->  371.49] or a personal weakness.
+[ 371.49 ->  380.91] You assume a few missed doses mean you can't do this at all.
+[ 380.91 ->  383.47] Yes, I guess my own hopeful thought is that
+[ 383.47 ->  385.43] I fear that if I take it regularly,
+[ 385.43 ->  396.92] I'll get too dependent on it.
+[ 396.92 ->  400.60] Now, how could you challenge those unhelpful thoughts?
+[ 400.60 ->  406.62] Please write a brief challenge.
+[ 406.62 ->  409.70] So I guess I'm not seeing any evidence
+[ 409.70 ->  412.22] that I will get dependent on it.
+[ 412.22 ->  429.17] As is a prescribed amount, I should be fine.
+[ 429.17 ->  432.37] You noted you haven't seen evidence you'll become dependent
+[ 432.37 ->  436.02] and that taking it as prescribed should be fine.
+[ 436.02 ->  439.06] Finally, can you reframe the unhelpful thought
+[ 439.06 ->  444.32] into a more balanced, constructive one?
+[ 444.32 ->  448.44] Yeah, so I guess I shouldn't be too worried
+[ 448.44 ->  451.28] about taking it will make me too dependent
+[ 451.28 ->  453.48] because I haven't even tried yet.
+[ 453.48 ->  465.95] So yeah, I'll give you the try and see what happens.
+[ 465.95 ->  467.15] Great work today.
+[ 467.15 ->  470.07] We completed the CBT steps for this topic.
+[ 470.07 ->  476.16] Thank you for your effort.
+[ 476.16 ->  479.64] I haven't implemented the session and function yet.
+[ 479.64 ->  481.65] I have to do that.
+[ 481.65 ->  484.17] Yeah, but that's the gist of it.

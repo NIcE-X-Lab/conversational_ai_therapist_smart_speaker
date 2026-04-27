@@ -96,7 +96,11 @@ Do not read into the client's mind or make strong assumptions. Do not output any
 
 Formatting:
 - ASCII characters only. Replace smart quotes, en/em dashes, and ellipses with ASCII equivalents (' " - ...).
-- Aim for a substantive reflection: typically 3-5 sentences. Shorter is fine when the client's input is short; go longer when the situation genuinely warrants deeper support.
+- REQUIRED LENGTH: 4 to 7 sentences. Not a single sentence, not two. This matches the CaiTI clinical reference style used in published demos (see Example 4 below for the target shape).
+- Structure your output as three parts, inline (no headers):
+  (a) empathic reflection that names, in the client's own phrasing, what is hard about their situation and why that reaction makes sense;
+  (b) a short normalising statement (one sentence) that de-pathologises the response;
+  (c) 3 to 5 grounded, concrete suggestions drawn from what they already said. Prefer imperative or "you might" phrasing. Do NOT end with an open-ended question or an invitation to share more.
 - Output format (one block of prose, prefixed with the label):
 VALIDATION: <your validation and support text here>
 
@@ -111,6 +115,10 @@ VALIDATION: It sounds like the pressure from your upcoming deadlines is really w
 Example 3:
 {"Topic": "Managing mood", "Original Response": "I am sad recently.", "Follow-up Response": "My sadness stems from a variety of factors. I have been dealing with a lot of stress at work, and it is affecting my mood. I am also finding it hard to connect with my friends due to the pandemic, and this isolation has been making me feel quite depressed."}
 VALIDATION: It sounds like you are going through a really challenging time, with work stress and pandemic isolation compounding each other and weighing on your mood. It is important to acknowledge these feelings and to understand that feeling overwhelmed in these circumstances is completely understandable. Staying connected during a pandemic can be hard, but small steps such as scheduled video calls with people you trust, or joining online communities around interests you enjoy, can ease the isolation over time. Sharing what you are going through with a friend, family member, or a mental health professional can also offer relief and help you cope more sustainably.
+
+Example 4 (TARGET LENGTH AND STRUCTURE — match this):
+{"Topic": "Taking medication as prescribed", "Original Response": "I haven't been taking my medications.", "Follow-up Response": "I just always forget to take it, and I don't wanna take too much of it then not be able to get off of it."}
+VALIDATION: It makes sense that you always forget to take it, and also do not want to take too much or end up not being able to get off of it. Wanting control and being cautious are completely understandable. A few steps that can help: ask your prescriber to clarify the exact dose, what to do if you miss a dose, and how you would get off of it safely if needed - a clear taper plan. Many medications can be adjusted or tapered with a plan. For safety, avoid doubling up to catch up and do not stop suddenly without guidance. Make remembering easier: set one phone alarm, pair the dose with a daily habit like tooth brushing or morning coffee, use a simple pill box and keep it where you will see it. Use pharmacy supports like blister packs or auto refills to simplify things. Keep a brief note of when you take it and how you feel so you and your prescriber can fine tune it to match what you want. You are not stuck; you can go at a pace that respects your concerns while staying safe and getting the benefit you want.
 '''
 
 
@@ -247,9 +255,10 @@ def rv_consolidated(
       - decision_token '1': guide_text has redirect, validation_text is empty
         (caller must run Validation separately on the user's new response).
     """
-    logger.info("Running split R-V pipeline (Reasoner -> Validator/Guide).")
+    logger.info("[PIPELINE] Reflection-Validation — Reasoner deciding on-topic vs off-topic.")
     decision = rv_reasoner(topic, original_question, original_response, follow_up_response)
     if decision == "1":
+        logger.info("[RV] Reasoner verdict: OFF-TOPIC -> running Guide to redirect.")
         guide_text = rv_guide(topic, original_question, original_response, follow_up_response)
         # Phase B: record the MI guide-redirect event.
         _log_mi_intervention(
@@ -261,6 +270,7 @@ def rv_consolidated(
         )
         return decision, guide_text, ""
     else:
+        logger.info("[RV] Reasoner verdict: ON-TOPIC -> running Validator for empathic reflection.")
         validation_text = rv_validator_mi(topic, original_question, original_response, follow_up_response)
         # Phase B: record the MI OARS simple-reflection event.
         _log_mi_intervention(

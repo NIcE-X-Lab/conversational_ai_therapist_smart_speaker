@@ -3,8 +3,16 @@
 #
 # Runs on: laptop.
 # Use:     after a session (or batch of sessions).  Copies data to the
-#          laptop for analysis / backup.  NON-DESTRUCTIVE — nothing on
-#          the Jetson is modified or deleted.
+#          laptop for analysis / backup.  NON-DESTRUCTIVE on the Jetson —
+#          nothing there is modified or deleted.
+#
+# Layout: single-mirror. Every run rsyncs into pulled_data/latest/,
+# which always reflects the Jetson's current state. Per-session
+# filenames (session_<subject>_<ts>.json, Report_<subject>_<ts>.csv,
+# etc.) guarantee dossiers and CSVs accumulate inside the mirror
+# without collision. therapist.db and per-subject Q-tables are
+# overwritten in place with the Jetson's latest copy. The Jetson is the
+# source of truth; keep a Jetson-side backup if you need DB rollback.
 #
 # Pulls:
 #   data/therapist.db        — the SQLite truth store
@@ -29,13 +37,31 @@ fi
 REMOTE_DIR="${JETSON_PROJECT_DIR:-~/project}"
 SSH_OPTS="${JETSON_SSH_OPTS:--o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new}"
 
-STAMP="$(date +%Y%m%d_%H%M%S)"
 ARCHIVE_ROOT="${LAPTOP_ARCHIVE_DIR:-$PROJECT_ROOT/pulled_data}"
-DEST="$ARCHIVE_ROOT/$STAMP"
+# Single mirror: one folder that always reflects the Jetson's current
+# state. The Jetson remains the source of truth — per-session filenames
+# (session_<subject>_<ts>.json, Report_<subject>_<ts>.csv, etc.) guarantee
+# dossiers and CSVs accumulate without collision, and therapist.db /
+# q_tables are overwritten in place with the Jetson's latest copy.
+DEST="$ARCHIVE_ROOT/latest"
+# Migration: prior versions created `latest` as a symlink into a
+# timestamped snapshot. Replace it with a real directory so the mirror
+# can accumulate on re-pulls.
+if [[ -L "$DEST" ]]; then
+    prior_target="$(readlink -f "$DEST")"
+    echo "[laptop_pull] Migrating symlink 'latest' -> real mirror directory"
+    rm -f "$DEST"
+    if [[ -d "$prior_target" ]]; then
+        # Seed the new mirror with the prior snapshot so we don't
+        # re-download everything on the first pull after the migration.
+        cp -a "$prior_target/." "$DEST/"
+        echo "[laptop_pull]   seeded from prior snapshot: $prior_target"
+    fi
+fi
 mkdir -p "$DEST"
 
 echo "[laptop_pull] Source: $JETSON_HOST:$REMOTE_DIR"
-echo "[laptop_pull] Dest:   $DEST"
+echo "[laptop_pull] Dest:   $DEST  (single-mirror mode)"
 
 pull() {
     local remote_rel="$1"
@@ -70,7 +96,5 @@ report_count=$(find "$DEST/data/results" -name 'Report_*.csv' 2>/dev/null | wc -
 echo "  dossiers       $dossier_count"
 echo "  reports        $report_count"
 
-# Keep a stable "latest" symlink for downstream tools.
-ln -sfn "$DEST" "$ARCHIVE_ROOT/latest"
 echo ""
-echo "[laptop_pull] Done.  Latest pull: $ARCHIVE_ROOT/latest"
+echo "[laptop_pull] Done.  Mirror: $DEST"

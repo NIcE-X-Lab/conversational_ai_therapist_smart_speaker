@@ -68,7 +68,7 @@ def _ghost_hunt(rss_threshold_mb: float = 50.0):
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
         if ghosts_found == 0:
-            logger.info(f"[GHOST HUNT] No child processes > {rss_threshold_mb}MB. Clean.")
+            logger.debug(f"[GHOST HUNT] No child processes > {rss_threshold_mb}MB. Clean.")
         else:
             logger.warning(
                 f"[GHOST HUNT] Found {ghosts_found} child process(es) "
@@ -211,7 +211,7 @@ def _startup_checklist() -> bool:
             f"[BOOT-AUDIT] {len(critical_failures)} critical failure(s): {critical_failures}"
         )
         return False
-    logger.info("[BOOT-AUDIT] All critical subsystems passed.")
+    logger.debug("[BOOT-AUDIT] All critical subsystems passed.")
     return True
 
 
@@ -237,8 +237,11 @@ def get_status():
         current_status = "session_active"
 
     return {
-        "status": current_status, 
-        "subject_id": SUBJECT_ID,
+        "status": current_status,
+        # Read the live subject rather than the boot-time default so
+        # /api/status reflects the name captured during onboarding for
+        # the currently-running session.
+        "subject_id": getattr(io_record, "SUBJECT_ID", SUBJECT_ID),
         "session_id": io_record.SESSION_ID
     }
 
@@ -290,7 +293,7 @@ def resume_session():
 
 @app.post("/api/end_session")
 def end_session_api():
-    logger.info("Ending session via API.")
+    logger.info("[SESSION] End requested via API.")
     if hasattr(app.state, 'speech_loop'):
         app.state.speech_loop.stop_audio()
     io_record.END_SESSION_EVENT.set()
@@ -381,7 +384,7 @@ def main():
     # Start API server in background for remote monitoring/control
     api_thread = threading.Thread(target=run_fastapi_server, daemon=True)
     api_thread.start()
-    logger.info("API Server started on port 8000")
+    logger.debug("API Server started on port 8000")
     RESOURCE_AUDIT.capture_point("api_thread_started")
 
     speech_service = None
@@ -397,7 +400,7 @@ def main():
             app.state.speech_loop = speech_service
             speech_thread = threading.Thread(target=speech_service.run, daemon=True)
             speech_thread.start()
-            logger.info("Unified SpeechInteractionService started.")
+            logger.debug("Unified SpeechInteractionService started.")
             RESOURCE_AUDIT.capture_point("speech_service_started")
             _log_process_rss("After SpeechService thread started (baseline)")
         except Exception as e:
@@ -416,13 +419,13 @@ def main():
                 continue
                 
             io_record.END_SESSION_EVENT.clear()
-            logger.info(f"Starting Clinical Pipeline (HandlerRL) for Session {io_record.SESSION_ID}")
+            logger.info(f"[SESSION] Clinical pipeline starting (DB session_id={io_record.SESSION_ID}).")
             
             # HandlerRL orchestrates the CBT/RL turns and uses the interstitial engine
             handler = HandlerRL()
             handler.run()
             
-            logger.info("Clinical Pipeline turn finished. Waiting for next trigger.")
+            logger.info("[SESSION] Clinical pipeline finished — returning to idle, awaiting next wake.")
             io_record.START_SESSION_EVENT.clear()
             
     except KeyboardInterrupt:

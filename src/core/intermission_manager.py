@@ -132,6 +132,12 @@ class IntermissionLadderManager:
         self._tracker = IntermissionTracker()
         self._rng = random.Random()
         self._last_breathing_idx = None
+        # Indices already played this session — removed from the rotation
+        # per the intermission protocol ("once a segment is finished, it is
+        # removed from the current session's rotation").  Wraps back to an
+        # empty set only when every script has been used and we would
+        # otherwise have nothing to play.
+        self._used_breathing_idx: set[int] = set()
         self._last_activity: IntermissionStage | None = None
 
     @property
@@ -141,6 +147,7 @@ class IntermissionLadderManager:
     def reset(self):
         self._tracker.reset()
         self._last_breathing_idx = None
+        self._used_breathing_idx = set()
         self._last_activity = None
 
     def load_checkpoint(self, status_map: Dict[str, dict] | None):
@@ -200,11 +207,26 @@ class IntermissionLadderManager:
         if not MEDITATIONS:
             return "Let's take a gentle breath together while I continue thinking."
 
-        candidate_indices = list(range(len(MEDITATIONS)))
-        if self._last_breathing_idx is not None and len(candidate_indices) > 1:
-            candidate_indices.remove(self._last_breathing_idx)
+        # Prefer scripts the user hasn't heard yet this session.  If every
+        # script has been used, wrap back to the full pool so we still have
+        # something to play — but clear the used set first so the "fresh"
+        # cycle starts clean rather than limping along on a single script.
+        unused = [i for i in range(len(MEDITATIONS)) if i not in self._used_breathing_idx]
+        if not unused:
+            self._used_breathing_idx = set()
+            unused = list(range(len(MEDITATIONS)))
+
+        candidate_indices = unused
+        # Deprioritise the most recent script only when an unused alternative
+        # exists — avoids "same script twice in a row" after a wrap-around.
+        if (self._last_breathing_idx in candidate_indices
+                and len(candidate_indices) > 1):
+            candidate_indices = [i for i in candidate_indices
+                                 if i != self._last_breathing_idx]
+
         idx = self._rng.choice(candidate_indices)
         self._last_breathing_idx = idx
+        self._used_breathing_idx.add(idx)
         return MEDITATIONS[idx]
 
     def stage_snapshot(self) -> dict:

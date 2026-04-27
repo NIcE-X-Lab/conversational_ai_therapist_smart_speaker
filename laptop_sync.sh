@@ -61,13 +61,14 @@ rsync $DRY_FLAG -az --delete -e "ssh $SSH_OPTS" \
     --include='/laptop_sync.sh' \
     --include='/laptop_pull.sh' \
     --include='/laptop_deploy.sh' \
+    --include='/start_therapist.sh' \
     --include='/readme.md' \
     --exclude='*' \
     "$PROJECT_ROOT/" "$JETSON_HOST:$REMOTE_DIR/"
 
 # Make the shell scripts executable on the Jetson side.
 if [[ -z "$DRY_FLAG" ]]; then
-    ssh $SSH_OPTS "$JETSON_HOST" "chmod +x $REMOTE_DIR/jetson_*.sh $REMOTE_DIR/laptop_*.sh 2>/dev/null || true"
+    ssh $SSH_OPTS "$JETSON_HOST" "chmod +x $REMOTE_DIR/jetson_*.sh $REMOTE_DIR/laptop_*.sh $REMOTE_DIR/start_therapist.sh 2>/dev/null || true"
     echo "[laptop_sync] Done.  Files landed on Jetson; scripts chmod'd."
 else
     echo "[laptop_sync] DRY_RUN complete."

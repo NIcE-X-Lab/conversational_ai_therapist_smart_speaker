@@ -18,12 +18,13 @@ Q-learning questioner over 37 daily-functioning dimensions → Response Analyzer
 7. [LLM Design (Self-Contained Per Task)](#llm-design-self-contained-per-task)
 8. [Persistence Model](#persistence-model)
 9. [Configuration](#configuration)
-10. [FastAPI Endpoints](#fastapi-endpoints)
-11. [Running the System](#running-the-system)
-12. [Jetson Deployment](#jetson-deployment)
-13. [Testing](#testing)
-14. [Clinical-Trial Operations Playbook](#clinical-trial-operations-playbook)
-15. [Key Technologies](#key-technologies)
+10. [Feature Gates & Future Development](#feature-gates--future-development)
+11. [FastAPI Endpoints](#fastapi-endpoints)
+12. [Running the System](#running-the-system)
+13. [Jetson Deployment](#jetson-deployment)
+14. [Testing](#testing)
+15. [Clinical-Trial Operations Playbook](#clinical-trial-operations-playbook)
+16. [Key Technologies](#key-technologies)
 
 ---
 
@@ -32,7 +33,7 @@ Q-learning questioner over 37 daily-functioning dimensions → Response Analyzer
 | Paper component | Paper section | Implementation |
 |---|---|---|
 | 37 daily-functioning dimensions | §3.1, Table 1 | `data/libs/question_lib_v4.json` (indices 1–37) |
-| Q-learning questioner (ε=0.9, α=0.1, γ=0.9) | §5.1, p.11 | `src/utils/rl_qtables.py`, `src/core/handler_rl.py` |
+| Q-learning questioner | §5.1, p.11 | `src/utils/rl_qtables.py`, `src/core/handler_rl.py` — runs on legacy-prototype values (ε=1, α=0.5, γ=0.9) which is what the published demo recording uses; paper-strict values (ε=0.9, α=0.1) are kept as a commented alternate in `config.yaml`. See [Feature Gates](#feature-gates--future-development). |
 | 7–11 therapist-authored question variants per dim + runtime Rephraser | §5.1 | `question_lib_v4.json` (`question[]` + `question_synthetic[]`) + `src/utils/text_generators.py::generate_synonymous_sentences` |
 | Response Analyzer (Dim, Score ∈ {0, 1, 2}) | §5.2 | `src/core/response_analyzer.py::classify_dimension_and_score` + `src/services/response_bridge.py` |
 | Reflective Summarizer (1st→3rd person) | §5.2 | `src/core/response_analyzer.py::reflective_summarizer`, `src/utils/text_generators.py::generate_change` |
@@ -49,7 +50,7 @@ Q-learning questioner over 37 daily-functioning dimensions → Response Analyzer
 - **Crisis override.** Adds a safety-net short-circuit: if any `CRITICAL_DIMS` entry (`sib`, `safe`, `risk`, `drug`, `alcohol`) scores 2, the RL loop is short-circuited to a `SAFETY_RESOURCES_MESSAGE` (988 Lifeline + SAMHSA) before CBT. The paper describes similar safety handling narratively; we implement it as an explicit check in `handler_rl._crisis_scan`.
 - **Multi-dim back-fill.** `questioner._apply_segment_level_backfill` + `_apply_multi_dim_updates` credit secondary dimensions mentioned in a single substantive utterance (paper §4.1 "minimal questioning"). The per-segment back-fill is free (reuses existing classification); the LLM back-fill is gated to ≥20 tokens + ≥2 segments.
 - **Reward aggregation.** `config.yaml::rl.reward_mode` defaults to `"hybrid"` = (max + mean) / 2. Paper uses pure mean; hybrid is safer for mixed-severity replies without changing within-session clinical response (see `config.yaml` for the full rationale). Set to `"mean"` for paper-strict reproduction.
-- **Smart-speaker UX layer.** Paper targets multiple form factors; this repo adds a Jetson-specific hardware layer — GPIO buttons, LED, ambient background music bed with volume ducking + smooth fades, and a **randomised-cycling** intermission pipeline (PHQ screening / breathing exercise / music, picked at random with last-activity deprioritisation and user-decline fallback) that engages the user during LLM wait time. Music uses random-segment playback over a long ambient track so users never hear the same opening bars twice. These are UX additions; they do not change clinical behaviour.
+- **Smart-speaker UX layer.** Paper targets multiple form factors; this repo adds a Jetson-specific hardware layer — GPIO buttons, LED, ambient background music bed with automatic ducking + smooth fades, and a **GIL-safe proactive intermission** pipeline (SCREENING / BREATHING / MUSIC, SCREENING-first while PHQ-4 questions remain, then last-activity-deprioritised cycling). The activity runs in the speech thread *in parallel with* the handler's LLM work — started BEFORE the GIL-holding inference begins — so PHQ-4 questions and breathing guidance play out through the latency window instead of the user hearing silence. Music sits at a foreground listen level (0.85) whenever Piper TTS is not speaking and the mic is not listening, and auto-ducks to a 2 % whisper in both of those cases so the voice path stays clean. Breathing is passive (no listen step). Random-segment playback keeps a long ambient track fresh; breathing scripts are session-scoped so all 5 meditations play before any repeat. The pipeline engages on **every** LLM-wait gap — including the post-greeting gap before the first dimension question — so the user never hears silence from wake to session end. These are UX additions; they do not change clinical behaviour.
 
 ---
 
@@ -92,6 +93,37 @@ This build adds 22 layered safeguards on top of the paper's pipeline, each one a
 | **M5** | Cached TTS fallback WAV | `assets/audio/tts_fallback.wav` (3 s, 880 Hz alert beeps) is copied to the output path when BOTH Piper and espeak-ng fail. The device is never silent during a trial. Generic "check the device" signal for clinicians. |
 | **M6** | Max session length cap | `SESSION_MAX_SECONDS` (default 3600). `_session_timed_out()` checks at the top of every RL-loop iteration; timeout triggers graceful termination + `clinical_flags.SESSION_CAP_REACHED`. Matches paper's brief-session model. |
 | **M7** | Safety scan on PHQ-4 opt-out | If the user opts out of PHQ-4 partway and their partial sub-scores already crossed `GAD2_THRESHOLD` or `PHQ4_THRESHOLD`, the safety path fires: `clinical_flags.PHQ4_OPT_OUT_ELEVATED` + `_deliver_safety_message("phq4_partial_<last_qid>")`. Paper's safety logic does not hinge on completing all 4 questions. |
+
+### Per-session subject identity (two-layer model)
+
+Every session is a distinct file entry, even for repeat visits from the same subject or near-collision names like "Alice" / "Alex". This is achieved with a two-layer identity installed at onboarding (`io_record.init_record`):
+
+| Layer | Example | Used for |
+|---|---|---|
+| **`SUBJECT_BASE_ID`** (stable across a subject's visits) | `alice` | `users.subject_id` in SQLite, Q-table filename (`item_qtable_alice.csv`) — so longitudinal warm-start still finds prior Q-values, user context, preferences on the next visit. |
+| **`SUBJECT_ID`** (composed per session as `<base>_<YYYYMMDD_HHMMSS>`) | `alice_20260425_190621` | Every per-session artefact filename — Report / Notes CSV, session dossier JSON, per-session log directory, crisis file-fallback. Also what `/api/status` reports as the live subject. |
+
+**Artefacts produced per session** (for onboarded name `alice` starting at `20260425_190621`):
+
+```
+data/results/Report_alice_20260425_190621.csv       # CSV Report (per session)
+data/results/Notes_alice_20260425_190621.csv        # CSV Notes  (per session)
+data/sessions/session_alice_20260425_190621.json    # Session dossier JSON
+data/logs/alice_20260425_190621/                    # Per-session log dir
+        alice_20260425_190621.log                 # CSV transcript
+        alice_20260425_190621.json                # NDJSON event stream
+data/clinical/clinical_report_alice_<session_id>.csv  # Therapist-facing export
+data/safety/crisis_alice_20260425_190621_<dim>_<ts>.txt  # (if crisis fires)
+```
+
+**Subject-stable artefacts** (intentionally NOT per-session — longitudinal continuity):
+
+```
+data/q_tables/item_qtable_alice.csv                 # Q-table accumulates across Alice's sessions
+users row (alice)                                    # One DB users row → many sessions rows
+```
+
+Three sequential sessions from Alice therefore produce three distinct Report / Notes / dossier files, but a single `item_qtable_alice.csv` that warm-starts each new visit.
 
 ### Participant experience end-to-end
 
@@ -237,11 +269,11 @@ Every LLM call passes through `llm_complete(system, user, role=LLMRole.XYZ)` wit
 ├── data/                      # Runtime data (all subdirectories auto-created on first boot)
 │   ├── therapist.db           # SQLite (authoritative relational store; turns + clinical_scores + intervention_logs + ...)
 │   ├── libs/                  # question_lib_v4.json (37 dims + synthetic pool) — only file kept here
-│   ├── q_tables/              # Per-subject Q-tables (CSV); rebuilt from config.yaml item_importance on participant reset
-│   ├── results/               # Session Report.csv / Notes.csv (handler_rl end-of-session emit)
-│   ├── sessions/              # SessionDossier JSON (one file per session, paired user→agent interactions)
-│   ├── clinical/              # Phase B: clinical_report_{SUBJECT}_{SESSION}.csv — therapist-facing export
-│   └── logs/                  # Per-session {SUBJECT}_Session_{TS}.log (CSV) + .json (NDJSON event stream)
+│   ├── q_tables/              # Per-subject Q-tables (CSV, keyed by BASE id — stable across a subject's sessions); rebuilt from config.yaml item_importance on participant reset
+│   ├── results/               # Per-session Report_{SUBJECT}_{TS}.csv / Notes_{SUBJECT}_{TS}.csv (handler_rl end-of-session emit)
+│   ├── sessions/              # SessionDossier JSON — one file per session, session_{SUBJECT}_{TS}.json
+│   ├── clinical/              # Phase B: clinical_report_{SUBJECT}_{SESSION_ID}.csv — therapist-facing export
+│   └── logs/                  # data/logs/{SUBJECT}_{TS}/ per-session log dir — {SUBJECT}_{TS}.log (CSV) + .json (NDJSON)
 │
 ├── assets/audio/              # waiting_music.wav (fallback) + ambient_therapy.mp3 (long-form ambient bed, git-ignored; deploy-time asset)
 ├── scripts/                   # Python tools + clinical-ops helpers (no launchers)
@@ -254,7 +286,7 @@ Every LLM call passes through `llm_complete(system, user, role=LLMRole.XYZ)` wit
 │
 ├── laptop_deploy.sh           # ⭐ laptop: one-command dev loop — sync + kill + run + tail
 ├── laptop_sync.sh             # laptop: rsync code to Jetson (no kill, no launch)
-├── laptop_pull.sh             # laptop: archival data pull Jetson → laptop (non-destructive)
+├── laptop_pull.sh             # laptop: single-mirror data pull Jetson → pulled_data/latest/ (non-destructive on Jetson)
 ├── jetson_setup.sh            # Jetson: one-time env bootstrap (apt, venv, Piper, LiteRT)
 ├── jetson_kill.sh             # Jetson: hard kill of all CaiTI processes + port release
 └── jetson_run.sh              # Jetson: launch main.py (assumes env ready, ports clear)
@@ -313,7 +345,7 @@ The consolidated wrapper `rv_consolidated` dispatches to Guide-or-Validator base
 
 Triggered when one or more dims scored 2. `run_cbt(question_lib)`:
 
-1. **Stage 0 — Select.** List every Score-2 dim; user picks by number.
+1. **Stage 0 — Select.** List every Score-2 dim; user picks by number. `_extract_choice_number()` accepts digits ("2"), cardinal words ("two"), and ordinal words ("second", "the third one") — voice-dictated answers through Whisper rarely emit numerals for small integers.
 2. **Stage 1 — Recognize.** Pull the user's recorded statement (prefers `followup_resp_1` > `followup_resp` > `original_resp` from the RV notes), ask them to identify unhelpful thoughts. `stage1_reasoner` checks validity (returns DECISION 0/1). Up to 2 retries via `stage1_guide`.
 3. **Stage 2 — Challenge.** `stage2_reasoner` / `stage2_guide` loop.
 4. **Stage 3 — Reframe.** `recap_stage3_challenge` recaps the user's CHALLENGE as a prefix, then `stage3_reasoner` / `stage3_guide` loop.
@@ -321,6 +353,8 @@ Triggered when one or more dims scored 2. `run_cbt(question_lib)`:
 If any stage exhausts its 3-attempt budget, the `CBT_ESCALATION_MESSAGE` (SAMHSA / 988) is spoken before pausing. Every CBT step writes a structured note row into `question_lib[i][j]["notes"]` with `CBT_stage: success` or `CBT_stage: N_failed`.
 
 `_parse_decision` is strict — requires an explicit `DECISION: 0` / `DECISION: 1` line and fail-closes to "retry" on ambiguity, avoiding the legacy false-pass on any stray `0` in prose.
+
+**Guide output sanitizer.** Each `stageN_guide` LLM call is wrapped in `_sanitize_guide_text(raw, target_label)` before being spoken. Addresses three Gemma-4-E2B small-LLM failure modes: (1) the model echoes the prompt's STATEMENT / UNHELPFUL_THOUGHTS header back before the actual guidance (confusing — sounds like CaiTI is reading the user's own words back); (2) it prefixes the output with the target label itself (`CHALLENGE: ...`, fine in the DB note but awkward spoken); (3) it mimics the few-shot examples' first-person register ("I can challenge this thought by asking myself..." — sounds like CaiTI is narrating the user's internal monologue). The sanitizer extracts only the content after the target label, strips re-echoed header lines, swaps first-person pronouns to second-person ("I can" → "you can", "myself" → "yourself"), recapitalises sentence-initial pronouns, and prefixes with "Here's an example challenge you could try:" so the user hears it clearly as offered guidance, not a question aimed at them. Legacy / GPT-4 didn't need this — the sanitizer is a Gemma-specific output-hygiene shim, not a divergence from the clinical contract.
 
 ### `src/core/therapy_content.py` — Clinical content constants
 
@@ -338,10 +372,26 @@ If any stage exhausts its 3-attempt budget, the `CBT_ESCALATION_MESSAGE` (SAMHSA
 - `next_activity(exclude=...)` picks one of `{SCREENING, BREATHING_EXERCISE, MUSIC}` at random on each iteration, deprioritising the last stage played so users don't get the same activity twice in a row when alternatives exist. SCREENING is only eligible while at least one PHQ/GAD question remains unanswered. MUSIC is the guaranteed fallback — if every stage is excluded (e.g. after the user declines all others this turn), MUSIC is returned so the user never hears silence.
 - `mark_activity(stage)` records the last-played activity for the next pick's deprioritisation.
 - **SCREENING** — asks the next unanswered PHQ-4 / GAD-2 question. Tracker guarantees no repeats **for the entire session** and supports checkpoint restore from DB so mid-session restarts don't reset state. Answered / skipped questions never regress. If the user says "no" / "skip" / "pass", the question is marked SKIPPED and the turn falls through to a fresh random pick from `{BREATHING, MUSIC}`.
-- **BREATHING_EXERCISE** — one meditation from the no-repeat pool (tracks `_last_breathing_idx` so we don't play the same one twice in a row). If the user declines mid-exercise, the turn falls through to MUSIC.
-- **MUSIC** — ambient fallback via `BackgroundMusicThread` with random-segment playback (see `src/drivers/audio.py` below). The MUSIC block fades the bed up to 30 % via `BackgroundMusicThread.fade_to` and triggers a fresh `jump_to_random_segment()` on each invocation so two back-to-back MUSIC beats sound different.
+- **BREATHING_EXERCISE** — one meditation from the pool with **session-scoped removal**: each played script is added to `_used_breathing_idx` and excluded from subsequent picks, so a user working through a long session hears all 5 scripts before any repeat. When the pool is exhausted the used set clears (wrap-around) and the next pick still avoids the most recent script. Breathing is passive — the block speaks the guidance and holds silently for the LLM's remaining latency; there is **no listen step** (removed so the user isn't left wondering why the device is waiting for them to respond to a meditation, and to eliminate one class of STT false positives on the global command gate).
+- **MUSIC** — ambient fallback via `BackgroundMusicThread` with random-segment playback (see `src/drivers/audio.py` below). The MUSIC block fades the bed up to `_MUSIC_BED_INTERMISSION` (85 %) via `BackgroundMusicThread.fade_to` — at listen-level loudness matching Piper TTS — and triggers a fresh `jump_to_random_segment()` on each invocation so two back-to-back MUSIC beats sound different.
 
-**Handoff back to the LLM reply.** When the LLM output arrives, the intermission loop fades the music down to 5 %, speaks a randomised bridge phrase ("Thank you for reflecting on that with me…"), speaks the LLM response, then fades the bed back up to 15 %. Music is never hard-cut — every transition goes through `fade_to`.
+**Handoff back to the LLM reply.** When the LLM output arrives, the intermission loop fades the music down to `_MUSIC_BED_HANDOFF` (5 %) for the bridge phrase, speaks a randomised bridge ("Thank you for reflecting on that with me…"), speaks the LLM response (during which `set_ai_speaking` auto-ducks the bed to 2 %), then fades back up to `_MUSIC_BED_AMBIENT` (85 %) ready for the next turn. Music is never hard-cut — every transition goes through `fade_to`. The bridge phrase is suppressed on the very first turn (`is_session_start=True`) because the user hasn't shared anything yet — the opening dimension question lands clean after the post-greeting intermission.
+
+**Background-music loudness contract.** Two audibly distinct states:
+
+| State | Volume | When it applies |
+|---|---|---|
+| **LOUD** (foreground listen level) | 0.85 | Idle, post-turn rest, between meditation guidance phrases, MUSIC intermission, any "hold" window while the LLM thinks and the mic is NOT listening |
+| **DUCKED** (whisper) | 0.02 | Any time Piper TTS is playing (`set_ai_speaking` set by `AudioPlayer.play`) OR the mic is listening (`set_user_speaking` set from the moment `record_until_silence` opens the stream — not just after VAD detects voice) |
+
+`_target_volume()` short-circuits to `speaking_volume` (0.02) whenever either flag is set, so raising the base levels cannot interfere with TTS intelligibility or mic capture. The four per-state constants keep distinct names so a deployment can tune one independently, but by default three of them share the same loud value:
+
+| Constant | Value | When it applies |
+|---|---|---|
+| `_MUSIC_BED_AMBIENT` | 0.85 | Idle / post-turn resting level (LOUD) |
+| `_MUSIC_BED_BREATHING` | 0.85 | Between meditation guidance phrases (LOUD) |
+| `_MUSIC_BED_INTERMISSION` | 0.85 | MUSIC intermission block (LOUD, TTS-match) |
+| `_MUSIC_BED_HANDOFF` | 0.05 | ~1 s dip right before the LLM response TTS |
 
 ### `src/core/context_manager.py` — Closing-reflection helper
 
@@ -372,11 +422,11 @@ Single public function: `llm_complete(system_content, user_content, role=LLMRole
 The main audio loop. States: `idle`, `onboarding`, `main_listen`, `main_process`, `intermission_screening`, `intermission_exercise`, `music_fallback`, `speaking`.
 
 - **Idle** — polls 1 s audio windows for the wake phrase (`hello|hi|hey|start|wake` + `katie`) or GPIO Start button.
-- **Onboarding** — asks for the user's name. Greeting is split into two TTS utterances ("Hello, I'm CaiTI." → short music swell → "Who am I speaking with today?") so the ambient bed gets an audible beat between the introduction and the prompt. A multi-layer Name Guard rejects common filler ("of course", "good morning", "I'm fine", etc.) and strips phrases like "my name is". Bypass keywords (e.g. "start", "hello") fall back to `User`.
-- **Active session** — first agent utterance from `OUTPUT_QUEUE` → `say()` → then the listen/send/handoff/intermission cycle.
-- **VRAM handoff** — before waiting for the LLM, `stt.suspend_all()` + 0.3 s delay so the OS can reclaim RAM; after the intermission produces the agent's response, STT is resumed for the next listen.
-- **Intermission pipeline** — when `LLM silence > _INTERMISSION_TRIGGER_SEC` (3 s default), `_wait_for_output_with_intermission` drives `IntermissionLadderManager` through **randomised cycling** of `{SCREENING, BREATHING_EXERCISE, MUSIC}`. Activities are routed through three helpers — `_run_screening_block`, `_run_breathing_block`, `_run_music_block` — each returning an outcome (`end` / `llm_ready` / `declined` / `completed`) so the parent loop can decide to cycle, break, or fall through. User decline chains (screening → breathing-or-music fallback in the same turn; breathing → music fallback) are implemented as per-turn `exclude` sets passed to `next_activity()`. Supports "repeat", "skip", and opt-out keywords mid-pipeline. When the LLM response arrives the music fades down, a randomised bridge phrase smooths the handoff, the therapist's reply is spoken, and the music fades back up to the ambient base.
-- **End session** — via voice (`end session` / `goodbye` via `GlobalCommandMatcher`), GPIO End button, or the FastAPI `/api/end_session`. Triggers: `stop_audio` → `generate_closing_reflection` → speak reflection → save `SessionDossier` → play goodbye music → back to idle.
+- **Onboarding** — asks for the user's name, then delivers a **personalised handshake greeting**: `"Hello, {name}. I'm CaiTI, your intelligent therapist. Thank you for joining me today."` (the name is dropped gracefully when the Name Guard fell back to `User`). The earlier "Hello, I'm CaiTI." → music swell → "Who am I speaking with today?" opener still frames the name prompt. A multi-layer Name Guard rejects common filler ("of course", "good morning", "I'm fine", etc.) and strips phrases like "my name is". Bypass keywords (e.g. "start", "hello") fall back to `User`. At the end of onboarding, `_first_output_pending` is armed so the main loop routes the very first LLM utterance through the intermission pipeline.
+- **Active session** — post-greeting, the main loop checks `_first_output_pending`: if set, `_run_one_intermission_activity()` + `_wait_for_output_with_intermission(is_session_start=True)` run so PHQ-4 / breathing / music fills the pre-first-question gap and the internal watchdog speaks the LLM's opening dimension question on its way out (bridge phrase suppressed — the user hasn't shared anything yet). On every subsequent turn: `OUTPUT_QUEUE.get()` → `say()` → listen → `input_queue.put` → Pre-unload → **`_run_one_intermission_activity()` (proactive)** → `_wait_for_output_with_intermission()` (delivery) → next turn.
+- **VRAM handoff** — before running intermission, `stt.suspend_all()` frees ~125 MB of GPU memory so the LLM has room. STT is resumed inside the activity (for SCREENING's listen step) and re-suspended at the activity's exit. Also resumed at idle-loop entry so the wake-detect transcribe never fails with "Model not loaded".
+- **Intermission pipeline — GIL-safe proactive activity** — LiteRT-LM's Gemma inference holds the Python GIL for the full 10–30 s of each LLM call, which means any `Event.wait(3)` on this thread is effectively paused until the handler releases the GIL. A naive "wait for LLM silence > 3 s, then start intermission" loop therefore never fires at all; the output is already queued by the time the speech thread gets a GIL slice (observed in sessions 13/14, fixed). Current design: **`_run_one_intermission_activity()` is called BEFORE the delivery pipeline** — immediately after `input_queue.put` — so the activity's TTS + listen (both GIL-free inside pygame / PyAudio C extensions) run in parallel with the handler's LLM work. SCREENING is picked first while any PHQ-4 / GAD-2 question remains; once all four are resolved, the ladder cycles BREATHING ↔ MUSIC with last-activity deprioritisation. Breathing is passive (no listen step, just speak + hold). User-decline chains still fire on SCREENING (paper-aligned fallback). When the LLM response arrives the music fades down for the bridge phrase (suppressed on session start), the therapist's reply is spoken, and the music fades back up to the ambient base.
+- **End session** — via voice (`end session` / `goodbye` via `GlobalCommandMatcher`), GPIO End button, or the FastAPI `/api/end_session`. Triggers: `stop_audio` → `generate_closing_reflection` → speak reflection → save `SessionDossier` → play goodbye music → back to idle. Also clears `_first_output_pending` so a mid-first-turn end doesn't leave the flag armed. The global command matcher uses **exact-token match** for `goodbye`/`bye` (short-token fuzzy matching is unreliable — "be" ↔ "bye" scored 0.80 under the old threshold and ended a session mid-CBT, fixed).
 
 ### `src/services/response_bridge.py` — Classifier output parser
 
@@ -390,8 +440,8 @@ Pure-Python parser for the Analyzer's output. `get_openai_resp(user_input, origi
 
 - `AudioRecorder` — PyAudio + WebRTC-VAD recorder. `record_until_silence` waits up to 5 s for speech to start, then records until `silence_duration` (2 s default) of VAD silence, plus a 0.4 s trailing pad. Filters out noise bursts shorter than `min_speech_sec` (0.3 s). Computes RMS so the caller can discard buffers below a noise gate.
 - `BackgroundMusicThread` — ambient `pygame.mixer.music` loop. Always-on; `start()` / `stop()` are idempotent. Plays `assets/audio/ambient_therapy.mp3` with `waiting_music.wav` fallback.
-  - **Auto-duck** — whenever `set_ai_speaking(True)` or `set_user_speaking(True)` fires, volume drops to `speaking_volume` (2 % default) so the user isn't fighting music to be heard; restores base 15 % after.
-  - **Smooth fades** — `fade_to(target_volume, duration)` ramps linearly between volumes over `duration` seconds (the worker thread evaluates the ramp every ~200 ms). Used by the intermission MUSIC block to swell up to 30 % while the user waits, then duck to 5 % for the bridge-phrase handoff before the LLM reply, then restore to 15 % after.
+  - **Auto-duck** — whenever `set_ai_speaking(True)` (Piper TTS playing) or `set_user_speaking(True)` (mic stream open — fires from the moment `record_until_silence` opens the stream, not just after VAD detects voice) is set, `_target_volume()` short-circuits to `speaking_volume` (2 % default) regardless of any base/fade target. Restores to the current base (85 %) as soon as both flags clear. This is the single source of "music ducks while the therapist speaks OR the mic is listening."
+  - **Smooth fades** — `fade_to(target_volume, duration)` ramps linearly between volumes over `duration` seconds (the worker thread evaluates the ramp every ~200 ms). Used by the intermission pipeline to hold `_MUSIC_BED_INTERMISSION` / `_MUSIC_BED_BREATHING` / `_MUSIC_BED_AMBIENT` (all 85 % by default, foreground listen level matching Piper TTS) during any "hold" window, then dip to `_MUSIC_BED_HANDOFF` (5 %) ~1 s before the LLM reply TTS so the bridge phrase lands clean, then restore to `_MUSIC_BED_AMBIENT` (85 %) after. See the [Intermission Manager section](#srccoreintermission_managerpy--intermission-activity-selector) for the full loudness contract + constants table.
   - **Random-segment playback** — on startup and on every natural loop rollover, the track begins at a **random offset** picked uniformly from `[0, duration × 0.90]`. Duration is probed once per track via a zero-dependency MPEG frame-header parser (`_probe_audio_duration`) so no `mutagen` / `ffprobe` install is needed. For the shipped 5 h ambient track this means users rarely hear the same opening seconds twice.
   - **Explicit segment jumps** — `jump_to_random_segment()` sets a thread-safe event that the worker observes on its next poll and seeks to a new random offset. Called from `_run_music_block` so every MUSIC intermission plays a different part of the track.
   - **Seek hardening** — SDL2's MP3 decoder silently fails on very deep seeks on some hardware (confirmed empirically on the shipped Jetson + USB DAC chain at offsets past ~95 % of the 5 h track: `play(start=offset)` returned `get_busy()==False` and produced no audio). Two defences: (a) the 90 % safe-fraction cap on the random-offset upper bound avoids the problem region entirely for organic jumps; (b) every `play(start=offset)` is verified via `get_busy()` + `get_pos() >= 0` within ~200 ms and on failure retries at half the offset, then zero.
@@ -454,6 +504,8 @@ Reads `config.yaml` (RL + audio + STT + TTS + DB) and `.env` (LiteRT model + GPI
 
 - Queues: `INPUT_QUEUE` (user → handler), `OUTPUT_QUEUE` (handler → speech). Both `queue.Queue`.
 - Events: `START_SESSION_EVENT`, `END_SESSION_EVENT`.
+- **Two-layer subject identity.** `init_record()` composes `SUBJECT_ID = "<base>_<YYYYMMDD_HHMMSS>"` from `SUBJECT_BASE_ID` at session start. `SUBJECT_ID` keys every per-session artefact (Report / Notes / dossier / log dir / crisis file); `SUBJECT_BASE_ID` stays stable across visits and keys the DB `users.subject_id` row + Q-table filename so longitudinal state still resolves for returning subjects.
+- Per-session `REPORT_FILE` / `NOTES_FILE` module attrs are re-computed inside `init_record()` via `config_loader.format_result_paths(SUBJECT_ID)`, so `generate_results()` writes to a session-unique path every time.
 - `log_question(text)` / `get_answer()` / `get_resp_log()` — the speech loop writes user input to INPUT_QUEUE; the handler writes questions to OUTPUT_QUEUE via `log_question`.
 - `set_question_prefix(text)` — prepends a one-shot prefix (e.g. RV Validator output) to the next agent utterance.
 - `_segment_utterance(text)` — legacy-faithful segmenter that splits on `.!?` + connectives `", and"` / `" but "`. Zero deps.
@@ -461,7 +513,7 @@ Reads `config.yaml` (RL + audio + STT + TTS + DB) and `.env` (LiteRT model + GPI
 
 ### `src/utils/io_question_lib.py` — Question library I/O
 
-`load_question_lib(path)` / `save_question_lib(path, lib)` + `generate_results` which atomically writes the end-of-session `Report_<subject>.csv` (label, score, notes) and `Notes_<subject>.csv` to `data/results/`.
+`load_question_lib(path)` / `save_question_lib(path, lib)` + `generate_results` which atomically writes `Report_<SUBJECT_ID>.csv` and `Notes_<SUBJECT_ID>.csv` to `data/results/`. The destinations default to `io_record.REPORT_FILE` / `NOTES_FILE`, which are rewritten at session start so the composed `<name>_<timestamp>` id produces a distinct file for every session.
 
 ### `src/utils/rl_qtables.py` — Q-learning primitives
 
@@ -515,7 +567,24 @@ IDLE
   |
   |  [wake word / GPIO Start / API /api/login]
   v
-ONBOARDING            ---> name captured, reset_session(uid), START_SESSION_EVENT.set()
+ONBOARDING            ---> name captured, reset_session(name) installs:
+                              SUBJECT_BASE_ID = "alice"                  (stable across visits)
+                              SUBJECT_ID      = "alice_20260425_190621"  (per-session unique)
+                           then START_SESSION_EVENT.set()
+                           |-- personalised handshake greeting:
+                           |     "Hello, <name>. I'm CaiTI, your intelligent
+                           |      therapist. Thank you for joining me today."
+                           |-- _first_output_pending = True
+                           |     (arms the main loop to route the first LLM
+                           |      utterance through the intermission pipeline)
+  |
+  v
+POST-GREETING GAP     ---> _wait_for_output_with_intermission(is_session_start=True)
+                           |-- PHQ-4 / breathing / music fills the silence
+                           |   while HANDLER_RL initialises + generates
+                           |   the opening dimension question
+                           |-- watchdog speaks the first LLM utterance
+                           |   on arrival (bridge phrase suppressed)
   |
   v
 HANDLER_RL.run()
@@ -559,7 +628,8 @@ HANDLER_RL.run()
   |   |-- Stage 2 Challenge
   |   |-- Stage 3 Reframe
   |
-  |-- generate_results -> data/results/{Report,Notes}_<id>.csv
+  |-- generate_results -> data/results/{Report,Notes}_<SUBJECT_ID>.csv
+  |                       (per session — composed id carries the timestamp)
   |-- closing message LLM
   |-- _generate_session_analysis -> DB summaries + preferences + safety flags
   |-- _generate_clinical_summary -> SOAP note in DB + spoken
@@ -615,9 +685,9 @@ Session data fans out into **five parallel stores**, plus a session-close artefa
 |---|---|---|---|---|
 | 1 | SQLite — dialogue | `data/therapist.db` → `turns` | `DB.add_turn()` | query, therapist report |
 | 2 | SQLite — clinical | `data/therapist.db` → `clinical_scores`, `clinical_score_attempts`, `intervention_logs`, `clinical_flags`, `safety_deliveries`, `clinical_screening`, `intermission_screening` | `DB.record_clinical_score()`, `DB.record_intervention_log()`, `log_*_flag()`, `log_safety_delivery()` | therapist report, audits, longitudinal analysis |
-| 3 | JSON dossier | `data/sessions/session_{SUBJECT}_{TS}.json` | `SessionDossier.record_interaction()` (via `log_question`) | archival / human inspection |
-| 4 | JSON event stream | `data/logs/{SUBJECT}/{SUBJECT}_Session_{TS}.json` (NDJSON) | `log_json_event()` | timeline replay, debugging |
-| 5 | CSV transcript | `data/logs/{SUBJECT}/{SUBJECT}_Session_{TS}.log` | `append_to_csv()` | spreadsheet review |
+| 3 | JSON dossier | `data/sessions/session_{SUBJECT_ID}.json` (where `SUBJECT_ID` is the composed `<base>_{TS}`) | `SessionDossier.record_interaction()` (via `log_question`) | archival / human inspection |
+| 4 | JSON event stream | `data/logs/{SUBJECT_ID}/{SUBJECT_ID}.json` (NDJSON) | `log_json_event()` | timeline replay, debugging |
+| 5 | CSV transcript | `data/logs/{SUBJECT_ID}/{SUBJECT_ID}.log` | `append_to_csv()` | spreadsheet review |
 
 All five are coordinated through `src/utils/io_record.py`.
 
@@ -627,9 +697,10 @@ All five are coordinated through `src/utils/io_record.py`.
 
 ### Two RL-state stores (side-by-side by design)
 
-**Per-subject Q-table CSV** — `data/q_tables/item_qtable_<subject_id>.csv`
+**Per-subject Q-table CSV** — `data/q_tables/item_qtable_<base_subject_id>.csv`
 
 - Written unconditionally at the end of every session.
+- **Keyed by the BASE subject id** (no timestamp), so Alice's session-2 warm-starts from the Q-values saved at the end of session 1. This is a deliberate divergence from the per-session filename scheme used for Report / Notes / dossier artefacts.
 - Paper / legacy byte-compatible format (same filename scheme, same shape).
 - Loaded as the baseline Q-table at session start.
 
@@ -683,10 +754,11 @@ Useful one-liners (all hit `data/therapist.db`):
 -- How sessions are closing (clean vs crash-recovered vs dangling):
 SELECT end_reason, COUNT(*) FROM sessions GROUP BY end_reason;
 
--- Latest N sessions for a subject:
+-- Latest N sessions for a subject (DB keys on the BASE id; pass the
+-- onboarded name here, NOT the composed per-session SUBJECT_ID):
 SELECT s.id, s.start_time, s.end_time, s.end_reason
 FROM sessions s JOIN users u ON s.user_id = u.id
-WHERE u.subject_id = '8080'
+WHERE u.subject_id = 'alice'
 ORDER BY s.id DESC LIMIT 10;
 
 -- All Score=2 (crisis) dimensions across history:
@@ -759,17 +831,46 @@ Ring 1 is what you hand a therapist. Ring 2 is what you query during research. R
 
 ```yaml
 app:
-  subject_id: "8080"          # default subject id if .env doesn't override
+  subject_id: "8080"          # boot-time fallback only — the real subject id is
+                              # captured at onboarding ("Who am I speaking with
+                              # today?") and composed into <name>_<YYYYMMDD_HHMMSS>
+                              # in io_record.init_record().
+
+paths:
+  # ${subject_id} in these templates is filled with the *composed* per-session id
+  # (<onboarded_name>_<timestamp>) so every session is its own file entry.
+  report_file: "data/results/Report_${subject_id}.csv"
+  notes_file:  "data/results/Notes_${subject_id}.csv"
 
 rl:
   item_n_states: 38            # 1 INIT + 37 dims (paper-equivalent to the 39-state grid)
-  epsilon: 0.9                 # paper p.11
-  alpha: 0.1                   # paper p.11
-  gamma: 0.9                   # paper p.11
-  item_importance: [...]       # 1-10 therapist-validated weights per dim
-  rephrase_at_runtime: true    # set false for latency-sensitive deploys
-  rephrase_probability: 0.95
-  reward_mode: hybrid          # "mean" for paper-strict, "hybrid" for safer revisit priority
+
+  # Legacy-prototype / demo values in use (clinically-tested).
+  # Paper §5.1 states ε=0.9 / α=0.1; legacy prototype shipped ε=1 / α=0.5
+  # and that is what the published demo recording runs on.
+  epsilon: 1                   # legacy prototype (demo)
+  alpha: 0.5                   # legacy prototype (demo)
+  gamma: 0.9                   # paper + legacy (agree)
+  item_importance: [0, 5, 98, 99, 5, 4, 4, 4, 2, 2, 5, 97, 5, ...]
+                               # legacy sentinel pins: mood=98, medication=99, eat=97
+                               # pin the top-3 screening triage order (see demo)
+
+  rephrase_at_runtime: true    # D5/D6 — legacy-parity: legacy prototype calls
+                               # generate_synonymous_sentences() on ~95% of turns
+  rephrase_probability: 0.95   # legacy `np.random.uniform() < 0.95` gate
+  reward_mode: mean            # paper §5.1 + legacy prototype (arithmetic mean)
+
+  # ── Feature gates (see "Feature Gates & Future Development" below) ──
+  # All default false for legacy-parity EXCEPT soap_report_enabled which
+  # is a silent clinician artefact with no user-visible impact.
+  reask_dimension_n: false            # G5  — paper §4.2 re-ask
+  multi_dim_backfill_enabled: false   # G8  — paper §4.1 multi-dim back-fill
+  reflective_summarizer_enabled: false # G9 — paper §5.2 MI reflective summarizer
+  warm_start_enabled: false           # G11 — returning-user Q nudge + recall greeting
+  session_analysis_enabled: false     # G12 — post-session SUMMARY+prefs+safety LLM
+  soap_report_enabled: true           # G13 — SOAP clinician note (silent, DB only)
+  dimension_optouts_enabled: false    # G14 — per-user disabled_dim masking
+  session_cap_enabled: false          # G15 — 60-minute hard cap (re-enable for trials)
 
 audio:
   sample_rate: 16000
@@ -797,8 +898,10 @@ database:
 LLM_MODEL=gemma-4-E2B-it
 LITERT_MODEL_PATH=./models/litert/gemma-4-E2B-it.litertlm
 LITERT_BACKEND=cpu                 # cpu (XNNPack) | gpu (ML Drift if build supports it)
-LITERT_CONTEXT_LENGTH=2048         # paragraph-length R-V / CBT outputs need headroom
-LITERT_MAX_TOKENS=512
+LITERT_CONTEXT_LENGTH=4096         # paragraph-length R-V / CBT outputs need headroom
+LITERT_MAX_TOKENS=4096             # D1 — lifted from 512 so Gemma can emit the demo's
+                                   # 4-7 sentence MI Validator and 3-5 clause CBT Stage-1
+                                   # Guide enumerations without mid-word truncation.
 
 # Speech I/O
 STT_MODEL=base.en
@@ -839,6 +942,120 @@ MIN_FREE_DISK_MB=1000
 SESSION_MAX_SECONDS=3600
 RESOURCE_AUDIT_ENABLED=1
 ```
+
+---
+
+## Feature Gates & Future Development
+
+The current deployment is calibrated for **legacy / demo parity** — the runtime flow, prompts, and hyperparameters match the Flutter-demo recording on the legacy prototype exactly, so participants hear the clinically-tested CaiTI experience the paper describes.
+
+Along the way we built **eleven extension features** that either refine paper-research behaviour (§4.1 multi-dim back-fill, §4.2 Dim-N re-ask, §5.2 reflective summarizer) or add new clinical-trial infrastructure (SOAP reports, longitudinal warm-start, dimension opt-outs, session-length caps, crisis override, CBT escalation referral). **Each of these is code-resident but gated OFF by default** so it can be re-enabled for future iterations without reopening the codebase.
+
+Every gate is an independent toggle: flip one in `config.yaml` (or `src/core/therapy_content.py` for the two defined there) and restart — no code changes needed.
+
+### Gate index
+
+**Currently ON** (all legacy-parity safe): `MULTI_DIM_BACKFILL_ENABLED` (G8), `SOAP_REPORT_ENABLED` (G13), `REPHRASE_AT_RUNTIME` (D5/D6).
+**Currently OFF** (future / off-demo): G5, G7, G9, G11, G12, G14, G15, D3.
+
+| # | Gate | Default | Config key | Subsystem | Adds |
+|---|---|---|---|---|---|
+| G5 | `REASK_DIMENSION_N` | `false` | `rl.reask_dimension_n` | Questioner | Paper §4.2 Dim-N re-ask before `retry_guide`. |
+| G7 | `CBT_ESCALATION_ENABLED` | `False` | `therapy_content.py` | CBT | 988/SAMHSA hotline referral after 3 failed CBT stage attempts. |
+| G8 | `MULTI_DIM_BACKFILL_ENABLED` | **`true`** | `rl.multi_dim_backfill_enabled` | Questioner | Paper §4.1 multi-dimension back-fill (segment + joined LLM passes). **ON after session 11 (John, 2026-04-25):** the Analyzer classified "my sadness takes over my life" as `('emo', 2)` while the asked dim was `mood`; without back-fill the score was dropped and CBT never triggered. The segment-level pass is a free reuse of the classifier output; only the joined-utterance pass is LLM-gated. |
+| G9 | `REFLECTIVE_SUMMARIZER_ENABLED` | `false` | `rl.reflective_summarizer_enabled` | Questioner | Paper §5.2 MI reflective summarizer LLM call for the "You mentioned that X…" follow-up. |
+| G11 | `WARM_START_ENABLED` | `false` | `rl.warm_start_enabled` | Session lifecycle | Returning-user Q-table nudge (+0.3 on prior Score-2 dims) + recall-and-resume greeting. |
+| G12 | `SESSION_ANALYSIS_ENABLED` | `false` | `rl.session_analysis_enabled` | Session lifecycle | Post-session LLM pass producing warm SUMMARY (spoken) + preferences (silent DB) + safety flags (silent DB). |
+| G13 | `SOAP_REPORT_ENABLED` | **`true`** | `rl.soap_report_enabled` | Session lifecycle | Silent SOAP clinical note (Subjective/Objective/Assessment/Intervention) written to DB for clinician handoff. **ON — legacy-parity safe (never spoken).** |
+| G14 | `DIMENSION_OPTOUTS_ENABLED` | `false` | `rl.dimension_optouts_enabled` | RL | Per-user `disabled_dim:<label>` preference masking at RL mask-init time. |
+| G15 | `SESSION_CAP_ENABLED` | `false` | `rl.session_cap_enabled` | Session lifecycle | 60-minute hard session length cap (tunable via `SESSION_MAX_SECONDS` env) with graceful termination. |
+| D3 | `CRISIS_OVERRIDE_ENABLED` | `False` | `therapy_content.py` | Safety | Score-2 on `CRITICAL_DIMS` (`sib`, `safe`, `risk`, `drug`, `alcohol`) short-circuits the RL loop and speaks `SAFETY_RESOURCES_MESSAGE` (988, SAMHSA, 911). Also runs between every CBT stage. |
+| D5/D6 | `REPHRASE_AT_RUNTIME` | **`true`** | `rl.rephrase_at_runtime` | Questioner | Paper §5.1 / legacy runtime Rephraser — LLM rewrites ~95% of picked question variants before speaking. **ON — matches legacy's `generate_synonymous_sentences()` behaviour.** |
+
+### How each gate is wired
+
+All gates are consumed via `src.utils.config_loader` module constants (except `CRISIS_OVERRIDE_ENABLED` and `CBT_ESCALATION_ENABLED` which live in `src/core/therapy_content.py` for locality with the safety content they guard). Every call site has a short `if FLAG:` guard and the extension implementation is preserved in full — flipping the flag to `true` re-enables the feature with no other edits.
+
+Grep points for each gate in source:
+
+```bash
+# Pipeline-shape gates (questioner)
+grep -n "REASK_DIMENSION_N\|MULTI_DIM_BACKFILL_ENABLED\|REFLECTIVE_SUMMARIZER_ENABLED" src/core/questioner.py
+
+# Safety / CBT content gates
+grep -n "CRISIS_OVERRIDE_ENABLED\|CBT_ESCALATION_ENABLED" src/core/CBT.py src/core/handler_rl.py
+
+# Session-lifecycle gates
+grep -n "WARM_START_ENABLED\|SESSION_ANALYSIS_ENABLED\|SOAP_REPORT_ENABLED\|DIMENSION_OPTOUTS_ENABLED\|SESSION_CAP_ENABLED" src/core/handler_rl.py
+```
+
+### Hyperparameters (values, not flags)
+
+These are single-value choices, not toggles — flip between legacy and paper by editing `config.yaml`:
+
+| Knob | Legacy (in use) | Paper §5.1 | Notes |
+|---|---|---|---|
+| `rl.epsilon` | `1` | `0.9` | Legacy pure exploitation vs. paper's 10% random exploration. |
+| `rl.alpha` | `0.5` | `0.1` | Legacy aggressive Q-updates vs. paper's conservative learning rate. |
+| `rl.gamma` | `0.9` | `0.9` | Both agree. |
+| `rl.item_importance` | legacy `[0, 5, 98, 99, 5, ..., 97, ...]` with 97/98/99 pins on mood/medication/eat | — | Legacy sentinel pins force the top-3 screening triage order (demo shape). A therapist-rebalanced 1-10 alternate is kept commented in `config.yaml`. |
+| `rl.reward_mode` | `mean` | `mean` | `hybrid = (max+mean)/2` is a safer-revisit research alternate. |
+| `LITERT_MAX_TOKENS` | `4096` | n/a | Lifted from 512 so Gemma can emit the demo's paragraph-length Validator and Stage-1 Guide outputs. |
+
+### Permanent fixes (not gated)
+
+These are pure bug fixes or legacy restorations — no flag, no alternate code path:
+
+| ID | File | What it does |
+|---|---|---|
+| G3 | `src/core/handler_rl.py` | Greeting raw seed restored to legacy's three-sentence text so the LLM rewrite produces the demo's warm opening ("Hi, I'm Caiti, and I'm here to support you…"). |
+| G4 | `src/core/questioner.py` | On RV decision=0 the Validator's output returned by `rv_consolidated()` is reused directly, eliminating the duplicate `rv_validator_mi()` call (halves RV hot-path LLM latency). |
+| G6 | `src/core/CBT.py` | CBT Stage 0 spoken wording restored verbatim from legacy ("you have issue in:", "Which dimension would you like to work on today?", "Tell me the dimension number. For example: 1"). |
+| G10 | `src/core/handler_rl.py` | When `SESSION_ANALYSIS_ENABLED=true`, SUMMARY is written by the LLM as 1–2 warm spoken sentences for the user, while PREFERENCES and SAFETY_FLAGS remain structured clinician artifacts. |
+| D1 | `src/core/CBT.py` | `_parse_decision` uses legacy substring semantics (`"0" if "0" in raw else "1"`) so Gemma replies without the literal `DECISION:` header still parse correctly. |
+| D2 | `src/core/handler_rl.py` | PHQ-4 pre-screen removed from the handler. The 4 PHQ/GAD items are delivered by `SpeechInteractionService`'s intermission ladder as latency fillers (each fires at most once per session). |
+| D4 | `src/core/handler_rl.py` | `_load_longitudinal_state` boost reduced from 3.0 → 0.3 and the "first 2 turns force-target prior Score-2 dim" bypass of ε-greedy removed. (Only active when `WARM_START_ENABLED=true`.) |
+| D7 | multiple | Log taxonomy matches the demo: heartbeat, per-call LLM request logs, and `log_reasoning` INFO lines demoted to DEBUG. |
+
+### Re-enablement checklists
+
+Before flipping a gate on for a live session or trial, follow the checklist for that feature:
+
+**G5 — `reask_dimension_n`** — Demo never re-asks verbatim; enabling this adds a user-visible "I missed that, let me ask again" moment for off-topic answers. No safety implication, purely UX.
+
+**G7 — `CBT_ESCALATION_ENABLED`** — Must coordinate with the study PI. The 988/SAMHSA script is spoken *only* on 3 failed CBT attempts, so false-positive exposure is low, but the recording is a regulated clinical script and the PI should approve its exact wording.
+
+**G8 — `multi_dim_backfill_enabled`** — Already ON (session-11 fix). Silent DB-level change — the user hears the same screening questions; the only effect is that the CBT Stage 0 candidate list may include dims the user mentioned incidentally (e.g. scoring `emo` Score-2 from a long answer to a `mood` question). To tighten for strict demo parity (single asked-dim-only scoring) flip to `false`. Current trade-off: the `_apply_multi_dim_updates` LLM pass is gated on utterance length (≥20 tokens, ≥2 segments) so the extra inference cost only fires on substantive replies.
+
+**G9 — `reflective_summarizer_enabled`** — Adds one LLM call per Score-2 RV follow-up. Verify latency budget on the Jetson before enabling; the demo's "You mentioned that X. Can you tell me more?" wording is preserved by the legacy `generate_change()` regex path at zero LLM cost.
+
+**G11 — `warm_start_enabled`** — Requires DB-backed `rl_state` rows. Safe to enable once at least one completed session exists for the subject; first-session users get a no-op. Check the greeting prompt still speaks naturally when the recall hint is auto-filled.
+
+**G12 — `session_analysis_enabled`** — Adds one post-session LLM call (warm SUMMARY, preferences, safety flags). Gemma output must be validated to match the spoken-SUMMARY prompt's warm tone — the system prompt is explicit but Gemma-4-E2B's adherence is weaker than GPT-4's.
+
+**G13 — `soap_report_enabled`** — Already ON. DB-only (never spoken to user). Ensure the SQLite DB path (`data/therapist.db` by default) lives on a HIPAA-compliant filesystem for the trial. The SOAP note is stored in the `summaries` table keyed by `session_id`.
+
+**G14 — `dimension_optouts_enabled`** — Requires the `disabled_dim:<label>` preferences to already exist in the DB for the subject. Safe to enable any time; becomes a no-op for any subject without opt-outs.
+
+**G15 — `session_cap_enabled`** — **Strongly recommended for clinical trials.** Protects against a stuck LLM holding a participant on-device indefinitely. Re-enable along with setting `SESSION_MAX_SECONDS` to the trial's per-visit time budget.
+
+**D3 — `CRISIS_OVERRIDE_ENABLED`** — Higher bar. Before enabling:
+1. FP rate of the DLA Analyzer on `CRITICAL_DIMS` (`sib`, `safe`, `risk`, `drug`, `alcohol`) must be measured < 2% on a held-out set.
+2. `SAFETY_RESOURCES_MESSAGE` (988, SAMHSA, 911) content must be reviewed by the study PI.
+3. The safety delivery audit trail (DB `safety_deliveries` + file fallback at `data/safety/`) must be verified to actually land in the trial deployment environment.
+4. No double-delivery: mid-CBT crisis fires the callback exactly once per `_crisis_dims_handled` entry.
+
+**D5/D6 — `rephrase_at_runtime`** — Already ON (legacy parity). Legacy prototype calls `generate_synonymous_sentences()` on ~95% of screening turns, so the demo recording varies wording from session to session. If disabling for a latency-sensitive deploy, validate that the pre-generated `question_synthetic[]` pool covers the turns you'd otherwise rewrite.
+
+### Future development — beyond what is gated
+
+Things that would require new code, not just a flag flip:
+
+- **Per-role model routing.** The `ROLE_MODEL_MAP` in `src/models/llm_client.py` currently points every paper role (ANALYZER, REPHRASER, RV_REASONER, RV_VALIDATOR, CBT_REASONER, CBT_GUIDE, GENERAL, etc.) at the same on-device Gemma instance. When a larger model (local or cloud) is available for the heavy reasoning roles, splitting the map is the single change required — every call site already passes `role=LLMRole.X`.
+- **PHQ-9 / GAD-7 extensions.** The intermission ladder today ships only the PHQ-4 / GAD-2 subset. Full-length instruments would live in `src/core/therapy_content.py::CLINICAL_SCREENING` and the ladder selector would pick them on sessions where the clinician has enabled the extended screen.
+- **Offline LLM fallback.** When `litert_lm.Engine` throws repeatedly (see `engine_is_healthy()` in `src/models/llm_client.py`), the current behaviour is to raise `LLMError` and mark the turn SKIPPED. A future fallback path would route to a smaller cached model or a scripted decision tree so a hardware hiccup doesn't end the session.
+- **Multi-language.** Every clinical prompt is currently English-only. Translation would change both the STT/TTS models (Whisper supports many; Piper has several voices) and the question/prompt libraries.
+- **Clinician dashboard.** SOAP notes land in `DB.summaries` today but there is no browse UI. A read-only FastAPI endpoint plus a static page would close that loop.
 
 ---
 
@@ -887,14 +1104,78 @@ python scripts/model_fetch.py
 
 The long-form ambient track is **not** in git (git-ignored to keep the repo small). Drop a licensed/royalty-free ambient track at `assets/audio/ambient_therapy.mp3` — anything from a few minutes to several hours works; duration is probed automatically. If the file is absent, `BackgroundMusicThread` falls back to the 2 min `assets/audio/waiting_music.wav` clip already in the repo. Random-segment playback still works on the fallback but is less varied because the track is short.
 
-### Run locally (dev machine, no Jetson)
+### One-command start (laptop or Jetson)
 
 ```bash
-# Local interactive — FastAPI on :8000 + speech loop
+./start_therapist.sh
+```
+
+`start_therapist.sh` is the **single launcher** used for every real-session run. It auto-detects the host and behaves differently on each:
+
+- **On a laptop** (no `/etc/nv_tegra_release` file): rsyncs the code to the Jetson, ssh'es in, kills any stale process, and re-invokes itself on the Jetson in Jetson mode. Ctrl-C here detaches the laptop terminal; the remote process keeps running.
+- **On the Jetson**: activates `.venv`, sources `.env`, exports the clinician-view log env + native-library noise suppressors (`TF_CPP_MIN_LOG_LEVEL=3`, `GLOG_minloglevel=2`, `GRPC_VERBOSITY=ERROR`, `ABSL_LOG_LEVEL=ERROR`), and launches `main.py` with **split stream routing**:
+  - **stdout** → console + `data/logs/therapist_<ts>.log` (clean clinician trace)
+  - **stderr** → `data/logs/therapist_<ts>.stderr.log` only (native C++ noise from LiteRT / XNNPack / TensorFlow Lite, LLM prompt dumps, absl `I0000 ...` rows)
+
+The clinician console therefore shows only clinical events (RL weights, module I/O, screening turns, CBT stage progression, every spoken utterance, warnings and above). The `.log` file captures the same clean trace with full DEBUG detail from Python; the `.stderr.log` file captures every byte the native runtime produced so forensic debugging still has the raw engine logs.
+
+Force a specific mode with `THERAPIST_MODE=jetson ./start_therapist.sh` (for a non-Tegra dev host that you want to run locally) or `THERAPIST_MODE=laptop` (for an SSH-over-VPN loop from a Jetson dev kit).
+
+Flags mirrored from `laptop_deploy.sh`:
+- `SKIP_SYNC=1 ./start_therapist.sh` — no code changed, skip rsync
+- `SKIP_KILL=1 ./start_therapist.sh` — Jetson is idle, skip the pre-launch kill
+- `CONSOLE_LOG_LEVEL=DEBUG ./start_therapist.sh` — verbose debug on console (propagates over the ssh hop)
+- `CLINICIAN_LOG_MODE=0 ./start_therapist.sh` — turn the clinician filter off (every logger lands on console; noisy). Also restores legacy stderr→console routing so native C++ logs return to the terminal.
+- `CLINICIAN_LOG_TAGS="[DOSSIER],[LITERT]" ./start_therapist.sh` — extend the accepted tag set for a specific trial day without editing code.
+- `tail -f data/logs/therapist_<ts>.stderr.log` — inspect native LiteRT/TensorFlow/XNNPack output if the clinician console shows something odd and the forensic file is ambiguous.
+
+### Run locally on any dev machine (no Jetson, pure local)
+
+```bash
+# Force Jetson-mode on a laptop to run main.py directly
+THERAPIST_MODE=jetson ./start_therapist.sh
+```
+
+Or raw (no banner, no clinician view):
+
+```bash
 python main.py
 ```
 
-`main.py` brings up the full stack (speech loop + FastAPI + RL orchestrator). No launcher script is needed for local dev — the Jetson-specific shells live at the project root for the hardware deploy.
+### Clinician-view console (tag-based filter)
+
+When `CLINICIAN_LOG_MODE=1` (the default under `start_therapist.sh`), the console filter accepts an `INFO` line **only** if its message begins with one of these clinical-event tags. Anything else is still written to the file log.
+
+| Tag | Subsystem | What it marks |
+|---|---|---|
+| `[SESSION]` | lifecycle | Session start/end, subject identity binding, resume semantics |
+| `[GREETING]` | handler | Opening greeting rewrite + first-question handoff |
+| `[PIPELINE]` | cross-cutting | Explicit stage entry (Response Analyzer, RV, CBT, etc.) |
+| `[RL]` | Q-learning | State, action chosen, Q-value, Q-update, reward |
+| `[DLA]` | Response Analyzer | (Dim, Score) classification of a user utterance |
+| `[RV]` | Reflection-Validation | Reasoner decision, Guide redirect, Validator output |
+| `[CBT]` | CBT protocol | Dimension pick, stage progression, success/failure |
+| `[QUESTIONER]` | questioner | `ask_question` / `evaluate_result` milestones |
+| `[INTERMISSION]` | speech service | Screening/breathing/music activity transitions |
+| `[USER]` | I/O | User transcript (redacted if `REDACT_PII=1`) |
+| `[AGENT]` | I/O | Handler-driven clinical turn queued to speech (via `log_question`) |
+| `[TTS]` | speech service | Every utterance that actually becomes audio — onboarding greetings, bridge phrases, breathing scripts, goodbye lines, fallback beeps. Deduped against the immediately preceding `[AGENT]` line so handler-driven turns aren't logged twice. |
+| `[SAFETY]` | crisis layer | `SAFETY_RESOURCES_MESSAGE` delivery (only if `CRISIS_OVERRIDE_ENABLED`) |
+| `[PHQ4]` | screening | PHQ-4 / GAD-2 answer, scoring, clinical flag |
+| `[SCORE]` | questioner | Per-dimension score write to `question_lib` |
+| `[CLOSING]` | handler | Session-end farewell + SOAP persistence event |
+
+**`WARNING` and above always pass** regardless of tag — clinicians still see `ResourceAudit` pressure warnings, `DBManager` write failures, `GPIOManager` hardware-missing warnings, etc. Warnings appear prefixed with `! WARNING:` so they stand out in an otherwise clean trace.
+
+**Section banners** are auto-emitted when the active tag transitions into a new clinical stage — e.g. `[SESSION START]`, `[INITIALIZATION & RL SEEDING]`, `[SCREENING LOOP]`, `[NEXT TURN SELECTION]`, `[INTERMISSION & PHQ-4 GATING]`, `[RESPONSE ANALYSIS & SCORING]`, `[CBT STAGE 1: RECOGNIZE]`, `[SESSION CLOSING]`. Banners are global to the console handler so cross-logger transitions (HandlerRL → CBT → RL) still get the right header. The banner logic lives in `src/utils/log_util.py::_section_for`.
+
+**Format** is minimal — no timestamp, hostname, logger name, or PID in the clinician console; the file log retains the full `YYYY-MM-DD HH:MM:SS host name[pid] LEVEL ...` format for forensic replay. Implemented by `_ClinicianConsoleFormatter` in `src/utils/log_util.py`.
+
+**Native C++ noise separation.** Gemma runs through the compiled LiteRT-LM engine, which writes its own glog-style lines (`I0000 ...`, `INFO: [...]`, the tokenised prompt dumps, XNNPack warnings) directly to the process's file descriptor 2 (stderr) — Python's logger can't filter those. `start_therapist.sh` handles this by:
+1. Setting `TF_CPP_MIN_LOG_LEVEL=3`, `GLOG_minloglevel=2`, `GRPC_VERBOSITY=ERROR`, `ABSL_LOG_LEVEL=ERROR` to silence most of it at the source.
+2. Redirecting whatever still prints to `data/logs/therapist_<ts>.stderr.log` via `2> >(tee -a stderr.log >/dev/null)`, so the clinician console never sees it. The stderr log stays on disk beside the main log for any forensic debug that needs the raw runtime view.
+
+Extend the tag vocabulary for a specific trial via `CLINICIAN_LOG_TAGS="[CUSTOM], [EXTRA]"` (comma-separated; brackets and uppercasing are normalised for you).
 
 ### Boot-time checklist
 
@@ -911,23 +1192,22 @@ A `_ghost_hunt(50MB)` sweep flags any child process eating > 50 MB RSS.
 
 ## Jetson Deployment
 
-Six small single-purpose shell scripts live at the project root. Each does one thing; the composer (`laptop_deploy.sh`) chains three of them for the common dev loop.
-
 ### Scripts at a glance
 
 | Script | Runs on | One-line purpose |
 |---|---|---|
-| **`laptop_deploy.sh`** | laptop | ⭐ Everyday dev command: sync → remote kill → remote run → tail logs |
+| **`start_therapist.sh`** | laptop **or** Jetson | ⭐ Everyday launcher — dual-mode, auto-detects host. On laptop: sync → remote kill → remote Jetson launch. On Jetson: banner + clinician-view console + tee'd logs. |
 | `laptop_sync.sh` | laptop | `rsync` code + assets to Jetson (preserves models, DB, logs, venv) |
-| `laptop_pull.sh` | laptop | Pull therapist.db + sessions/ + logs/ + results/ + q_tables/ Jetson → laptop (non-destructive) |
+| `laptop_pull.sh` | laptop | Pull therapist.db + sessions/ + logs/ + results/ + q_tables/ Jetson → `pulled_data/latest/` (single mirror; non-destructive on Jetson) |
+| `laptop_deploy.sh` | laptop | *(legacy)* sync → remote kill → remote `jetson_run.sh`. Superseded by `start_therapist.sh` which also gives you the clinician-view console. Still shipped for non-CaiTI scripted automation. |
 | `jetson_setup.sh` | Jetson | One-time env bootstrap — apt deps, venv, pip, Piper voice, LiteRT fetch |
 | `jetson_kill.sh` | Jetson | Hard kill all CaiTI processes + free ports 8000/8001/8080; detects D-state survivors |
-| `jetson_run.sh` | Jetson | Launch `main.py` — single-instance lock, preflight asset check, tee'd logs |
+| `jetson_run.sh` | Jetson | *(legacy)* Launch `main.py` directly with file-level logs. Kept because `start_therapist.sh`'s Jetson branch still SSHes through it when invoked with `THERAPIST_MODE=legacy`, and for CI. |
 
 Required env (from `.env`, read automatically):
 
 ```env
-JETSON_HOST=user@1.2.3.4              # required for laptop_* scripts
+JETSON_HOST=user@1.2.3.4              # required for laptop-mode start_therapist.sh
 JETSON_PROJECT_DIR=~/project          # default
 JETSON_PASSWORD=...                   # optional: used only by jetson_setup for sudo apt
 ```
@@ -944,19 +1224,23 @@ cd ~/project
 ./jetson_setup.sh
 exit
 
-# Back on the laptop — launch
-./laptop_deploy.sh
+# Back on the laptop — launch (dual-mode; auto-detects laptop here)
+./start_therapist.sh
 ```
 
 ### Everyday dev loop
 
 ```bash
-./laptop_deploy.sh          # sync + kill + run + tail
+./start_therapist.sh        # sync + remote kill + remote launch + clinician view
 ```
 
 Flags:
-- `SKIP_SYNC=1 ./laptop_deploy.sh` — no code changed, skip rsync
-- `SKIP_KILL=1 ./laptop_deploy.sh` — Jetson is idle, skip the pre-launch kill
+- `SKIP_SYNC=1 ./start_therapist.sh` — no code changed, skip rsync
+- `SKIP_KILL=1 ./start_therapist.sh` — Jetson is idle, skip the pre-launch kill
+- `CONSOLE_LOG_LEVEL=DEBUG ./start_therapist.sh` — verbose debug on console
+- `CLINICIAN_LOG_MODE=0 ./start_therapist.sh` — turn the clinician filter off
+
+Ctrl-C detaches from the laptop terminal; the remote Jetson process keeps running. Reattach with `ssh $JETSON_HOST 'tail -f ~/project/data/logs/therapist_*.log'`.
 
 ### Running directly on the Jetson
 
@@ -964,16 +1248,16 @@ Flags:
 ssh $JETSON_HOST
 cd ~/project
 ./jetson_kill.sh            # hard stop any active session
-./jetson_run.sh             # launch — streams to terminal + data/logs/
+./start_therapist.sh        # launches in Jetson mode (auto-detected)
 ```
 
 ### Harvesting clinical data
 
 ```bash
-./laptop_pull.sh            # pulls to ./pulled_data/<timestamp>/ + updates 'latest' symlink
+./laptop_pull.sh            # single-mirror: rsyncs into ./pulled_data/latest/ in place
 ```
 
-Always non-destructive — the Jetson remains the source of truth. The Jetson can keep running a session while the pull rsync completes.
+Always non-destructive on the Jetson — it remains the source of truth, and can keep running a session while the pull rsync completes. On the laptop side the script maintains **one folder** (`pulled_data/latest/`) that always reflects the Jetson's current state; per-session filenames (`session_<subject>_<ts>.json`, `Report_<subject>_<ts>.csv`, etc.) guarantee dossiers and CSVs accumulate without collision across pulls. `therapist.db` and per-subject Q-tables are overwritten in place with each pull. First-run migration: if an older `pulled_data/latest` symlink is found, the script seeds the new real `latest/` directory from the symlink's target and replaces the symlink — no re-download required.
 
 ### One-command kill
 
@@ -1016,6 +1300,14 @@ Key test files:
 
 It stubs out the real LLM engine, drives scripted user replies through the full pipeline against a scratch SQLite, and asserts every clinical checkpoint (safety delivery, clinical flag, PHQ-4 persistence, turn count, Q-table CSV, crisis checkpoint file). Exit 0 = green; non-zero exits list each failed assertion.
 
+### Demo-parity smoke suite
+
+```bash
+dev/smoke_tests/run_all.sh
+```
+
+5 test files covering static invariants (flag values, legacy wordings, prompt structure), RL math (Q-table init, `choose_action`, `get_env_feedback`, Q-update formula), questioner pipeline + G4 double-Validator regression, CBT flow with legacy Stage 0 wording, and a full end-to-end `HandlerRL.run()` demo replay with scripted user inputs. **~35 s, 119 assertions, all tests gate-value aware.** See [`dev/smoke_tests/REPORT.md`](dev/smoke_tests/REPORT.md) for detail on what is and is not covered.
+
 ---
 
 ## Clinical-Trial Operations Playbook
@@ -1044,7 +1336,7 @@ ssh $JETSON_HOST ~/project/scripts/new_participant_init.sh 9001    # optional: s
 ssh $JETSON_HOST ~/project/scripts/new_participant_init.sh
 ```
 
-`laptop_pull.sh` copies `therapist.db`, `data/sessions/`, `data/logs/`, `data/results/`, and `data/q_tables/` Jetson → laptop into `pulled_data/<timestamp>/` with a stable `pulled_data/latest` symlink. Non-destructive: nothing on the Jetson is modified or purged (per operator policy — laptop is trusted, Jetson is the source of truth).
+`laptop_pull.sh` rsyncs `therapist.db`, `data/sessions/`, `data/logs/`, `data/results/`, and `data/q_tables/` from the Jetson into `pulled_data/latest/` on the laptop — a **single mirror** that accumulates per-session files (each filename already carries the onboarded subject + session timestamp, so no collisions) and overwrites mutating files (`therapist.db`, Q-tables) in place. Non-destructive on the Jetson: nothing there is modified or purged (per operator policy — laptop is the analyst view, Jetson is the source of truth). Keep a Jetson-side DB backup if you require point-in-time DB rollback.
 
 `new_participant_init.sh` archives the per-subject Q-table CSV with a timestamped suffix so the next boot rebuilds from `config.yaml → rl.item_importance` (the therapist-authored empirical priors — matching paper §5.1 "initial Q-values"). `therapist.db` / `sessions/` / `results/` / `logs/` are all preserved for longitudinal analysis.
 

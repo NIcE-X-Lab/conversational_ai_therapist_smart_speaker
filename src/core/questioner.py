@@ -22,7 +22,14 @@ from src.core.response_analyzer import (
     reflective_summarizer,
     rephrase_question,
 )
-from src.utils.config_loader import REPHRASE_AT_RUNTIME, REPHRASE_PROBABILITY, REWARD_MODE
+from src.utils.config_loader import (
+    REPHRASE_AT_RUNTIME,
+    REPHRASE_PROBABILITY,
+    REWARD_MODE,
+    REASK_DIMENSION_N,
+    MULTI_DIM_BACKFILL_ENABLED,
+    REFLECTIVE_SUMMARIZER_ENABLED,
+)
 
 
 _RESERVED_LABELS = frozenset({"yes", "no", "maybe", "question", "stop", "na", "other", ""})
@@ -92,7 +99,12 @@ def _apply_segment_level_backfill(
 
     Always runs, regardless of whether the primary answered the asked
     dimension.  Returns the list of (label, score) pairs that were applied.
+
+    G8 — gated by rl.multi_dim_backfill_enabled in config.yaml. Default
+    is OFF so the legacy flow (primary dim only) governs.
     """
+    if not MULTI_DIM_BACKFILL_ENABLED:
+        return []
     if not dla_result:
         return []
 
@@ -127,7 +139,7 @@ def _apply_segment_level_backfill(
         applied.append((label_l, score))
 
     if applied:
-        logger.info(f"segment-level back-fill applied: {applied}")
+        logger.info(f"[DLA] Segment-level back-fill credited dims: {applied}")
         log_reasoning("segment_level_backfill", {
             "primary": primary_label,
             "applied": [{"dim": d, "score": s} for d, s in applied],
@@ -148,7 +160,12 @@ def _apply_multi_dim_updates(
     picking them up, this extra LLM pass (on the joined utterance) back-fills
     them.  Gated by length (≥20 tokens, ≥2 segments) to amortise the extra
     LLM round-trip.
+
+    G8 — gated by rl.multi_dim_backfill_enabled in config.yaml. Default
+    is OFF so no extra LLM calls on long utterances.
     """
+    if not MULTI_DIM_BACKFILL_ENABLED:
+        return
     joined = " ".join(s for s in user_segments if s).strip()
     tokens = joined.split()
     if len(tokens) < 20 or len(user_segments) < 2:
@@ -190,7 +207,7 @@ def _apply_multi_dim_updates(
         applied.append((dim, score))
 
     if applied:
-        logger.info(f"multi-dim back-fill applied: {applied}")
+        logger.info(f"[DLA] Multi-dim back-fill credited dims: {applied}")
         log_reasoning("multi_dim_backfill", {
             "primary": primary_label,
             "applied": [{"dim": d, "score": s} for d, s in applied],
@@ -242,7 +259,7 @@ def retry_guide(topic: str, original_question: str, original_answer: str) -> str
     Paper role: RV_GUIDE (same clarify-and-redirect semantics as R-V Guide;
     paper uses GPT-3.5-Turbo for this guidance style).
     """
-    logger.info("Generating retry guide for re-ask.")
+    logger.info("[PIPELINE] Retry Guide — user response unclear, generating clarification.")
     payload = f'{{"Topic": {topic!r}, "Original Question": {original_question!r}, "Original Answer": {original_answer!r}}}'
     raw_resp = _chat_complete(RETRY_GUIDE_SYSTEM_PROMPT, payload, role=LLMRole.RV_GUIDE)
     if "GUIDE:" in raw_resp:
@@ -256,7 +273,7 @@ def classify_segments(user_segments: List[str], original_question: str, dimensio
     - For general answers (Yes/No/Stop/Maybe/Question): (dimension_label, Keyword)
     - For scored outputs: (dimension, score:int in [0,1,2])
     """
-    logger.info("Classifying user segments. Total segments: %d", len(user_segments))
+    logger.debug("Classifying user segments. Total segments: %d", len(user_segments))
     result = []
     for seg in user_segments:
         if not seg:
@@ -265,7 +282,7 @@ def classify_segments(user_segments: List[str], original_question: str, dimensio
         label, score = get_openai_resp(seg, original_question, dimension_label)
         logger.debug("Segment classified: '%s' -> (dim: %s, val: %s)", seg, label, str(score))
         result.append((label, score))
-    logger.info("Classification complete. Results: %s", str(result))
+    logger.info("[DLA] Classification result: %s", str(result))
     return result
 
 def _if_valid_response(
@@ -289,7 +306,7 @@ def _if_valid_response(
     # Default to no follow-up; only set when we truly have a follow-up to ask
     followup_to_RV = ""
     if not dla_result:
-        logger.info("No DLA result provided. Returning default values.")
+        logger.debug("No DLA result provided. Returning default values.")
         return 0, 0, followup_to_RV, question_lib, False
 
     question_label = question_lib[str(item_index)][str(question_index)]["label"]
@@ -298,13 +315,13 @@ def _if_valid_response(
         # Normalize label for robust match
         label_norm = str(label).strip()
         score_norm = score_val
-        logger.info(f"Processing dla_result entry: {label_norm}, {score_norm}")
+        logger.debug(f"Processing dla_result entry: {label_norm}, {score_norm}")
 
         # Yes/No/Stop bound to the question's dimension (unified format)
         if str(score_norm) in ["Yes", "No", "Stop"]:
-            logger.info(f"Match special token: {score_norm}")
+            logger.debug(f"Match special token: {score_norm}")
             if str(score_norm) == "Stop":
-                logger.info("Received 'Stop' label. Terminating evaluation.")
+                logger.info("[QUESTIONER] User said 'Stop' — terminating screening.")
                 return 1, 1, followup_to_RV, question_lib, False
 
             score = question_lib[str(item_index)][str(question_index)].get(str(score_norm), 99)
@@ -314,7 +331,7 @@ def _if_valid_response(
                 question_lib, str(item_index), score,
                 evidence_text=_seg_primary, source=f"yes_no_{str(score_norm).lower()}",
             )
-            logger.info("Appended score %s for keyword %s to question_lib[%s][%s].", str(score), str(score_norm), str(item_index), str(question_index))
+            logger.info(f"[SCORE] dim={question_label} score={score} (via {score_norm} keyword)")
 
             if score > 1:
                 text = question_lib[str(item_index)][str(question_index)]["question"][0]
@@ -338,7 +355,7 @@ def _if_valid_response(
 
         # Valid response: Label matches question label & score in [0,1,2]
         if label_norm.lower() == str(question_label).lower() and score_norm in [0, 1, 2]:
-            logger.info("Valid response: label matches and score is in [0,1,2]")
+            logger.info(f"[SCORE] dim={question_label} score={score_norm} (via Response Analyzer)")
             question_lib[str(item_index)][str(question_index)]["score"].append(score_norm)
             _seg_primary = user_segments[i] if i < len(user_segments) else (user_segments[0] if user_segments else "")
             _record_clinical_score(
@@ -346,13 +363,18 @@ def _if_valid_response(
                 evidence_text=_seg_primary, source="response_analyzer",
             )
             if score_norm > 1:
-                # Paper p.13: follow-up uses the ReflectiveSummarizer to restate
-                # the client's response in third person ("You mentioned that...")
-                # as an MI simple-reflection before the "tell me more" prompt.
-                # This replaces the ad-hoc generate_change() concatenation.
+                # Follow-up after a Score-2 answer: "You mentioned that X.
+                # Can you tell me more?". Two implementations:
+                #   - Legacy / demo path (default): regex-based generate_change()
+                #     transform — zero extra LLM call.
+                #   - Paper §5.2 ReflectiveSummarizer path: LLM restates the
+                #     client's response in third person as an MI simple
+                #     reflection before the "tell me more" prompt.
+                # G9 — gated by rl.reflective_summarizer_enabled in config.yaml.
+                # Default is OFF for legacy parity.
                 seg = user_segments[i] if i < len(user_segments) else ""
                 reflected = ""
-                if seg:
+                if REFLECTIVE_SUMMARIZER_ENABLED and seg:
                     try:
                         raw = reflective_summarizer(original_question, seg)
                         # Strip any "REFLECTIVE_SUMMERIZER:" label the prompt
@@ -369,8 +391,8 @@ def _if_valid_response(
                 if reflected:
                     followup_to_RV = f"{reflected} Can you tell me more about it?"
                 else:
-                    # Fallback path preserves legacy behaviour when the LLM
-                    # returns nothing usable.
+                    # Legacy / fallback path: regex-based transform, zero LLM
+                    # cost, matches the demo's wording pattern.
                     fallback = generate_change(seg).lower() if seg else ""
                     followup_to_RV = f"You mentioned that {fallback} Can you tell me more?"
             # Prepare note
@@ -386,7 +408,7 @@ def _if_valid_response(
 
         # Skip Maybe or Question, follow-up will be collected by caller
         if str(score_norm) in ["Maybe", "Question"]:
-            logger.info("Processing 'Maybe' or 'Question' token.")
+            logger.debug("Processing 'Maybe' or 'Question' token.")
             # return 0, 0, followup_to_RV, question_lib, False
             continue
 
@@ -396,9 +418,9 @@ def _if_valid_response(
     # off-topic → re-ask the original Dimension_N question once.
     had_ambiguous = any(str(sc) in ("Maybe", "Question") for _, sc in dla_result)
     if had_ambiguous:
-        logger.info("Ambiguous response (Maybe/Question only). Caller will clarify via retry_guide.")
+        logger.info("[QUESTIONER] Response was ambiguous (Maybe/Question) — will route to retry_guide.")
     else:
-        logger.info("No primary match. Caller will re-ask Dimension_N per paper §4.2.")
+        logger.info("[QUESTIONER] No primary match — will re-ask the same dimension question.")
     return 0, 0, followup_to_RV, question_lib, had_ambiguous
 
 def evaluate_result(question_lib, DLA_result, S, question_A, user_input, original_question_asked):
@@ -411,7 +433,7 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
     `had_ambiguous` lets the caller decide between re-asking Dimension_N
     (off-topic user) and calling retry_guide (confused/uncertain user).
     """
-    logger.info(f"Evaluating result for item {S}, question {question_A}.")
+    logger.debug(f"Evaluating result for item {S}, question {question_A}.")
     # If valid user response, update the question library and last question
     valid, terminate, followup_to_RV, updated, had_ambiguous = _if_valid_response(
         [(lbl, sc) for lbl, sc in DLA_result], S, question_A, user_input, original_question_asked, question_lib
@@ -421,12 +443,12 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
     previous_question = followup_to_RV 
     if followup_to_RV:
         # If valid user response, log the last question and collect user response
-        logger.info(f"Logging AI follow-up question and collecting user response for item {S}, question {question_A}.")
+        logger.debug(f"Logging AI follow-up question and collecting user response for item {S}, question {question_A}.")
         # Log the last AI question and get a user response
         log_question(followup_to_RV)
         user_response = get_resp_log()
         if user_response == "SESSION_END":
-            logger.info("Session End signal received during follow-up.")
+            logger.info("[SESSION] End signal received during Score-2 follow-up — closing session.")
             # Contract: evaluate_result returns a 5-tuple. Early-return paths
             # MUST preserve arity or callers in ask_question crash on unpack.
             return 1, 1, previous_question, question_lib, had_ambiguous
@@ -435,12 +457,12 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         topic = question_lib[str(S)][str(question_A)]["label"]
         original_resp = user_input[0] if user_input else ""
 
-        logger.info(f"Running RV Reasoner for topic '{topic}'.")
+        logger.info(f"[RV] Topic '{topic}' — Reasoner evaluating follow-up.")
         rv_decision_token, rv_guide_text, rv_validation_text = rv_consolidated(
             topic, original_question_asked, original_resp, user_response
         )
 
-        logger.info(f"RV Decision: {rv_decision_token}")
+        logger.info(f"[RV] Decision: {'ON-TOPIC (Validator)' if rv_decision_token == '0' else 'OFF-TOPIC (Guide)'}")
         log_reasoning("reasoner_decision", {
             "component": "rv",
             "decision": "related" if rv_decision_token == "0" else "unrelated",
@@ -450,23 +472,29 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         user_response_0 = ""
 
         if rv_decision_token == "1":
-            # Unrelated: speak the Guide, re-collect a new follow-up response
-            logger.info("Follow-up unrelated. Using Guide text and recollecting.")
+            # Unrelated: speak the Guide, re-collect a new follow-up response,
+            # THEN run the Validator on the new response. rv_consolidated()
+            # returned guide_text only and empty validation_text for this
+            # branch because the validation target changes (new user input).
+            logger.info("[RV] Off-topic — speaking Guide redirect and re-collecting user response.")
             user_response_0 = user_response
             log_question(rv_guide_text)
             user_response = get_resp_log()
             if user_response == "SESSION_END":
-                logger.info("Session End signal received during RV guide.")
+                logger.info("[SESSION] End signal received during RV Guide — closing session.")
                 return 1, 1, previous_question, question_lib, had_ambiguous
 
-        # Empathic validation always runs — even after a Guide redirect,
-        # the user's (new) response still gets validated per paper/legacy.
-        logger.info("Running RV Validator (empathic validation).")
-        rv_validation_text = rv_validator_mi(
-            topic, original_question_asked, original_resp, user_response
-        )
+            # Run Validator ONCE on the new (post-Guide) response.
+            logger.info("[RV] Running Validator on post-Guide response.")
+            rv_validation_text = rv_validator_mi(
+                topic, original_question_asked, original_resp, user_response
+            )
+        # else: rv_decision_token == "0" — rv_consolidated() already ran
+        # Validator on `user_response` and returned its text. G4: reuse it
+        # instead of duplicating the LLM call (halves RV hot-path latency).
+
         set_question_prefix(rv_validation_text)
-        logger.info("Queued RV validation to prepend before next question output.")
+        logger.debug("Queued RV validation to prepend before next question output.")
 
         log_reasoning("validation_flag", {
             "decision_token": rv_decision_token,
@@ -478,7 +506,7 @@ def evaluate_result(question_lib, DLA_result, S, question_A, user_input, origina
         therapist_resp = ""
 
         # Record notes
-        logger.info("Recording notes for this question/response.")
+        logger.debug("Recording notes for this question/response.")
         note_resp = [
             "original_question: " + original_question_asked,
             "original_resp: " + (user_input[0] if user_input else ""),
@@ -498,7 +526,7 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
         Handles the RL loop for asking questions within a given item (S).
         Returns the total reward, termination flag, and the last question asked.
         """
-        logger.info(f"Starting question RL loop for item S={S}.")
+        logger.info(f"[QUESTIONER] Starting turn for dim state S={S}.")
         question_reward = []
         DLA_terminate = 0
         
@@ -555,7 +583,7 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                     rephrased = rephrase_question(question_text)
                     if rephrased and rephrased.strip():
                         question_text_ask = rephrased.strip()
-                        logger.info(
+                        logger.debug(
                             f"[REPHRASER] '{question_text}' -> '{question_text_ask}'"
                         )
                 except Exception as e:
@@ -565,7 +593,7 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
             # Get user input for the question
             _ , user_input = get_answer()
             if user_input and "SESSION_END" in user_input:
-                logger.info("Session End signal received in ask_question.")
+                logger.info("[SESSION] End signal received in Questioner — closing session.")
                 return 0.0, 1, ""
 
             # Classify against the question the user actually heard (possibly
@@ -615,12 +643,13 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
             # If the primary dimension got no score AND the user wasn't
             # confused/uncertain (no Maybe/Question tokens), they talked about
             # something else entirely. Re-ask the SAME Dimension_N question
-            # once before falling back to retry_guide. Back-fill above already
-            # captured whatever other dimensions they covered.
-            if valid == 0 and DLA_terminate == 0 and not had_ambiguous:
+            # once before falling back to retry_guide.
+            # G5 — legacy/demo flow goes straight to retry_guide instead of
+            # re-asking verbatim. Gated off by default (rl.reask_dimension_n
+            # in config.yaml). Flip that flag to true to restore paper §4.2.
+            if REASK_DIMENSION_N and valid == 0 and DLA_terminate == 0 and not had_ambiguous:
                 logger.info(
-                    f"[RE-ASK] Primary dim '{dimension_label}' unscored after back-fill. "
-                    f"Re-asking Dimension_N per paper §4.2."
+                    f"[QUESTIONER] Re-asking dim '{dimension_label}' (primary unscored, no ambiguity)."
                 )
                 log_reasoning("reask_dimension_n", {
                     "dimension": dimension_label,
@@ -629,7 +658,7 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                 log_question(question_text_ask)
                 _, user_input = get_answer()
                 if user_input and "SESSION_END" in user_input:
-                    logger.info("Session End signal received in Dimension_N re-ask.")
+                    logger.info("[SESSION] End signal received during re-ask — closing session.")
                     return 0.0, 1, ""
 
                 try:
@@ -674,7 +703,7 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
                 log_question(guide_text)
                 _, user_input = get_answer()
                 if user_input and "SESSION_END" in user_input:
-                    logger.info("Session End signal received in retry_guide.")
+                    logger.info("[SESSION] End signal received during retry_guide — closing session.")
                     return 0.0, 1, ""
 
                 try:
@@ -747,8 +776,6 @@ def ask_question(question_lib, S: int) -> Tuple[float, int, str]:
             reward_desc = "(max+mean)/2 hybrid"
 
         logger.info(
-            f"Finished question RL loop for item S={S}. "
-            f"Reward [{reward_desc}]: {question_reward_value}, "
-            f"DLA_terminate: {int(DLA_terminate)}"
+            f"[QUESTIONER] Finished dim S={S}. Reward ({reward_desc}): {question_reward_value:.2f}"
         )
         return question_reward_value, int(DLA_terminate), previous_question

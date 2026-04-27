@@ -30,7 +30,14 @@ from typing import List, Tuple
 
 from src.utils.log_util import get_logger
 from src.drivers.db_manager import DBManager
-from src.utils.config_loader import DB_PATH, SUBJECT_ID, RECORD_CSV
+from src.utils.config_loader import (
+    DB_PATH,
+    SUBJECT_ID,
+    RECORD_CSV,
+    REPORT_FILE as _DEFAULT_REPORT_FILE,
+    NOTES_FILE as _DEFAULT_NOTES_FILE,
+    format_result_paths,
+)
 
 
 def _segment_utterance(text: str) -> List[str]:
@@ -63,6 +70,28 @@ def _redact(text) -> str:
 
 _DEFAULT_RECORD_CSV = RECORD_CSV
 _LAST_AUTO_RECORD_CSV = None
+
+# ── Subject identity (two layers) ─────────────────────────────────────────
+# SUBJECT_BASE_ID : the raw onboarded name ("alice"). Used for DB
+#                   `users.subject_id` so longitudinal state (Q-table
+#                   warm-start, user context from prior sessions) still
+#                   links across a subject's visits. Also used as the
+#                   Q-table filename stem (item_qtable_alice.csv).
+#
+# SUBJECT_ID      : the *per-session* composed id "alice_YYYYMMDD_HHMMSS".
+#                   Used for every per-session artefact filename — dossier
+#                   JSON, Report/Notes CSVs, log directory, crisis file —
+#                   so three sessions from Alice produce three distinct
+#                   file entries and never collide with similarly-named
+#                   subjects like "Alex".
+#
+# Before the first session both hold the boot-time default from config.
+SUBJECT_BASE_ID: str = SUBJECT_ID
+REPORT_FILE: str = _DEFAULT_REPORT_FILE
+NOTES_FILE: str = _DEFAULT_NOTES_FILE
+# Timestamp for the currently active session, shared with dossier + CSV
+# filenames so every per-session artefact lines up.
+SESSION_TIMESTAMP: str = ""
 
 # ── IPC Queues ───────────────────────────────────────────────────────────
 # INPUT_QUEUE: user -> handler. UNBOUNDED by design. Dropping a user
@@ -112,6 +141,7 @@ SESSION_ID = None
 CURRENT_TURN_INDEX = 0
 
 _PENDING_QUESTION_PREFIX = ""
+_LAST_AGENT_LOGGED = ""
 USER_CONTEXT = ""
 _LAST_USER_TRANSCRIPT = ""
 _LAST_USER_EMOTION = "Neutral"
@@ -226,21 +256,36 @@ def init_record(user_id_override: str = None, force: bool = False):
     session, `init_record()` is a no-op unless called with force=True
     (which is what `reset_session()` does).
     """
-    global DB, SESSION_ID, CURRENT_TURN_INDEX, SUBJECT_ID
+    global DB, SESSION_ID, CURRENT_TURN_INDEX, SUBJECT_ID, SUBJECT_BASE_ID
     global _LAST_USER_TRANSCRIPT, _LAST_USER_EMOTION, _LAST_RL_STATE, _LATEST_SCREENING_SCORES
     global _LAST_AUTO_RECORD_CSV, RECORD_CSV, _JSON_LOG_PATH, _INIT_DONE
+    global REPORT_FILE, NOTES_FILE, SESSION_TIMESTAMP
 
     with _INIT_LOCK:
         if _INIT_DONE and not force:
-            logger.info(
+            logger.debug(
                 f"init_record already ran this session (SESSION_ID={SESSION_ID}); "
                 "skipping duplicate init."
             )
             return
 
+        # ── Compose the two-layer subject identity ───────────────────
+        # 1. BASE: the raw onboarded name — stable across sessions so
+        #    DB-driven longitudinal state (Q-table, user context) still
+        #    resolves Alice's 3 visits to one `users` row.
+        # 2. SUBJECT_ID: base_name + session timestamp — used for every
+        #    per-session filename so three sessions for Alice produce
+        #    Report_alice_<ts1>.csv, Report_alice_<ts2>.csv, and
+        #    similarly-named subjects ("Alex") can't ever collide.
+        import datetime
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        SESSION_TIMESTAMP = timestamp_str
+
         if user_id_override:
-            logger.info(f"Overriding SUBJECT_ID with {user_id_override}")
-            SUBJECT_ID = user_id_override
+            logger.debug(f"Overriding SUBJECT_BASE_ID with {user_id_override}")
+            SUBJECT_BASE_ID = str(user_id_override)
+        SUBJECT_ID = f"{SUBJECT_BASE_ID}_{timestamp_str}"
+        logger.info(f"[SESSION] Subject onboarded: {SUBJECT_BASE_ID} (session id: {SUBJECT_ID})")
 
         # Clear queues (on force / fresh session)
         with OUTPUT_QUEUE.mutex:
@@ -250,7 +295,10 @@ def init_record(user_id_override: str = None, force: bool = False):
 
         try:
             DB = DBManager(DB_PATH)
-            user_id = DB.get_user_id(SUBJECT_ID)
+            # DB row is keyed by the stable BASE id, not the timestamped
+            # one, so a returning subject's longitudinal Q-table warm-
+            # start, user context, preferences all still resolve.
+            user_id = DB.get_user_id(SUBJECT_BASE_ID)
 
             # M2: crash recovery — close any sessions left open for this user.
             try:
@@ -277,7 +325,7 @@ def init_record(user_id_override: str = None, force: bool = False):
                 global USER_CONTEXT
                 USER_CONTEXT = DB.get_user_context_string(user_id)
                 if USER_CONTEXT:
-                    logger.info("Loaded User Context for session.")
+                    logger.debug("Loaded User Context for session.")
             except Exception as e:
                 logger.error(f"Failed to load user context: {e}")
 
@@ -289,16 +337,23 @@ def init_record(user_id_override: str = None, force: bool = False):
         except Exception as e:
             logger.error(f"Failed to initialize DB: {e}")
 
-        import datetime
-        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Per-session log directory, keyed by the composed SUBJECT_ID so
+        # each session gets its own folder ("data/logs/alice_20260425_190621/")
+        # — you can archive or hand off one session's artefacts cleanly.
         base_session_dir = os.path.join(os.path.abspath("."), "data", "logs", SUBJECT_ID)
         record_csv_is_external = RECORD_CSV not in {_DEFAULT_RECORD_CSV, _LAST_AUTO_RECORD_CSV}
         if record_csv_is_external:
-            logger.info(f"Using externally configured RECORD_CSV path: {RECORD_CSV}")
+            logger.debug(f"Using externally configured RECORD_CSV path: {RECORD_CSV}")
         else:
-            RECORD_CSV = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.log")
+            RECORD_CSV = os.path.join(base_session_dir, f"{SUBJECT_ID}.log")
             _LAST_AUTO_RECORD_CSV = RECORD_CSV
-        _JSON_LOG_PATH = os.path.join(base_session_dir, f"{SUBJECT_ID}_Session_{timestamp_str}.json")
+        _JSON_LOG_PATH = os.path.join(base_session_dir, f"{SUBJECT_ID}.json")
+
+        # Per-session Report/Notes CSV destinations. The composed
+        # SUBJECT_ID already carries the session timestamp, so this
+        # produces Report_alice_20260425_190621.csv etc. automatically.
+        REPORT_FILE, NOTES_FILE = format_result_paths(SUBJECT_ID)
+        logger.debug(f"[RESULTS] Per-session CSVs: {REPORT_FILE}, {NOTES_FILE}")
 
         _init_dossier()
 
@@ -392,7 +447,7 @@ def log_question(text: str, meta_data: dict = None):
     combined = text
     if _PENDING_QUESTION_PREFIX:
         combined = f"{_PENDING_QUESTION_PREFIX}\n\n{text}"
-        logger.info("Combining pending prefix with next question.")
+        logger.debug("Combining pending prefix with next question.")
 
     _safe_output_put(combined)
 
@@ -416,7 +471,11 @@ def log_question(text: str, meta_data: dict = None):
 
     _PENDING_QUESTION_PREFIX = ""
     # Agent output is the model's output — not PII. Logged in full.
-    logger.info(f"Prompted question: {combined}")
+    logger.info(f"[AGENT] {combined}")
+    # Track the last agent-tagged line so speech_service.say() can dedup
+    # the [TTS] echo when it speaks the same handler-driven text.
+    global _LAST_AGENT_LOGGED
+    _LAST_AGENT_LOGGED = combined
 
 
 def log_reasoning(reasoning_type: str, data: dict):
@@ -426,14 +485,16 @@ def log_reasoning(reasoning_type: str, data: dict):
         meta = {"reasoning_type": reasoning_type}
         meta.update(data)
         DB.add_turn(SESSION_ID, idx, "system", f"[{reasoning_type.upper()}]", meta_data=meta)
-        logger.info(f"Logged Reasoning ({reasoning_type}) to DB.")
+        # DEBUG: internal reasoning breadcrumb, useful for forensics but
+        # not part of the demo's spoken-turn log taxonomy. Divergence 7.
+        logger.debug(f"Logged Reasoning ({reasoning_type}) to DB.")
     if reasoning_type == "rl_decision":
         set_rl_context(data)
 
 
 def get_answer() -> Tuple[List, List[str]]:
     """Block on INPUT_QUEUE; return (DLA_result=[], segments)."""
-    logger.info("Waiting for user answer...")
+    logger.debug("Waiting for user answer...")
     user_input_raw = None
     while user_input_raw is None:
         if END_SESSION_EVENT.is_set():
@@ -443,7 +504,7 @@ def get_answer() -> Tuple[List, List[str]]:
             user_input_raw = INPUT_QUEUE.get(timeout=0.5)
         except queue.Empty:
             continue
-    logger.info(f"Received user input: {_redact(user_input_raw)}")
+    logger.info(f"[USER] {_redact(user_input_raw)}")
 
     if DB and SESSION_ID:
         idx = _next_turn_index()
@@ -469,7 +530,7 @@ def get_answer() -> Tuple[List, List[str]]:
 
 def get_resp_log() -> str:
     """Block on INPUT_QUEUE; return the raw user response string (RV path)."""
-    logger.info("Waiting for user response (raw)...")
+    logger.debug("Waiting for user response (raw)...")
     user_response_raw = None
     while user_response_raw is None:
         if END_SESSION_EVENT.is_set():
@@ -497,7 +558,7 @@ def get_resp_log() -> str:
     append_to_csv("turn", "user", user_response)
     log_json_event("user_turn", {"response": user_response})
 
-    logger.info(f"Received user response: {_redact(user_response)}")
+    logger.info(f"[USER] {_redact(user_response)}")
     return user_response
 
 
@@ -525,15 +586,20 @@ def dump_session_history_to_terminal() -> None:
 
 class SessionDossier:
     """Accumulates structured per-interaction records into a single JSON
-    dumped to `data/sessions/session_<SUBJECT>_<TIMESTAMP>.json` on close."""
+    dumped to `data/sessions/session_<SUBJECT_ID>.json` on close.
+
+    `subject_id` is expected to be the composed per-session id from
+    io_record.SUBJECT_ID (e.g. "alice_20260425_190621"), which already
+    carries the session timestamp — so the output filename is unique per
+    session without appending a second timestamp.
+    """
 
     def __init__(self, subject_id: str, session_id):
         import datetime
         self._subject = subject_id
         self._session_id = session_id
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self._dir = os.path.join(os.path.abspath("."), "data", "sessions")
-        self._path = os.path.join(self._dir, f"session_{subject_id}_{ts}.json")
+        self._path = os.path.join(self._dir, f"session_{subject_id}.json")
         self._interactions: list = []
         self._meta: dict = {
             "subject_id": subject_id,
@@ -543,7 +609,7 @@ class SessionDossier:
         }
         self._lock = threading.Lock()
         self._closed = False
-        logger.info(f"[DOSSIER] Initialized: {self._path}")
+        logger.debug(f"[DOSSIER] Initialized: {self._path}")
 
     def record_interaction(
         self,
@@ -585,7 +651,7 @@ class SessionDossier:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, default=str)
             os.replace(tmp_path, self._path)
-            logger.info(f"[DOSSIER] Saved {len(self._interactions)} interactions to {self._path}")
+            logger.debug(f"[DOSSIER] Saved {len(self._interactions)} interactions to {self._path}")
         except Exception as e:
             logger.error(f"[DOSSIER] Failed to save: {e}")
         finally:

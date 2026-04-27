@@ -1,0 +1,64 @@
+Timestamp,Type,Speaker,Text
+"2026-04-26T02:48:58.903208","turn","agent","{""Original Question"": ""Are you eating at fairly steady times each day?""}"
+"2026-04-26T02:48:58.903684","turn","user","Yes."
+"2026-04-26T02:48:58.905855","turn","agent","{""Original Question"": ""How's your eating habits? Do you have your meals on time?""}"
+"2026-04-26T02:48:58.906214","turn","user","No."
+"2026-04-26T02:48:58.907004","turn","agent","It seems that 　Change from question to negative declarative sentence.
+
+    User: Do you have coping skills to help you calm down.
+    Answer: You don't have coping skills to help you calm down.
+    User: Do you feel productive?
+    Answer: You don't feel productive.
+    User: Have you done anything creative recently?
+    Answer: You haven't done anything creative recently.
+    User:How's your eating? are you eating regularly?
+    Answer: Can you tell me more about it?"
+"2026-04-26T02:48:58.907282","turn","user","I've been skipping meals because of work stress."
+"2026-04-26T02:48:59.011007","turn","agent","It sounds like medication has been hard. Many people feel the same — small routines help. Consider setting a daily alarm and a pill box by the toothbrush. Keep a brief note of doses. You're not stuck.
+
+{""Original Question"": ""How's your eating? Are you eating regularly?""}"
+"2026-04-26T02:48:59.011790","turn","user","stop"
+"2026-04-26T02:48:59.543959","turn","agent","Thank you for answering the questions. 
+According to your previous responses, you have issue in: 
+1) Taking Medication as Prescribed 
+Which dimension would you like to work on today? Tell me the dimension number. For example: 1"
+"2026-04-26T02:48:59.544380","turn","user","1"
+"2026-04-26T02:48:59.544995","turn","agent","Let us work on dimension 'Taking Medication as Prescribed'. From our record, you mentioned that: I just always forget to take it, and I don't wanna take too much of it
+
+Can you try to identify any unhelpful thoughts you have that contribute to this situation?"
+"2026-04-26T02:48:59.545307","turn","user","I guess I fear I'll get dependent on it."
+"2026-04-26T02:48:59.545565","turn","agent","Now, how could you challenge those unhelpful thoughts? Please write a brief challenge."
+"2026-04-26T02:48:59.545788","turn","user","I haven't seen any real evidence I'd actually get dependent."
+"2026-04-26T02:48:59.546127","turn","agent","UNHELPFUL_THOUGHTS: you think you always forget; you fear that if you take it regularly, you'll get dependent; you worry that the prescribed dose is too much; you see medication as loss of control; you assume a few missed doses mean you can't do this at all.
+
+Finally, can you reframe the unhelpful thought into a more balanced, constructive one?"
+"2026-04-26T02:48:59.546424","turn","user","I'll try taking it as prescribed and see what happens."
+"2026-04-26T02:48:59.546728","turn","agent","Great work today. We completed the CBT steps for this topic. Thank you for your effort."
+"2026-04-26T02:49:00.009186","turn","agent","Hi, I'm Caiti, and I'm here to support you. Thanks for being here. Let's start with a few quick questions about your recent day-to-day.
+
+Have you been taking medication according to your prescriptions?"
+"2026-04-26T02:49:00.009805","turn","user","No, not really."
+"2026-04-26T02:49:00.010980","turn","agent","It seems that  Can you tell me more about it?"
+"2026-04-26T02:49:00.011477","turn","user","I just always forget to take it."
+"2026-04-26T02:49:00.017508","turn","agent","It makes sense that you always forget to take it. A few small steps can help: set a daily alarm, pair the dose with a routine, use a pill box. Keep a short note of what works. You are not stuck.
+
+How has your mood been? Have you been able to manage your moods?"
+"2026-04-26T02:49:00.018010","turn","user","fine"
+"2026-04-26T02:49:00.022728","turn","agent","Has your eating pattern been regular lately?"
+"2026-04-26T02:49:00.023097","turn","user","stop"
+"2026-04-26T02:49:00.046279","turn","agent","Thank you for answering the questions. 
+According to your previous responses, you have issue in: 
+1) Taking Medication as Prescribed 
+Which dimension would you like to work on today? Tell me the dimension number. For example: 1"
+"2026-04-26T02:49:00.047065","turn","user","1"
+"2026-04-26T02:49:00.048009","turn","agent","Let us work on dimension 'Taking Medication as Prescribed'. From our record, you mentioned that: I just always forget to take it.
+
+Can you try to identify any unhelpful thoughts you have that contribute to this situation?"
+"2026-04-26T02:49:00.048448","turn","user","I guess I fear I'll get dependent."
+"2026-04-26T02:49:00.048820","turn","agent","Now, how could you challenge those unhelpful thoughts? Please write a brief challenge."
+"2026-04-26T02:49:00.049258","turn","user","I haven't seen any evidence."
+"2026-04-26T02:49:00.049624","turn","agent","UNHELPFUL_THOUGHTS: you think you always forget; you fear you'll get dependent; you worry the dose is too much; you see it as loss of control; you assume missed doses mean you can't do this.
+
+Finally, can you reframe the unhelpful thought into a more balanced, constructive one?"
+"2026-04-26T02:49:00.049905","turn","user","I'll try taking it as prescribed."
+"2026-04-26T02:49:00.050208","turn","agent","Great work today. We completed the CBT steps for this topic. Thank you for your effort."

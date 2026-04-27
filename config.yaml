@@ -6,6 +6,12 @@ paths:
   data_dir: "data"
   result_dir: "data/results"
   question_lib_filename: "data/libs/question_lib_v4.json"
+  # Per-session, subject-keyed artefacts. ${subject_id} is composed at
+  # session start as "<onboarded_name>_<YYYYMMDD_HHMMSS>" so every session
+  # is a distinct file entry even if the same person (or two similar
+  # names like "Alice" / "Alex") enrol back-to-back. The composition
+  # happens inside io_record.init_record(); config only sees the final
+  # timestamped id.
   report_file: "data/results/Report_${subject_id}.csv"
   notes_file: "data/results/Notes_${subject_id}.csv"
   logs_dir: "data/logs"
@@ -20,12 +26,48 @@ rl:
   # (q_target = R, not R + γ·max Q(END,·)), which matches an explicit END
   # row whose Q-values are all 0. See src/utils/rl_qtables.py::get_env_feedback.
   item_n_states: 38
-  epsilon: 0.9 # exploitation rate (fixed, paper p.11: ε=0.9)
-  alpha: 0.1   # learning rate (paper p.11: α=0.1)
-  gamma: 0.9   # discount factor (paper p.11: γ=0.9)
+  # G1 — RL hyperparameters: legacy-prototype (demo video) values in use.
+  # The paper's stated values differ from what the legacy prototype (and
+  # the demo recording) actually used; we follow the demo because the
+  # clinically-tested behaviour matches those artefacts, not the paper
+  # text. See original-caiti-previous-paper.pdf p.11 for the paper claim.
+  #
+  # Legacy prototype / demo values (authoritative for clinical parity):
+  epsilon: 1    # exploitation rate — legacy used pure exploitation (ε=1.0)
+  alpha: 0.5    # learning rate — legacy's aggressive Q-update rate
+  gamma: 0.9    # discount factor — matches both paper and legacy
+  #
+  # Paper §5.1 (p.11) alternate values — kept here as a commented-out
+  # reference only. NOT in use. Flip the pairs above/below to reproduce
+  # paper-strict numbers instead of demo parity.
+  # epsilon: 0.9  # paper p.11
+  # alpha: 0.1    # paper p.11
+  #
   # epsilon_start / epsilon_end / epsilon_decay_turns / top_n_dims REMOVED — not in paper/legacy
 
-  # Therapist-validated importance weights (1-10 scale):
+  # G2 — item_importance: legacy-prototype (demo) array in use.
+  #
+  # Legacy uses sentinel values 97/98/99 on mood/medication/eat to pin
+  # those dimensions as the first three RL picks (they always win the
+  # exploitation max-argmax). This is why the demo video's opening
+  # question is "How are your eating habits?" (index 11, importance=97)
+  # followed by mood (index 2, importance=98) and medication (index 3,
+  # importance=99). Once masked out, the remaining 1-5 importance scale
+  # drives subsequent dim selection.
+  #
+  # Index: 0(INIT) 1(weight) 2(mood) 3(med) 4(care) 5(house) 6(talk)
+  #        7(emo) 8(safe) 9(risk) 10(sleep) 11(eat) 12(work) 13(dayoff)
+  #        14(showup) 15(finance) 16(nutrition) 17(problem) 18(support)
+  #        19(family) 20(alcohol) 21(ciga) 22(drug) 23(hobbies)
+  #        24(creativity) 25(community) 26(support2) 27(social)
+  #        28(comfortable) 29(protection) 30(productivity) 31(motivation)
+  #        32(coping) 33(sib) 34(arrest) 35(legal) 36(hygiene) 37(sports)
+  item_importance: [0, 5, 98, 99, 5, 4, 4, 4, 2, 2, 5, 97, 5, 5, 5, 2, 2, 1, 3, 3, 4, 4, 4, 3, 3, 1, 4, 2, 2, 2, 4, 4, 3, 1, 1, 1, 4, 4]
+  #
+  # Alternate therapist-rebalanced 1-10 scale — NOT in use. Flips away
+  # from legacy sentinel pinning toward a flatter clinical severity
+  # ordering. Kept commented so an operator can switch to this schema
+  # without hunting through git history.
   #   10: sib, safe, risk  (critical safety dimensions)
   #    8: mood, drug, alcohol  (severe clinical indicators)
   #    7: medication, care, coping  (treatment adherence / resilience)
@@ -36,14 +78,7 @@ rl:
   #       productivity, motivation  (moderate functioning)
   #    2: hobbies, creativity, community, arrest, legal, hygiene, sports
   #       (lower-priority lifestyle)
-  # Index: 0(INIT) 1(weight) 2(mood) 3(med) 4(care) 5(house) 6(talk)
-  #        7(emo) 8(safe) 9(risk) 10(sleep) 11(eat) 12(work) 13(dayoff)
-  #        14(showup) 15(finance) 16(nutrition) 17(problem) 18(support)
-  #        19(family) 20(alcohol) 21(ciga) 22(drug) 23(hobbies)
-  #        24(creativity) 25(community) 26(support2) 27(social)
-  #        28(comfortable) 29(protection) 30(productivity) 31(motivation)
-  #        32(coping) 33(sib) 34(arrest) 35(legal) 36(hygiene) 37(sports)
-  item_importance: [0, 5, 8, 7, 7, 3, 5, 5, 10, 10, 6, 6, 4, 3, 3, 4, 6, 4, 5, 5, 8, 4, 8, 2, 2, 2, 3, 3, 3, 3, 3, 3, 7, 10, 2, 2, 2, 2]
+  # item_importance: [0, 5, 8, 7, 7, 3, 5, 5, 10, 10, 6, 6, 4, 3, 3, 4, 6, 4, 5, 5, 8, 4, 8, 2, 2, 2, 3, 3, 3, 3, 3, 3, 7, 10, 2, 2, 2, 2]
   number_questions: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
   # Paper §5.1: after picking one of the therapist-authored 7-11 sample
@@ -54,11 +89,97 @@ rl:
   # Set false to trust the pre-generated question_synthetic[] pool alone
   # (zero runtime LLM cost, repeats after pool is exhausted) — useful
   # for latency-sensitive Jetson deployments.
+  # Paper §5.1 / legacy-prototype runtime Rephraser. The legacy prototype
+  # (and therefore the demo recording) DOES rewrite each picked question
+  # variant via `generate_synonymous_sentences` — a few-shot LLM call
+  # that returns a paraphrase of the therapist-authored text ~95% of the
+  # time (`np.random.uniform() < 0.95` in legacy questioner.py:261).
+  # We keep this ON for legacy parity. The earlier "verbatim-only"
+  # setting was based on a mis-read of the legacy code and has been
+  # reverted.
   rephrase_at_runtime: true
   # Legacy prototype used np.random.uniform() < 0.95 to skip rephrase 5%
-  # of the time. Set to 1.0 for paper-strict "always rephrase", or lower
-  # to mix pre-authored and rephrased variants.
+  # of the time. Set to 1.0 for paper-strict "always rephrase".
   rephrase_probability: 0.95
+
+  # G5 — Paper §4.2 "Understand user input better" re-ask.
+  # When enabled, if the primary dimension gets no score AND the user
+  # wasn't confused/uncertain (no Maybe/Question tokens), the SAME
+  # Dimension_N question text is spoken a second time before falling
+  # through to retry_guide. Legacy / demo flow skips this and goes
+  # straight to retry_guide, so default is false for clinical parity.
+  reask_dimension_n: false
+
+  # G8 — Opportunistic multi-dimension back-fill (paper §4.1 "minimal
+  # questioning"). When enabled, a single user utterance can silently
+  # credit Score-0/1/2 to any dimension whose label is mentioned in the
+  # response — both the cheap segment-level pass and the gated
+  # joined-utterance LLM pass.  ENABLED by default because real sessions
+  # routinely land a score-2 signal on a neighbour dimension (e.g. the
+  # Analyzer classifies "my sadness takes over my life" as ('emo', 2)
+  # while the asked dim was 'mood').  Without back-fill the score is
+  # thrown away, CBT never triggers, and the session closes with "no
+  # score-2 dimension to work on today" — observed in session 11 (John,
+  # 2026-04-25).  The segment-level pass is a free reuse of the
+  # classifier output; only the joined-utterance pass is LLM-gated.
+  multi_dim_backfill_enabled: true
+
+  # G9 — LLM-based ReflectiveSummarizer for the "You mentioned that ...
+  # Can you tell me more about it?" follow-up on Score-2 dimensions.
+  # When disabled, falls back to the legacy `generate_change()` regex
+  # transform (no extra LLM call). Legacy / demo used the regex path,
+  # so default is false for parity. Flip on for the paper §5.2
+  # ReflectiveSummarizer behaviour at the cost of an extra LLM turn.
+  reflective_summarizer_enabled: false
+
+  # ── Legacy-parity gates (G11-G15) ─────────────────────────────────────
+  # The following extensions do not appear in the legacy prototype or
+  # paper architecture. Each is kept in code but gated off by default so
+  # the flow mirrors the demo exactly. Flip a flag to true to re-enable
+  # that single extension without touching any other.
+
+  # G11 — Returning-user warm-start (Q-table nudge + recall greeting).
+  # When enabled, _load_longitudinal_state reads the user's prior Q-table
+  # from SQLite, applies a +0.3 nudge to any prior Score-2 dim's Q-column,
+  # and the greeting path tells the LLM to "briefly acknowledge a detail
+  # from their past session summary". Legacy prototype has no longitudinal
+  # memory beyond the per-subject Q-table CSV, so default is false.
+  # NOTE: the paper/legacy-compatible CSV persistence (data/q_tables/
+  # item_qtable_<subject>.csv) is unaffected by this flag — that write
+  # path is always on because the demo prototype also wrote it.
+  warm_start_enabled: false
+
+  # G12 — Post-session analysis LLM pass (summary + preferences + safety).
+  # When enabled, _generate_session_analysis runs a GENERAL LLM call at
+  # session end, stores preferences to the DB, and speaks a warm 1-2
+  # sentence SUMMARY as the user-facing goodbye. When disabled, the
+  # handler falls back to the legacy closing flow: one LLM call with the
+  # legacy "cbt_used" prompt, emitting a short "Thank you for your time"
+  # style goodbye (or nothing if CBT already delivered its closing).
+  # Default false for legacy parity.
+  session_analysis_enabled: false
+
+  # G13 — SOAP-format clinical report at session end.  When enabled,
+  # _generate_clinical_summary issues a GENERAL LLM call and writes the
+  # SOAP (Subjective/Objective/Assessment/Intervention) note to the
+  # DB's `summaries` table for clinician handoff. Never spoken to the
+  # user — legacy-parity safe.  Enabled so the clinician has an audit
+  # artefact after each trial session.
+  soap_report_enabled: true
+
+  # G14 — Per-user dimension opt-outs via preferences. When enabled,
+  # _apply_dimension_optouts masks any dimension for which the user has
+  # stored a `disabled_dim:<label>` preference (e.g. opting out of the
+  # "law-abiding / arrest" family). Legacy had no opt-out mechanism and
+  # always asked every dim.  Default false for legacy parity.
+  dimension_optouts_enabled: false
+
+  # G15 — 60-minute hard session cap. When enabled, _session_timed_out
+  # forces graceful termination once the session has been running longer
+  # than SESSION_MAX_SECONDS env var (default 3600). Legacy had no cap
+  # and relied on user "stop" keyword for exit.  Default false for
+  # legacy parity.  Clinical trials should re-enable this for safety.
+  session_cap_enabled: false
 
   # ── Per-dimension reward aggregation (paper §5.1) ──────────────────
   # Paper p.11: "The Score, based on the analysis of the user's response,

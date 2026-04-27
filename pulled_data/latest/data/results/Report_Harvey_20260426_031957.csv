@@ -1,0 +1,38 @@
+Item Label,Score,Notes
+weight,[],[]
+mood,[0],"[['original_question: Can you describe your current mood and your feelings regarding that mood?', ""original_resp: I'm pretty happy today""]]"
+medication,[1],"[['original_question: Are you adhering to the medication regimen prescribed by your physician?', 'original_resp: Not really']]"
+care,[],[]
+house,[],[]
+talk,[1],"[['segment_backfill: true', 'source_question: Could you describe your eating patterns, and are you consistently adhering to scheduled meal times?', ""original_resp: I just have no friends and I don't want to even talk about it"", 'inferred_score: 1']]"
+emo,[],[]
+safe,[],[]
+risk,[],[]
+sleep,[0],"[['original_question: Have the quality and quantity of your sleep over the past few nights been adequate?', ""original_resp: I think that's enough for today""]]"
+eat,[2],"[['original_question: Could you describe your eating patterns, and are you consistently adhering to scheduled meal times?', ""original_resp: I don't know""], ['original_question: Could you describe your eating patterns, and are you consistently adhering to scheduled meal times?', ""original_resp: I don't know"", ""followup_resp: I don't want any more questions for today."", 'rv_decision: 1', 'rv_guide: I understand that you do not want to answer any more questions for today. However, since we are discussing your eating patterns and adherence to scheduled meal times, could you tell me what makes it difficult for you to know or describe those patterns right now? For example, is it a lack of awareness, or is there something else making it hard to recall?', ""followup_resp_1: Actually, I just don't eat my food. I just get my meals and I'm not eating anything. So I don't really remember even when I ate."", ""rv_validation: It sounds like you are experiencing a disconnect where you are getting your meals but not actually eating them, and that makes sense if you are feeling overwhelmed or disconnected from the experience of eating. It is understandable that if you don't remember eating, it can feel like you are losing track of what is happening. You might try focusing on the sensory experience of your food, like noticing the taste or texture of each bite, even if it's just for a few minutes. You could try setting a very simple reminder to pause and notice your food before you take a bite. Perhaps you could start by focusing on just one meal a day and trying to be fully present with that one meal."", 'therapist_resp: '], ['CBT_dimension: eat', ""CBT_statement: Actually, I just don't eat my food. I just get my meals and I'm not eating anything. So I don't really remember even when I ate."", 'CBT_unhelpful_thoughts: the unhealthy thought would be not remembering to eat and I should probably push myself to eat at decent times.', 'CBT_challenge: When I feel like not eating, I will set reminders to eat so that I can meet the three meals.', ""CBT_reframe: When I don't feel like eating, I will push myself to eat properly and healthy."", 'CBT_stage: success']]"
+work,[],[]
+work_dayoff,[],[]
+showup,[],[]
+finance,[],[]
+nutrition,"[0, 0]",[]
+problem,[],[]
+support,[],[]
+family,[],[]
+alcohol,[],[]
+ciga,[],[]
+drug,[],[]
+hobbies,[],[]
+creativity,[],[]
+community,[],[]
+support,[],[]
+social,[],[]
+comfortable,[],[]
+protection,[],[]
+productivity,[],[]
+motivation,[],[]
+coping,[],[]
+sib,[],[]
+arrest,[],[]
+legal,[],[]
+hygiene,[],[]
+sports,[],[]

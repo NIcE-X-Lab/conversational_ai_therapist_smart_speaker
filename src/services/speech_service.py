@@ -72,6 +72,36 @@ _REPEAT_KEYWORDS = ("repeat", "again", "say that again", "what was that",
 # Background music paths
 _MUSIC_PATH_PREFERRED = "assets/audio/ambient_therapy.mp3"
 _MUSIC_PATH_FALLBACK = "assets/audio/waiting_music.wav"
+
+# Background-music loudness contract
+# ----------------------------------
+# Two states, audibly distinct:
+#
+#   LOUD  (0.85, foreground listen level, comparable to Piper TTS):
+#     - idle between turns
+#     - in any intermission "hold" window (screening gap before the user
+#       speaks, breathing gap between guidance phrases, music block)
+#     - during the proactive activity's `never_done.wait()` hold
+#
+#   DUCKED (0.02, whisper, auto-applied by `_target_volume()`):
+#     - whenever `_AI_IS_SPEAKING` is set (Piper TTS playing) or
+#       `_USER_IS_SPEAKING` is set (mic listening, from the moment the
+#       stream opens — not just after VAD detects voice).
+#
+# The auto-ducker in `src/drivers/audio.py::BackgroundMusicThread._target_volume`
+# short-circuits any base_volume we set here as long as either flag is
+# on, so raising these constants cannot make TTS less intelligible or
+# leak music over the mic.  All four levels below therefore only take
+# effect when NO ducking is active.
+#
+# Why we keep separate names for the four code-paths even though three
+# of them use the same loud value: the call sites still semantically
+# differ (handoff dip before TTS, breathing hold, music-block peak,
+# resting ambient) and this lets a deployment tune one independently.
+_MUSIC_BED_AMBIENT = 0.85          # idle / post-turn resting level (LOUD)
+_MUSIC_BED_BREATHING = 0.85        # between meditation guidance phrases (LOUD)
+_MUSIC_BED_INTERMISSION = 0.85     # MUSIC intermission block (LOUD, TTS-match)
+_MUSIC_BED_HANDOFF = 0.05          # deep dip ~1 s before LLM response TTS
 _SCREENING_OPTIONS_HINT = (
     "You can answer: Not at all, Several days, More than half the days, or Nearly every day."
 )
@@ -194,17 +224,30 @@ class GlobalCommandMatcher:
         if not tokens:
             return False
 
-        # "goodbye" / "bye" alone is sufficient
-        if self._token_hit(tokens, ("goodbye", "bye"), self.FUZZY_THRESHOLD):
+        # "goodbye" / "bye" alone is sufficient — but require EXACT match.
+        # SequenceMatcher ratios are unreliable for short tokens: "be"
+        # ↔ "bye" scores 0.80 (triggering at the old default threshold),
+        # and any utterance containing the common word "be" (e.g.
+        # "need to be healthy") would falsely END the session (observed
+        # mid-CBT Stage 2 for Kyle, 2026-04-26 — user said "I need to be
+        # healthy and have green food" while answering the CHALLENGE
+        # prompt and the session terminated).  A strict exact-match is
+        # the only safe policy for these 3-letter tokens.
+        if "goodbye" in tokens or "bye" in tokens:
             return True
 
-        # Require "session" (or close fuzzy match) to be present
+        # Require "session" to be present — this disambiguates the
+        # end-word tokens from normal conversational use of "and" /
+        # "stop" / "finish" etc.  Fuzzy-match on "session" is acceptable
+        # because the word is long enough (7 chars) for SequenceMatcher
+        # ratios to be meaningful.
         has_session = "session" in tokens or self._token_hit(tokens, ("session",), 0.75)
         if not has_session:
             return False
 
-        # "end" is commonly mis-heard as "and" — use a lower threshold
-        # for these short words to catch typos / STT errors.
+        # "end" is commonly mis-heard as "and" — a lower threshold is
+        # fine here because the presence of "session" already blocks
+        # normal conversational false positives.
         has_end_token = self._token_hit(tokens, ("end", "and", "stop", "finish", "close"), 0.75)
         has_start_token = self._token_hit(tokens, ("start", "begin", "hello", "hi"), self.FUZZY_THRESHOLD)
         return has_end_token and not has_start_token
@@ -260,7 +303,7 @@ class SpeechInteractionService:
     """
 
     def __init__(self, input_queue, output_queue, is_hands_free=True):
-        logger.info("Initializing Unified Speech Interaction Service...")
+        logger.debug("Initializing Unified Speech Interaction Service...")
         with RESOURCE_AUDIT.track_module_init("SpeechService/AudioRecorder"):
             self.recorder = AudioRecorder()
         with RESOURCE_AUDIT.track_module_init("SpeechService/STTGenerator"):
@@ -286,6 +329,10 @@ class SpeechInteractionService:
         self.global_command_matcher = GlobalCommandMatcher()
         self.intermission_ladder = IntermissionLadderManager()
         self._music_announced_for_turn = False
+        # Set at the end of onboarding; consumed by the main loop to route
+        # the first LLM utterance through the intermission pipeline so the
+        # post-greeting / pre-first-question gap is never silent.
+        self._first_output_pending = False
 
         self.manual_input_event = threading.Event()
         self.stop_playback_event = threading.Event()
@@ -314,19 +361,34 @@ class SpeechInteractionService:
     # ------------------------------------------------------------------ #
 
     def say(self, text):
-        """Speak text via TTS or play music.  Blocks until playback finishes."""
+        """Speak text via TTS or play music.  Blocks until playback finishes.
+
+        Every utterance that actually becomes audio is logged as [TTS] so
+        the clinician log is a complete record of what the device said,
+        including onboarding greetings, bridge phrases, breathing scripts
+        and goodbye lines that never route through log_question's [AGENT]
+        tag. Dedup guard below drops the log line when the last [AGENT]
+        event already carried the same text (handler-driven clinical turns).
+        """
         if not text:
             return
-        logger.info(f"Agent Action: {text[:120]}{'...' if len(text) > 120 else ''}")
+        logger.debug(f"Agent Action: {text[:120]}{'...' if len(text) > 120 else ''}")
 
         if text.startswith("[PLAY_MUSIC]"):
             music_file = text.split(" ", 1)[1] if " " in text else _get_music_path()
-            logger.info(f"Starting background music loop: {music_file}")
+            logger.debug(f"Starting background music loop: {music_file}")
             prev_state = self.state
             self.state = "music_fallback"
             self.music_service.start(music_file)
             self.state = prev_state
             return
+
+        # Clinician-facing record of the actual spoken audio. Dedup against
+        # the last [AGENT] line so handler-driven questions (already logged
+        # by log_question) don't appear twice on the console.
+        last_agent = str(getattr(io_record, "_LAST_AGENT_LOGGED", "") or "")
+        if text.strip() and text.strip() != last_agent.strip():
+            logger.info(f"[TTS] {text}")
 
         prev_state = self.state
         self.state = "speaking"
@@ -339,7 +401,7 @@ class SpeechInteractionService:
             # TTS completely failed (Piper + espeak both down).
             # Bump the music so the user hears *something* rather than silence.
             logger.error("[TTS FAILURE] Both engines failed. Raising music to cover silence gap.")
-            self.music_service.set_base_volume(0.15)
+            self.music_service.set_base_volume(_MUSIC_BED_AMBIENT)
         self.state = prev_state
 
     def _persist_intermission_status(self, question_id: str, status: str, score=None, response_text="", reason=""):
@@ -361,7 +423,7 @@ class SpeechInteractionService:
         """Apply START/END priority matching before queueing input to the NLP stack."""
         command = self.global_command_matcher.match(transcript)
         if command == "END":
-            logger.info("[COMMAND_GATE] END command detected. Bypassing analyzer pipeline.")
+            logger.info("[SESSION] End command heard — closing session.")
             self.handle_exit()
             return "END"
         return command
@@ -423,13 +485,13 @@ class SpeechInteractionService:
         user_wav = "active_user_input.wav"
         rms = self.recorder.compute_rms(audio_frames)
         if rms < 0.005:
-            logger.info(f"[AUDIO HYGIENE] RMS {rms:.5f} below threshold — skipping disk write.")
+            logger.debug(f"[AUDIO HYGIENE] RMS {rms:.5f} below threshold — skipping disk write.")
             self.state = "idle"
             return ""
         self.recorder.save_wav(audio_frames, user_wav)
         text = self.transcribe(user_wav, apply_priority_gate=apply_priority_gate)
 
-        logger.info(f"User heard: {text}")
+        logger.debug(f"User heard: {text}")
         self.state = "idle"
         return text
 
@@ -450,13 +512,13 @@ class SpeechInteractionService:
         words = text.split()
         # If very short and ends with a trailing word, try to capture more
         if len(words) <= confirm_threshold and not text.rstrip().endswith((".", "!", "?")):
-            logger.info(f"[STT] Short transcript ({len(words)} words). Checking for continuation...")
+            logger.debug(f"[STT] Short transcript ({len(words)} words). Checking for continuation...")
             extra = self.listen(timeout=4.0, apply_priority_gate=apply_priority_gate)
             if extra:
                 if extra in {"__CMD_END__", "__CMD_START__"}:
                     return extra
                 merged = f"{text} {extra}"
-                logger.info(f"[STT] Merged fragments: '{merged}'")
+                logger.debug(f"[STT] Merged fragments: '{merged}'")
                 return merged
         return text
 
@@ -498,13 +560,14 @@ class SpeechInteractionService:
         like a single fast sentence.
         """
         self.state = "onboarding"
-        logger.info("Starting Onboarding flow...")
+        logger.info("[SESSION] Onboarding — capturing subject name.")
         self.say("Hello, I'm CaiTI.")
-        # Short music beat: fade music up briefly, then back to base so
-        # the name question lands cleanly over a soft bed.
-        self.music_service.fade_to(0.30, duration=0.8)
+        # Short music beat: hold music at the foreground bed level between
+        # the introduction and the name prompt so the opener has an
+        # "arrival" feel.  Auto-duck re-engages as soon as `say()` fires
+        # the next TTS, so this doesn't compete with the name question.
+        self.music_service.fade_to(_MUSIC_BED_AMBIENT, duration=0.8)
         time.sleep(1.2)
-        self.music_service.fade_to(0.15, duration=0.8)
         self.say("Who am I speaking with today?")
 
         max_attempts = 3
@@ -522,7 +585,7 @@ class SpeechInteractionService:
             # Keyword buffer: if the user said "start", "hello", "ready",
             # "hey Katie" etc., skip the name loop — start as "User".
             if self._is_onboard_bypass(name):
-                logger.info(f"[ONBOARD BYPASS] Trigger phrase detected in '{name}'. Starting as 'User'.")
+                logger.debug(f"[ONBOARD BYPASS] Trigger phrase detected in '{name}'. Starting as 'User'.")
                 name = "User"
             elif not self._is_valid_name(name):
                 logger.warning(f"[NAME GUARD] Invalid name '{name}' (attempt {attempt}/{max_attempts}).")
@@ -533,19 +596,19 @@ class SpeechInteractionService:
                     self.say("Let me just call you 'User' for now. We can change that later.")
                     name = "User"
 
-            logger.info(f"[NAME GUARD] Accepted raw transcript '{name}' as valid name.")
+            logger.debug(f"[NAME GUARD] Accepted raw transcript '{name}' as valid name.")
             stripped = re.sub(
                 r"^(?:my\s+name\s+is|i\s*(?:am|'m)\s|it'?s\s|they\s+call\s+me\s)",
                 "", name, flags=re.IGNORECASE,
             ).strip()
             clean = re.sub(r"[^A-Za-z0-9 _-]", "", stripped or name).strip()
             uid = clean.replace(" ", "_") or "User"
-            logger.info(f"Initializing session for user: {uid}")
+            logger.info(f"[SESSION] Initializing session for subject: {uid}")
             io_record.reset_session(uid)
             io_record.END_SESSION_EVENT.clear()
 
             # Suspend STT before starting session — LLM needs memory for greeting.
-            logger.info("[VRAM HANDOFF] Pre-session: suspending STT before pipeline starts.")
+            logger.debug("[VRAM HANDOFF] Pre-session: suspending STT before pipeline starts.")
             try:
                 self.stt.suspend_all()
             except Exception as e:
@@ -554,6 +617,28 @@ class SpeechInteractionService:
             io_record.START_SESSION_EVENT.set()
             self.intermission_ladder.reset()
             self.music_service.start(_get_music_path())
+
+            # Personalised handshake greeting (protocol stage 2).  "User" is
+            # the fallback uid when the name loop fails — drop it to keep
+            # the opener natural ("Hello, I'm CaiTI..." rather than
+            # "Hello, User, I'm CaiTI...").
+            spoken_name = clean if clean and clean.lower() != "user" else ""
+            if spoken_name:
+                self.say(
+                    f"Hello, {spoken_name}. I'm CaiTI, your intelligent "
+                    "therapist. Thank you for joining me today."
+                )
+            else:
+                self.say(
+                    "I'm CaiTI, your intelligent therapist. "
+                    "Thank you for joining me today."
+                )
+
+            # Arm the main loop to route the *first* LLM utterance through
+            # the intermission pipeline — PHQ/breathing/music will fill the
+            # pre-first-question gap instead of the user hearing silence
+            # while the LLM generates the opening dimension question.
+            self._first_output_pending = True
             break
 
         self.state = "idle"
@@ -569,11 +654,15 @@ class SpeechInteractionService:
         5. Play goodbye music (or ambient fallback)
         6. Return to idle state
         """
-        logger.info("Ending session via hardware/voice command.")
+        logger.info("[SESSION] Ending via hardware button or voice command.")
         io_record.END_SESSION_EVENT.set()
         io_record.START_SESSION_EVENT.clear()
         self.intermission_ladder.reset()
         self._music_announced_for_turn = False
+        # If the session ended before the first LLM output arrived, clear
+        # the flag so the next wake starts cleanly instead of routing
+        # a non-existent "first" turn through intermission.
+        self._first_output_pending = False
         # Stop any ongoing playback instantly
         self.stop_audio()
         self.music_service.stop()
@@ -618,7 +707,7 @@ class SpeechInteractionService:
         if os.path.isfile(_GOODBYE_MUSIC):
             self.music_service.start(_GOODBYE_MUSIC)
         else:
-            self.music_service.set_base_volume(0.15)
+            self.music_service.set_base_volume(_MUSIC_BED_AMBIENT)
             self.music_service.start(_get_music_path())
 
         self.state = "idle"
@@ -655,9 +744,9 @@ class SpeechInteractionService:
         self.paused = bool(is_paused)
         if self.paused:
             self.stop_audio()
-            logger.info("Speech loop paused.")
+            logger.debug("Speech loop paused.")
         else:
-            logger.info("Speech loop resumed.")
+            logger.debug("Speech loop resumed.")
 
     # ------------------------------------------------------------------ #
     # Intermission State Machine                                           #
@@ -682,7 +771,7 @@ class SpeechInteractionService:
         self.state = "intermission_screening"
         intro = _random.choice(_SCREENING_INTROS)
         full_prompt = f"{intro} {question.text}\n{_SCREENING_OPTIONS_HINT}"
-        logger.info(f"[INTERMISSION] Screening question: {question.question_id}")
+        logger.info(f"[PHQ4] Asking screening question: {question.question_id}")
         self.say(full_prompt)
 
         listener_active.set()
@@ -711,7 +800,7 @@ class SpeechInteractionService:
 
         # Empty / very short transcript — one silent re-prompt before skip.
         if not clean or len(clean) < 2:
-            logger.info("[INTERMISSION] No response to screening. Re-prompting.")
+            logger.info("[PHQ4] No response heard — re-prompting.")
             self.say("I didn't catch that. Could you try again?")
             listener_active.set()
             try:
@@ -734,7 +823,7 @@ class SpeechInteractionService:
                 self.say("We're already in session, and I'm listening.")
                 return {"outcome": "completed"}
             if not clean:
-                logger.info("[INTERMISSION] Silence timeout; marking question skipped.")
+                logger.info("[PHQ4] Silence timeout — marking question SKIPPED.")
                 self.intermission_ladder.skip_screening_question(
                     question.question_id, reason="silence_timeout",
                 )
@@ -773,7 +862,7 @@ class SpeechInteractionService:
                 # so the forensic audit query groups it under an STT-layer
                 # issue rather than a user-initiated skip.
                 logger.info(
-                    f"[INTERMISSION] {question.question_id}: '{clean}' -> UNRESOLVED"
+                    f"[PHQ4] {question.question_id} UNRESOLVED: '{clean}' (STT couldn't map to a Likert anchor)"
                 )
                 self.intermission_ladder.skip_screening_question(
                     question.question_id, reason="stt_unresolved",
@@ -793,13 +882,13 @@ class SpeechInteractionService:
                     status="ANSWERED", score=score, response_text=clean,
                 )
                 logger.info(
-                    f"[INTERMISSION] {question.question_id}: '{clean}' -> score={score}"
+                    f"[PHQ4] {question.question_id} ANSWERED: '{clean}' -> score={score}"
                 )
                 time.sleep(_TRANSITION_PAUSE)
                 return {"outcome": "completed"}
 
         if user_declined:
-            logger.info(f"[INTERMISSION] Screening declined ({skip_reason}); falling through to relaxation.")
+            logger.info(f"[PHQ4] Declined by user ({skip_reason}); falling through to breathing.")
             self.intermission_ladder.skip_screening_question(
                 question.question_id, reason=skip_reason,
             )
@@ -812,32 +901,27 @@ class SpeechInteractionService:
         return {"outcome": "completed"}
 
     def _run_breathing_block(self, llm_done):
-        """Guide one random breathing exercise; honour mid-exercise opt-out."""
+        """Guide one random breathing exercise; no listen step.
+
+        The meditation / breathing exercise is a passive activity — the
+        user does the breathing, they don't respond to it.  Previously
+        this block ran a 6 s listen for opt-out keywords after the
+        guidance, which left the user confused ("why is the system
+        waiting for me after it said to breathe?") and could also
+        accidentally pick up throat-clears / background noise as an
+        end-session command (observed in Kyle's session — the STT layer
+        is the highest-leverage source of false positives).
+        Speak the guidance and hold for the LLM's remaining latency;
+        that's it.
+        """
         self.state = "intermission_exercise"
         exercise_text = self.intermission_ladder.next_breathing_exercise()
-        logger.info("[INTERMISSION] Breathing exercise.")
+        logger.info("[INTERMISSION] Guiding a breathing exercise while LLM generates.")
+        # Gentle lift so the bed rides *with* the exercise instead of
+        # dropping to a whisper between MUSIC blocks.  Ducking kicks in
+        # automatically while the guidance TTS plays (set_ai_speaking).
+        self.music_service.fade_to(_MUSIC_BED_BREATHING, duration=1.2)
         self.say(exercise_text)
-
-        # Brief listen for opt-out ("no", "skip", "just music")
-        try:
-            self.stt.resume_all()
-        except Exception:
-            pass
-        opt_response = self._listen_for_intermission_answer(
-            timeout=6.0, min_window=3.0,
-        )
-        try:
-            self.stt.suspend_all()
-        except Exception:
-            pass
-
-        opt_clean = opt_response.lower().strip()
-        if opt_clean == "__cmd_end__":
-            return {"outcome": "end"}
-        if opt_clean and (_is_opt_out(opt_clean)
-                          or opt_clean in ("no", "nah", "nope", "no thanks")):
-            logger.info("[INTERMISSION] User declined breathing — will fall back to music.")
-            return {"outcome": "declined"}
 
         # Hold the remainder of _EXERCISE_HOLD_SEC but wake immediately if
         # the LLM becomes ready.  If the LLM is still thinking after the
@@ -846,14 +930,89 @@ class SpeechInteractionService:
             return {"outcome": "llm_ready"}
         return {"outcome": "completed"}
 
+    def _run_one_intermission_activity(self):
+        """Run a single intermission activity proactively while handler works.
+
+        Called from the main loop AFTER queuing user input but BEFORE
+        waiting on the LLM output.  This is the load-bearing piece of
+        latency masking on Jetson:  the activity's TTS + listen blocks
+        run inside pygame / PyAudio C extensions that release the
+        Python GIL, so while the handler is mid-inference (holding the
+        GIL in LiteRT-LM), the user is already hearing SCREENING /
+        BREATHING / MUSIC as intended by the intermission protocol.
+
+        SCREENING is picked first when PHQ-4 / GAD-2 questions remain,
+        so the paper's clinical instrument leads every turn.  Declines
+        and silence timeouts fall through to BREATHING (and then MUSIC)
+        within the same call — the user never leaves this function
+        without some activity having happened.  The LLM's response
+        itself is delivered by the subsequent
+        :meth:`_wait_for_output_with_intermission` call, which by then
+        is essentially a no-wait delivery path.
+
+        The `llm_done` event handed to each block is a dummy in this
+        context — the activity is guaranteed to run its natural duration
+        regardless of LLM state, so the blocks' early-break behaviour
+        doesn't fire here.  This is intentional:  the whole point of
+        running the activity proactively is that we want it to play
+        THROUGH the LLM work rather than cutting it short.
+        """
+        logger.debug("[INTERMISSION] Proactive pre-wait activity starting.")
+        self._sync_intermission_state_from_db()
+        self._music_announced_for_turn = False
+
+        # Dummy llm_done — never fires, so blocks run their full length.
+        # This is the per-turn "active waiting" phase; the real LLM
+        # output delivery happens AFTER this returns.
+        never_done = threading.Event()
+
+        # Pick SCREENING when a PHQ/GAD question is still pending,
+        # else let the ladder pick between BREATHING and MUSIC.
+        if self.intermission_ladder.screening_available():
+            stage = IntermissionStage.SCREENING
+        else:
+            stage = self.intermission_ladder.next_activity()
+        logger.info(f"[INTERMISSION] Pre-wait activity: {stage.value}")  # user-engaging activity while LLM thinks
+
+        listener_active = threading.Event()
+        if stage == IntermissionStage.SCREENING:
+            question = self.intermission_ladder.next_screening_question()
+            if question is not None:
+                result = self._run_screening_block(question, never_done, listener_active)
+                self.intermission_ladder.mark_activity(stage)
+                if result.get("outcome") in ("declined", "completed", "end"):
+                    # Whether answered / skipped / declined, the user
+                    # has had their activity beat; return without
+                    # chaining further.
+                    return
+            # Defensive: screening picked but no question available — fall through.
+            stage = IntermissionStage.BREATHING_EXERCISE
+
+        if stage == IntermissionStage.BREATHING_EXERCISE:
+            # Breathing is passive — user doesn't respond mid-meditation.
+            # The block speaks the guidance and holds silently for the
+            # rest of the exercise window, then returns.  No "declined"
+            # branch is possible any more (opt-out listen was removed
+            # because it was confusing UX and the STT was a false-
+            # positive source for end-session).
+            self._run_breathing_block(never_done)
+            self.intermission_ladder.mark_activity(stage)
+            return
+
+        if stage == IntermissionStage.MUSIC:
+            self._run_music_block(never_done)
+            self.intermission_ladder.mark_activity(stage)
+
     def _run_music_block(self, llm_done):
         """Raise music bed, wait for LLM output or a hold interval."""
         self.state = "music_fallback"
         if not self._music_announced_for_turn:
             self.say("I'm still thinking, enjoy the music while I continue.")
             self._music_announced_for_turn = True
-        # Fade up so it becomes prominent — not a hard volume jump.
-        self.music_service.fade_to(0.30, duration=2.0)
+        # Fade up so the music bed becomes the foreground while the LLM
+        # is thinking — the user should feel like they're being *given*
+        # music to sit with, not listening to incidental background.
+        self.music_service.fade_to(_MUSIC_BED_INTERMISSION, duration=2.0)
         self.music_service.start(_get_music_path())
         # Jump to a fresh random segment so each MUSIC intermission sounds
         # different — avoids the "same opening bars every time" feel on
@@ -865,7 +1024,7 @@ class SpeechInteractionService:
             return {"outcome": "llm_ready"}
         return {"outcome": "completed"}
 
-    def _wait_for_output_with_intermission(self):
+    def _wait_for_output_with_intermission(self, is_session_start: bool = False):
         """Wait for the next pipeline utterance, engaging the intermission pipeline.
 
         The three activities (screening, breathing, music) are picked
@@ -877,6 +1036,13 @@ class SpeechInteractionService:
         Music fades softly up during the MUSIC block and fades softly
         back down before the LLM response is delivered, so the handoff
         never feels like a jump cut.
+
+        ``is_session_start=True`` suppresses the "going back to what you
+        shared" bridge phrase — the user hasn't shared anything yet on
+        the very first turn, so that bridge would be incoherent.  The
+        post-greeting gap still gets the full intermission treatment so
+        PHQ-4 / breathing / music fills the silence until the first
+        dimension question is ready.
         """
         llm_done = threading.Event()
         response_text = [None]
@@ -899,15 +1065,20 @@ class SpeechInteractionService:
         watcher = threading.Thread(target=_watcher, daemon=True)
         watcher.start()
 
-        # Fast path for short LLM latency
-        if llm_done.wait(timeout=_INTERMISSION_TRIGGER_SEC):
-            if response_text[0]:
-                self.say(response_text[0])
-            return
-
-        logger.info(
-            f"[INTERMISSION] LLM latency > {_INTERMISSION_TRIGGER_SEC}s. "
-            "Entering intermission pipeline."
+        # This pipeline is the "delivery + overflow" phase of the
+        # intermission protocol.  The main loop has already run one
+        # proactive activity via `_run_one_intermission_activity()`
+        # before calling us, so the user has heard their SCREENING /
+        # BREATHING / MUSIC beat for this turn.  From here we either:
+        #   - Deliver the LLM response immediately (llm_done already
+        #     set by the time the proactive activity returned), or
+        #   - Cycle additional activities while the LLM is still
+        #     thinking and then deliver when it's ready.
+        # Either path goes through the same music-fade / bridge-phrase
+        # handoff below.
+        logger.debug(
+            f"[INTERMISSION] Delivery pipeline entered "
+            f"(session_start={is_session_start}, llm_done={llm_done.is_set()})."
         )
         intermission_was_active = True
 
@@ -923,27 +1094,46 @@ class SpeechInteractionService:
         # alternative for the *same* turn.
         turn_exclude: set[IntermissionStage] = set()
 
-        while not llm_done.is_set() or listener_active.is_set():
+        # NOTE: the proactive `_run_one_intermission_activity()` call in
+        # the main loop has already delivered one activity by the time
+        # we get here — this pipeline exists to (a) absorb the rare case
+        # where the handler's LLM chain is still running after the
+        # proactive activity, and (b) deliver the output once ready.
+        # We therefore do NOT force an extra activity on entry; if the
+        # LLM is already done, fall straight through to delivery.
+        force_first_stage: IntermissionStage | None = None
+
+        while (
+            not llm_done.is_set()
+            or listener_active.is_set()
+        ):
             if io_record.END_SESSION_EVENT.is_set():
-                logger.info("[INTERMISSION] Session ended. Aborting.")
+                logger.info("[SESSION] End received during intermission — aborting.")
                 break
 
             # If LLM is done but listener is still active, wait for the
             # user to finish answering before breaking out.
             if llm_done.is_set() and listener_active.is_set():
-                logger.info("[INTERMISSION] LLM ready, listener lock held. Waiting for user.")
+                logger.debug("[INTERMISSION] LLM ready, listener lock held. Waiting for user.")
                 time.sleep(0.3)
                 continue
 
             now = time.monotonic()
             if now - last_heartbeat >= _INTERMISSION_HEARTBEAT_SEC:
                 last_heartbeat = now
-                logger.info("[Heartbeat] Still waiting for LLM output; cycling intermission activities.")
+                logger.debug("[Heartbeat] Still waiting for LLM output; cycling intermission activities.")
 
-            stage = self.intermission_ladder.next_activity(
-                exclude=frozenset(turn_exclude) if turn_exclude else None,
-            )
-            logger.info(f"[INTERMISSION] Selected activity: {stage.value}")
+            if force_first_stage is not None:
+                stage = force_first_stage
+                force_first_stage = None
+                logger.info(
+                    f"[INTERMISSION] Session-start forced first activity: {stage.value}"
+                )
+            else:
+                stage = self.intermission_ladder.next_activity(
+                    exclude=frozenset(turn_exclude) if turn_exclude else None,
+                )
+                logger.info(f"[INTERMISSION] Selected activity: {stage.value}")
 
             if stage == IntermissionStage.SCREENING:
                 question = self.intermission_ladder.next_screening_question()
@@ -971,15 +1161,11 @@ class SpeechInteractionService:
             if stage == IntermissionStage.BREATHING_EXERCISE:
                 result = self._run_breathing_block(llm_done)
                 self.intermission_ladder.mark_activity(stage)
-                if result["outcome"] == "end":
-                    break
+                # No "declined" path — breathing is a passive activity,
+                # the block just holds for its natural duration and
+                # returns "llm_ready" or "completed".
                 if result["outcome"] == "llm_ready":
                     break
-                if result["outcome"] == "declined":
-                    # User said no to breathing — force MUSIC this turn.
-                    turn_exclude.add(IntermissionStage.BREATHING_EXERCISE)
-                    turn_exclude.add(IntermissionStage.SCREENING)
-                    continue
                 turn_exclude.clear()
                 continue
 
@@ -1001,18 +1187,23 @@ class SpeechInteractionService:
             return
 
         if response_text[0]:
-            logger.info("[INTERMISSION] Complete. Delivering LLM response.")
+            logger.info("[INTERMISSION] Complete — delivering agent response.")
 
             # Soft handoff: fade music down over ~1.2 s before we speak.
             # Brief sleep so the fade is audibly underway before TTS plays;
             # once TTS starts, audio.set_ai_speaking() will further duck
             # the bed to speaking_volume automatically.
-            self.music_service.fade_to(0.05, duration=1.2)
+            self.music_service.fade_to(_MUSIC_BED_HANDOFF, duration=1.2)
             time.sleep(0.9)
 
-            if intermission_was_active:
+            # The standard bridge phrases all reference something the user
+            # "shared" — on the very first turn they haven't said anything
+            # yet, so the bridge would be nonsensical.  Skip it for
+            # session start; the LLM's opening dimension question is a
+            # clean lead-in on its own.
+            if intermission_was_active and not is_session_start:
                 bridge = _random.choice(_BRIDGE_PHRASES)
-                logger.info(f"[HANDOFF] Bridge phrase: '{bridge}'")
+                logger.debug(f"[HANDOFF] Bridge phrase: '{bridge}'")
                 self.say(bridge)
 
             time.sleep(0.3)
@@ -1020,17 +1211,17 @@ class SpeechInteractionService:
 
             # Restore the ambient base volume after the reply so the bed
             # sits at a calm level for the next listen.
-            self.music_service.fade_to(0.15, duration=1.5)
+            self.music_service.fade_to(_MUSIC_BED_AMBIENT, duration=1.5)
         else:
             # LLM timed out or produced no response — never leave silence.
             # Fall back to a breathing exercise so the user stays engaged.
             logger.warning("[INTERMISSION] LLM produced no response. Delivering therapeutic fallback.")
-            self.music_service.fade_to(0.05, duration=1.0)
+            self.music_service.fade_to(_MUSIC_BED_HANDOFF, duration=1.0)
             time.sleep(0.7)
             fallback = self.intermission_ladder.next_breathing_exercise()
             self.say(fallback)
             self.say("I'm having a little trouble with my thoughts right now. Let me try again shortly.")
-            self.music_service.fade_to(0.15, duration=1.5)
+            self.music_service.fade_to(_MUSIC_BED_AMBIENT, duration=1.5)
 
         self.state = "main_process"
 
@@ -1040,7 +1231,7 @@ class SpeechInteractionService:
 
     def run(self):
         """Main service loop."""
-        logger.info("Speech Interaction Service started.")
+        logger.debug("Speech Interaction Service started.")
 
         while self.running:
             try:
@@ -1053,7 +1244,7 @@ class SpeechInteractionService:
                     if io_record.START_SESSION_EVENT.is_set():
                         self.handle_end_session()
                 elif gpio_ev == EVENT_OPT_OUT:
-                    logger.info("[GPIO] Opt-out button pressed.")
+                    logger.info("[SESSION] GPIO opt-out button pressed — user requesting silence.")
                     self.stop_playback_event.set()
                     self.input_queue.put("[OPT_OUT]")
                     self.say(f"[PLAY_MUSIC] {_get_music_path()}")
@@ -1064,6 +1255,21 @@ class SpeechInteractionService:
 
                 # 2. Handle Idle State (Waiting for Voice Wake-up)
                 if not io_record.START_SESSION_EVENT.is_set():
+                    # The last LLM hand-off suspended STT for VRAM headroom;
+                    # once a session ends (either user-initiated or after CBT
+                    # completes / fails), main.py clears START_SESSION_EVENT
+                    # and control falls through here.  STT is still suspended
+                    # at that point, so every wake-word transcribe silently
+                    # errors with "Model not loaded, cannot transcribe."
+                    # Observed in Hudson's session 16 (2026-04-26) — after
+                    # CBT Stage 2 failed, the idle loop spent ~45 s firing
+                    # STT errors because the model was never reloaded.
+                    # Idempotent: resume_all() returns immediately if the
+                    # model is already loaded.
+                    try:
+                        self.stt.resume_all()
+                    except Exception as e:
+                        logger.warning(f"[IDLE] STT resume for wake-detect failed: {e}")
                     audio_frames = self.recorder.record_until_silence(max_duration=1.0)
                     if audio_frames:
                         temp_wav = "wake_temp.wav"
@@ -1079,13 +1285,13 @@ class SpeechInteractionService:
                         has_trigger = any(t in words for t in WAKE_TRIGGERS)
                         has_name = WAKE_NAME in words
                         command = self.global_command_matcher.match(text)
-                        logger.info(f"Wake transcription: {text}")
+                        logger.debug(f"Wake transcription: {text}")
 
                         if command == "START":
-                            logger.info("Global START command detected in idle state.")
+                            logger.info("[SESSION] Wake command heard — starting new session.")
                             self.initialize_session()
                         elif has_trigger and has_name:
-                            logger.info("Wake phrase accepted. Transitioning to onboarding.")
+                            logger.info("[SESSION] Wake phrase 'Hey CaiTI' detected — starting onboarding.")
                             self.initialize_session()
                     continue
 
@@ -1100,69 +1306,108 @@ class SpeechInteractionService:
                 # directly — NOT to output_queue.get() — because the handler
                 # is already waiting for the user's answer.
                 try:
-                    text_to_speak = self.output_queue.get(timeout=0.2)
-                    if text_to_speak:
+                    if self._first_output_pending:
+                        # Post-greeting gap: route the first LLM utterance
+                        # (the opening dimension question) through the
+                        # intermission pipeline so PHQ-4 / breathing / music
+                        # fills the pre-first-question silence.  The
+                        # watchdog is the one that actually speaks the
+                        # LLM output on its way out, so we don't call
+                        # self.say() here.
+                        self._first_output_pending = False
+                        logger.info("[SESSION] Routing first agent utterance through intermission pipeline.")
+                        # Proactive activity during the post-greeting gap
+                        # (handler is loading LiteRT + generating the first
+                        # dimension question — both hold the GIL, so we
+                        # must start an activity BEFORE waiting on the
+                        # output queue for the same reason described in
+                        # the per-turn path below).
+                        self._run_one_intermission_activity()
+                        self._wait_for_output_with_intermission(is_session_start=True)
+                        self.post_turn_cleanup()
+                    else:
+                        text_to_speak = self.output_queue.get(timeout=0.2)
+                        if not text_to_speak:
+                            raise queue.Empty
                         self.say(text_to_speak)
 
-                        while (self.running
-                               and io_record.START_SESSION_EVENT.is_set()
-                               and not io_record.END_SESSION_EVENT.is_set()):
+                    while (self.running
+                           and io_record.START_SESSION_EVENT.is_set()
+                           and not io_record.END_SESSION_EVENT.is_set()):
 
-                            # Resume STT for listening
-                            try:
-                                self.stt.resume_all()
-                            except Exception as e:
-                                logger.warning(f"[VRAM HANDOFF] STT resume failed: {e}")
+                        # Resume STT for listening
+                        try:
+                            self.stt.resume_all()
+                        except Exception as e:
+                            logger.warning(f"[VRAM HANDOFF] STT resume failed: {e}")
 
-                            if not self.is_hands_free:
-                                self.manual_input_event.wait()
-                                self.manual_input_event.clear()
+                        if not self.is_hands_free:
+                            self.manual_input_event.wait()
+                            self.manual_input_event.clear()
 
-                            user_response = self._listen_with_retry(timeout=15.0, apply_priority_gate=True)
-                            if not user_response:
-                                self._consecutive_silence_count += 1
-                                # After 2 consecutive silence rounds, reassure
-                                # the user so the device never feels "broken".
-                                if self._consecutive_silence_count >= 2:
-                                    self.say("I'm still here, just listening to the music with you. Take your time.")
-                                    self._consecutive_silence_count = 0
-                                continue
+                        user_response = self._listen_with_retry(timeout=15.0, apply_priority_gate=True)
+                        if not user_response:
+                            self._consecutive_silence_count += 1
+                            # After 2 consecutive silence rounds, reassure
+                            # the user so the device never feels "broken".
+                            if self._consecutive_silence_count >= 2:
+                                self.say("I'm still here, just listening to the music with you. Take your time.")
+                                self._consecutive_silence_count = 0
+                            continue
 
-                            self._consecutive_silence_count = 0
+                        self._consecutive_silence_count = 0
 
-                            if user_response == "__CMD_END__":
-                                break
-                            if user_response == "__CMD_START__":
-                                self.say("We're already in session, and I'm listening.")
-                                continue
+                        if user_response == "__CMD_END__":
+                            break
+                        if user_response == "__CMD_START__":
+                            self.say("We're already in session, and I'm listening.")
+                            continue
 
-                            command = self._apply_global_command_priority(user_response)
-                            if command == "END":
-                                break
-                            if command == "START":
-                                self.say("We're already in session, and I'm listening.")
-                                continue
+                        command = self._apply_global_command_priority(user_response)
+                        if command == "END":
+                            break
+                        if command == "START":
+                            self.say("We're already in session, and I'm listening.")
+                            continue
 
-                            # Global command gate is evaluated above before queueing text
-                            # into the downstream response-analyzer path.
-                            self.input_queue.put(user_response)
+                        # Global command gate is evaluated above before queueing text
+                        # into the downstream response-analyzer path.
+                        self.input_queue.put(user_response)
 
-                            # ── VRAM Handoff: suspend STT for LLM ────────
-                            logger.info(f"[VRAM HANDOFF] Pre-unload: {get_system_memory_snapshot()}")
-                            try:
-                                self.stt.suspend_all()
-                            except Exception as e:
-                                logger.warning(f"[VRAM HANDOFF] STT suspend failed: {e}")
+                        # ── VRAM Handoff: suspend STT for LLM ────────
+                        logger.debug(f"[VRAM HANDOFF] Pre-unload: {get_system_memory_snapshot()}")
+                        try:
+                            self.stt.suspend_all()
+                        except Exception as e:
+                            logger.warning(f"[VRAM HANDOFF] STT suspend failed: {e}")
 
-                            time.sleep(0.3)
+                        # ── Proactive intermission activity ─────────────────
+                        # Run one intermission activity BEFORE waiting for
+                        # the LLM output.  Critical for latency masking on
+                        # Jetson: LiteRT-LM holds the Python GIL for the
+                        # full 10-30 s of each inference, which means any
+                        # Python-level scheduling inside
+                        # _wait_for_output_with_intermission gets starved
+                        # until the handler finishes.  By entering an
+                        # activity HERE (before the GIL gets taken by
+                        # LiteRT), the speech thread is already inside
+                        # pygame TTS + PyAudio recording calls — both of
+                        # which release the GIL at the C level — so the
+                        # activity plays over the top of the handler's
+                        # LLM work in parallel, exactly as the protocol
+                        # intends.
+                        self._led_off()
+                        self.state = "main_process"
+                        self._run_one_intermission_activity()
 
-                            # Wait for next response with intermission
-                            self._led_off()
-                            self.state = "main_process"
-                            self._wait_for_output_with_intermission()
+                        # Now collect the LLM output and deliver it.  By
+                        # the time we get here the handler's chain is
+                        # usually complete, so this is just the delivery
+                        # path (music fade / bridge phrase / TTS).
+                        self._wait_for_output_with_intermission()
 
-                            self.post_turn_cleanup()
-                            logger.info(f"[VRAM HANDOFF] Post-intermission: {get_system_memory_snapshot()}")
+                        self.post_turn_cleanup()
+                        logger.debug(f"[VRAM HANDOFF] Post-intermission: {get_system_memory_snapshot()}")
 
                 except queue.Empty:
                     pass
