@@ -100,7 +100,7 @@ rl:
   rephrase_at_runtime: true
   # Legacy prototype used np.random.uniform() < 0.95 to skip rephrase 5%
   # of the time. Set to 1.0 for paper-strict "always rephrase".
-  rephrase_probability: 0.95
+  rephrase_probability: 0.20
 
   # G5 — Paper §4.2 "Understand user input better" re-ask.
   # When enabled, if the primary dimension gets no score AND the user

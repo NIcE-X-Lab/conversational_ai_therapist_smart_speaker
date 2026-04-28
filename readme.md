@@ -11,20 +11,21 @@ Q-learning questioner over 37 daily-functioning dimensions → Response Analyzer
 
 1. [Paper Alignment at a Glance](#paper-alignment-at-a-glance)
 2. [Clinical-Trial Hardening](#clinical-trial-hardening)
-3. [System Architecture](#system-architecture)
-4. [Repository Layout](#repository-layout)
-5. [Module Reference](#module-reference)
-6. [Session Lifecycle](#session-lifecycle)
-7. [LLM Design (Self-Contained Per Task)](#llm-design-self-contained-per-task)
-8. [Persistence Model](#persistence-model)
-9. [Configuration](#configuration)
-10. [Feature Gates & Future Development](#feature-gates--future-development)
-11. [FastAPI Endpoints](#fastapi-endpoints)
-12. [Running the System](#running-the-system)
-13. [Jetson Deployment](#jetson-deployment)
-14. [Testing](#testing)
-15. [Clinical-Trial Operations Playbook](#clinical-trial-operations-playbook)
-16. [Key Technologies](#key-technologies)
+3. [Latency & Performance](#latency--performance)
+4. [System Architecture](#system-architecture)
+5. [Repository Layout](#repository-layout)
+6. [Module Reference](#module-reference)
+7. [Session Lifecycle](#session-lifecycle)
+8. [LLM Design (Self-Contained Per Task)](#llm-design-self-contained-per-task)
+9. [Persistence Model](#persistence-model)
+10. [Configuration](#configuration)
+11. [Feature Gates & Future Development](#feature-gates--future-development)
+12. [FastAPI Endpoints](#fastapi-endpoints)
+13. [Running the System](#running-the-system)
+14. [Jetson Deployment](#jetson-deployment)
+15. [Testing](#testing)
+16. [Clinical-Trial Operations Playbook](#clinical-trial-operations-playbook)
+17. [Key Technologies](#key-technologies)
 
 ---
 
@@ -49,8 +50,8 @@ Q-learning questioner over 37 daily-functioning dimensions → Response Analyzer
 - **LLM backend.** Paper uses GPT-4 / fine-tuned GPT-3.5 per role via OpenAI API. We run a single local Gemma 4 E2B via **LiteRT-LM** for on-device privacy. Role plumbing stays paper-faithful (`LLMRole` enum at every call site) so multi-model deployments can map different roles to different model backends later.
 - **Crisis override.** Adds a safety-net short-circuit: if any `CRITICAL_DIMS` entry (`sib`, `safe`, `risk`, `drug`, `alcohol`) scores 2, the RL loop is short-circuited to a `SAFETY_RESOURCES_MESSAGE` (988 Lifeline + SAMHSA) before CBT. The paper describes similar safety handling narratively; we implement it as an explicit check in `handler_rl._crisis_scan`.
 - **Multi-dim back-fill.** `questioner._apply_segment_level_backfill` + `_apply_multi_dim_updates` credit secondary dimensions mentioned in a single substantive utterance (paper §4.1 "minimal questioning"). The per-segment back-fill is free (reuses existing classification); the LLM back-fill is gated to ≥20 tokens + ≥2 segments.
-- **Reward aggregation.** `config.yaml::rl.reward_mode` defaults to `"hybrid"` = (max + mean) / 2. Paper uses pure mean; hybrid is safer for mixed-severity replies without changing within-session clinical response (see `config.yaml` for the full rationale). Set to `"mean"` for paper-strict reproduction.
-- **Smart-speaker UX layer.** Paper targets multiple form factors; this repo adds a Jetson-specific hardware layer — GPIO buttons, LED, ambient background music bed with automatic ducking + smooth fades, and a **GIL-safe proactive intermission** pipeline (SCREENING / BREATHING / MUSIC, SCREENING-first while PHQ-4 questions remain, then last-activity-deprioritised cycling). The activity runs in the speech thread *in parallel with* the handler's LLM work — started BEFORE the GIL-holding inference begins — so PHQ-4 questions and breathing guidance play out through the latency window instead of the user hearing silence. Music sits at a foreground listen level (0.85) whenever Piper TTS is not speaking and the mic is not listening, and auto-ducks to a 2 % whisper in both of those cases so the voice path stays clean. Breathing is passive (no listen step). Random-segment playback keeps a long ambient track fresh; breathing scripts are session-scoped so all 5 meditations play before any repeat. The pipeline engages on **every** LLM-wait gap — including the post-greeting gap before the first dimension question — so the user never hears silence from wake to session end. These are UX additions; they do not change clinical behaviour.
+- **Reward aggregation.** `config.yaml::rl.reward_mode` defaults to `"mean"` (paper-strict + legacy-faithful np.mean). `"hybrid" = (max + mean) / 2` is available as a research alternate for dims where a single severe segment should bias revisit priority (see `config.yaml` for the full rationale). Switch via `reward_mode: hybrid`.
+- **Smart-speaker UX layer.** Paper targets multiple form factors; this repo adds a Jetson-specific hardware layer — GPIO buttons, LED, ambient background music bed with automatic ducking + smooth fades, and a **parallel STT + GIL-safe proactive intermission** pipeline (SCREENING / BREATHING / MUSIC, SCREENING-first while PHQ-4 questions remain, then last-activity-deprioritised cycling). The moment the user stops speaking, a daemon STT worker starts transcribing the saved WAV while the main thread drops straight into the intermission — the user hears "While I'm processing that…" / breathing / music within ~100 ms of the mic closing. When Whisper finishes (~2 s later) the worker pushes the transcript onto `input_queue`, so the handler's LLM call runs in parallel with the rest of the intermission rather than serialised behind it. Music sits at a foreground listen level (0.85) whenever Piper TTS is not speaking and the mic is not listening, and auto-ducks to a 2 % whisper in both of those cases so the voice path stays clean. An **output-ready watcher** peeks the handler's `output_queue` during the intermission and cuts BREATHING/MUSIC TTS short (via `stop_playback_event`) the instant the next LLM response is ready — with a 6 s minimum-engagement floor so meditation never gets chopped after a single breath. SCREENING is never interrupted (clinical data). Short user utterances (< 3 s) fall back to a serial path that preserves the fragment-merge retry. Random-segment playback keeps a long ambient track fresh; breathing scripts are session-scoped so all 5 meditations play before any repeat. Median turn latency on Jetson GPU backend: **~16 s** (vs. ~82 s in the initial CPU-backend build). These are UX additions; they do not change clinical behaviour.
 
 ---
 
@@ -135,6 +136,76 @@ Three sequential sessions from Alice therefore produce three distinct Report / N
 6. **LLM failure:** `LLMError` raised; bounded to 3 retries per session; callers can mark the turn SKIPPED.
 7. **TTS hard failure:** Piper → espeak → cached alert WAV. Never silent.
 8. **Session end:** DB row closed with `end_reason='normal'`. Dossier JSON atomically flushed. `atexit` handles SIGTERM/Ctrl-C cleanly.
+
+---
+
+## Latency & Performance
+
+The initial build (first "Smith" session, 2026-04-27) exhibited 60–120 s median per-turn latency on Jetson Orin Nano. After four rounds of targeted changes the median turn landed at **~16 s (5× faster)** with no change to clinical behaviour.
+
+### Current per-turn budget (Jetson, GPU backend, all tuning applied)
+
+| Stage | Time | Notes |
+|---|---|---|
+| Mic recording (record-until-silence) | user-driven | not on our critical path |
+| Save WAV to disk | ~0.1 s | pygame mixer write |
+| **STT decode (parallel)** | 1.5–2.5 s | runs in a daemon worker; main thread is already in the intermission |
+| **ANALYZER LLM call** | 2.0 s | single-segment warm call, ~1,263-token system prompt |
+| Multi-dim ANALYZER (if ≥ 20 tok + ≥ 2 seg) | 2.4 s | credits secondary dimensions, runs in parallel with intermission |
+| Intermission TTS playback | 5–15 s | BREATHING/MUSIC are interruptible; SCREENING runs to completion |
+| Music fade + bridge phrase | 5–8 s | `time.sleep(0.9)` + Piper spawn + 3-word bridge |
+| Final question TTS gen + playback | 3–5 s | Piper ~1.8 s spawn + ~25 ms/word |
+| **End-to-end turn median** | **~16 s** | measured across 7 turns of the Max session |
+
+### Per-role LLM latency (real production prompts, Jetson GPU warm)
+
+| Role | Prompt tokens | Time |
+|---|---|---|
+| Short GENERAL | ~50 | 0.9 s |
+| REPHRASER | ~350 | 1.6 s |
+| ANALYZER | ~1,263 | 2.0 s |
+| MULTI-DIM ANALYZER | ~395 | 2.4 s |
+| RV_REASONER | ~588 | 2.1 s |
+| RV_GUIDE | ~1,140 | 3.9 s |
+| RV_VALIDATOR (4–7 sentence output) | ~1,485 | 9.4 s |
+| Cold start (first call of the session) | — | ~4.6 s |
+
+Re-measure anytime with `./.venv/bin/python scripts/_audit_latency.py`.
+
+### How we got the 5× reduction
+
+1. **GPU backend for LiteRT-LM** (`LITERT_BACKEND=gpu` in `.env`). Gemma-4-E2B runs 4–8× faster per call on the Orin Nano's Ampere GPU than on its 6-core ARM CPU (XNNPack path). Whisper stays on CPU — they share the same 8 GB unified-memory pool and moving both to GPU risks OOM. This single change collapsed ANALYZER from ~18 s → 2 s and RV_VALIDATOR from ~29 s → 9 s.
+2. **Parallel STT + intermission** (`_run_parallel_turn` in `speech_service.py`). Record → save WAV → spawn STT worker → immediately run intermission on the main thread. The worker pushes the transcript onto `input_queue` as soon as decode completes, so the handler's LLM call runs in parallel with the rest of the intermission instead of serialising behind it. Closed the ~4 s gap between mic-close and the user hearing "While I'm processing that…".
+3. **Early-exit watcher on BREATHING / MUSIC** (`_start_output_ready_watcher`). Meditation and music blocks previously ran their full 30 s hold even after the LLM response was ready. The watcher peeks `output_queue` every 100 ms and trips `stop_playback_event` + `llm_done` as soon as the handler enqueues its response (respecting a 6 s minimum-engagement floor so meditation never gets chopped after a single breath). SCREENING remains uninterruptible — PHQ/GAD answers are clinical data.
+4. **Rephraser-probability tuning** (`rl.rephrase_probability: 0.20`). Legacy fires the Rephraser on ~95 % of turns; at 0.20 most turns speak the therapist-authored variant verbatim. Saves ~1.3 s/turn averaged across a session. Flip back to 0.95 for legacy wording frequency.
+5. **LITERT_MAX_TOKENS tightened from 4096 → 3072** (`.env`). Engine-level ceiling on prompt + output; 3072 covers RV_VALIDATOR worst-case (~2.2 k tokens total) while cutting KV-cache footprint on the unified-memory pool.
+
+### Validated in the Max session (7 turns, 2026-04-27 22:51–22:56)
+
+| Turn | Duration (mic-close → next question audible) | Intermission | Notes |
+|---|---|---|---|
+| 1 (medication) | ~23 s | SCREENING | first turn, Rephraser for opening |
+| 2 (mood) | ~28 s | SCREENING (worry control) | 15 s PHQ TTS playback dominates |
+| 3 (eat) | ~18 s | SCREENING | shorter user input |
+| 4 (work) | ~14 s | BREATHING (cut at 7.4 s) | early-exit watcher fired |
+| 5 (retry answer) | ~13 s | MUSIC (cut at 6.0 s) | early-exit watcher fired |
+| 6 (showup → care) | ~16 s | SCREENING | Rephraser in-flight + Analyzer |
+| 7 (care) | ~10 s | BREATHING (full run) | short user input, breathing not cut |
+
+**Median ~16 s.** A PDF walkthrough (per-module + per-turn timeline, before/after comparison, critical-path breakdown) is produced by `scripts/_build_latency_report_pdf.py`.
+
+### Remaining levers (not yet applied)
+
+| Lever | Saves per turn | Effort |
+|---|---|---|
+| Shrink ANALYZER prompt (drop 14 examples + confusing-dims paragraph) | 1–2 s | 1 h |
+| Shrink RV_VALIDATOR (keep only Example 4, require 2–3 sentences instead of 4–7) | 3–6 s on RV turns | 1 h |
+| Shorten bridge phrases to 3–4 words | 2–3 s | 10 min |
+| Drop the 0.9 s handoff `time.sleep` to 0.3 s | 0.6 s | 1 min |
+| Token-streaming LLM → Piper | ~2 s | 1 day |
+| Swap Whisper `base.en` for `tiny.en` | ~0.5 s | 5 min (quality trade) |
+
+Applying the top three would land the median turn at ~8–10 s.
 
 ---
 
@@ -423,10 +494,11 @@ The main audio loop. States: `idle`, `onboarding`, `main_listen`, `main_process`
 
 - **Idle** — polls 1 s audio windows for the wake phrase (`hello|hi|hey|start|wake` + `katie`) or GPIO Start button.
 - **Onboarding** — asks for the user's name, then delivers a **personalised handshake greeting**: `"Hello, {name}. I'm CaiTI, your intelligent therapist. Thank you for joining me today."` (the name is dropped gracefully when the Name Guard fell back to `User`). The earlier "Hello, I'm CaiTI." → music swell → "Who am I speaking with today?" opener still frames the name prompt. A multi-layer Name Guard rejects common filler ("of course", "good morning", "I'm fine", etc.) and strips phrases like "my name is". Bypass keywords (e.g. "start", "hello") fall back to `User`. At the end of onboarding, `_first_output_pending` is armed so the main loop routes the very first LLM utterance through the intermission pipeline.
-- **Active session** — post-greeting, the main loop checks `_first_output_pending`: if set, `_run_one_intermission_activity()` + `_wait_for_output_with_intermission(is_session_start=True)` run so PHQ-4 / breathing / music fills the pre-first-question gap and the internal watchdog speaks the LLM's opening dimension question on its way out (bridge phrase suppressed — the user hasn't shared anything yet). On every subsequent turn: `OUTPUT_QUEUE.get()` → `say()` → listen → `input_queue.put` → Pre-unload → **`_run_one_intermission_activity()` (proactive)** → `_wait_for_output_with_intermission()` (delivery) → next turn.
-- **VRAM handoff** — before running intermission, `stt.suspend_all()` frees ~125 MB of GPU memory so the LLM has room. STT is resumed inside the activity (for SCREENING's listen step) and re-suspended at the activity's exit. Also resumed at idle-loop entry so the wake-detect transcribe never fails with "Model not loaded".
-- **Intermission pipeline — GIL-safe proactive activity** — LiteRT-LM's Gemma inference holds the Python GIL for the full 10–30 s of each LLM call, which means any `Event.wait(3)` on this thread is effectively paused until the handler releases the GIL. A naive "wait for LLM silence > 3 s, then start intermission" loop therefore never fires at all; the output is already queued by the time the speech thread gets a GIL slice (observed in sessions 13/14, fixed). Current design: **`_run_one_intermission_activity()` is called BEFORE the delivery pipeline** — immediately after `input_queue.put` — so the activity's TTS + listen (both GIL-free inside pygame / PyAudio C extensions) run in parallel with the handler's LLM work. SCREENING is picked first while any PHQ-4 / GAD-2 question remains; once all four are resolved, the ladder cycles BREATHING ↔ MUSIC with last-activity deprioritisation. Breathing is passive (no listen step, just speak + hold). User-decline chains still fire on SCREENING (paper-aligned fallback). When the LLM response arrives the music fades down for the bridge phrase (suppressed on session start), the therapist's reply is spoken, and the music fades back up to the ambient base.
-- **End session** — via voice (`end session` / `goodbye` via `GlobalCommandMatcher`), GPIO End button, or the FastAPI `/api/end_session`. Triggers: `stop_audio` → `generate_closing_reflection` → speak reflection → save `SessionDossier` → play goodbye music → back to idle. Also clears `_first_output_pending` so a mid-first-turn end doesn't leave the flag armed. The global command matcher uses **exact-token match** for `goodbye`/`bye` (short-token fuzzy matching is unreliable — "be" ↔ "bye" scored 0.80 under the old threshold and ended a session mid-CBT, fixed).
+- **Active session (parallel turn)** — every clinical turn goes through `_run_parallel_turn()`, which returns one of `"delivered"` / `"silence"` / `"session_end"` / `"start_echo"`. The body is (1) `_record_utterance_to_wav()` — mic-only capture, saves a per-turn unique WAV so a concurrent SCREENING block can't overwrite it; (2) if the captured audio is ≥ `_PARALLEL_MIC_WINDOW_MIN_SEC` (3 s), spawn a daemon `_start_transcription_worker()` on the saved WAV; (3) call `_run_one_intermission_activity()` on this thread immediately, so the user hears "While I'm processing that…" / breathing / music within ~100 ms of the mic closing. The worker pushes the transcript onto `input_queue` the moment decode completes, so the handler's LLM call runs in parallel with the intermission instead of serialising behind it. Short utterances (< 3 s) take a serial fallback path that preserves the fragment-merge retry in `_listen_with_retry`. `_first_output_pending` routes the very first LLM utterance through the intermission pipeline the same way (PHQ-4 / breathing / music fills the pre-first-question gap; bridge phrase suppressed on session start).
+- **VRAM handoff** — moved INSIDE the STT worker: `stt.suspend_all()` runs after decode completes so the main thread can never suspend Whisper mid-decode. STT is resumed at the top of `_run_parallel_turn` and inside SCREENING's listen step, re-suspended by the worker at utterance end. Also resumed at idle-loop entry so the wake-detect transcribe never fails with "Model not loaded".
+- **Intermission early-exit watcher** — BREATHING and MUSIC blocks run behind `_start_output_ready_watcher(llm_done)`, a daemon thread that peeks `output_queue.empty()` every 100 ms. As soon as the handler's response lands, the watcher sets `stop_playback_event` (cuts any playing meditation TTS gracefully, respecting `_INTERMISSION_MIN_ENGAGEMENT_SEC=6.0`) and trips `llm_done` so the block's hold timer returns immediately. SCREENING is deliberately NOT watched — cutting the user mid-PHQ-answer would destroy clinical data.
+- **Intermission pipeline — GIL-safe proactive activity** — LiteRT-LM's Gemma inference holds the Python GIL for the full 2–10 s of each GPU-backed LLM call, which means any `Event.wait(3)` on this thread is effectively paused until the handler releases the GIL. The activity's TTS + listen run in GIL-free pygame / PyAudio C extensions, so they play over the top of the handler's LLM work in parallel. SCREENING is picked first while any PHQ-4 / GAD-2 question remains; once all four are resolved, the ladder cycles BREATHING ↔ MUSIC with last-activity deprioritisation. Breathing is passive (no listen step, just speak + hold). User-decline chains still fire on SCREENING (paper-aligned fallback). When the LLM response arrives the music fades down for the bridge phrase (suppressed on session start), the therapist's reply is spoken, and the music fades back up to the ambient base.
+- **End session** — via voice (`end session` / `goodbye` via `GlobalCommandMatcher`), GPIO End button, or the FastAPI `/api/end_session`. Triggers: `stop_audio` → `generate_closing_reflection` → speak reflection → save `SessionDossier` → play goodbye music → back to idle. Also clears `_first_output_pending` so a mid-first-turn end doesn't leave the flag armed. The global command matcher uses **exact-token match** for `goodbye`/`bye` (short-token fuzzy matching is unreliable — "be" ↔ "bye" scored 0.80 under the old threshold and ended a session mid-CBT, fixed). The STT worker's command gate is authoritative: on `__CMD_END__` the worker does NOT queue the transcript to `input_queue` (so the handler never sees a sentinel as a clinical answer) and the main thread sets `stop_playback_event` to cut any in-flight intermission.
 
 ### `src/services/response_bridge.py` — Classifier output parser
 
@@ -857,14 +929,17 @@ rl:
 
   rephrase_at_runtime: true    # D5/D6 — legacy-parity: legacy prototype calls
                                # generate_synonymous_sentences() on ~95% of turns
-  rephrase_probability: 0.95   # legacy `np.random.uniform() < 0.95` gate
+  rephrase_probability: 0.20   # Tuned down from legacy 0.95 to cut ~1.5 s/turn on GPU.
+                               # At 0.20 the Rephraser fires ~20% of the time, so most
+                               # turns speak the therapist-authored variant verbatim.
+                               # Set to 0.95 to restore legacy wording frequency.
   reward_mode: mean            # paper §5.1 + legacy prototype (arithmetic mean)
 
   # ── Feature gates (see "Feature Gates & Future Development" below) ──
-  # All default false for legacy-parity EXCEPT soap_report_enabled which
-  # is a silent clinician artefact with no user-visible impact.
+  # All default false for legacy-parity EXCEPT soap_report_enabled + G8
+  # multi-dim back-fill which are silent clinician/paper-research extensions.
   reask_dimension_n: false            # G5  — paper §4.2 re-ask
-  multi_dim_backfill_enabled: false   # G8  — paper §4.1 multi-dim back-fill
+  multi_dim_backfill_enabled: true    # G8  — paper §4.1 multi-dim back-fill (GPU-cheap now)
   reflective_summarizer_enabled: false # G9 — paper §5.2 MI reflective summarizer
   warm_start_enabled: false           # G11 — returning-user Q nudge + recall greeting
   session_analysis_enabled: false     # G12 — post-session SUMMARY+prefs+safety LLM
@@ -897,11 +972,15 @@ database:
 # LiteRT model + backend
 LLM_MODEL=gemma-4-E2B-it
 LITERT_MODEL_PATH=./models/litert/gemma-4-E2B-it.litertlm
-LITERT_BACKEND=cpu                 # cpu (XNNPack) | gpu (ML Drift if build supports it)
-LITERT_CONTEXT_LENGTH=4096         # paragraph-length R-V / CBT outputs need headroom
-LITERT_MAX_TOKENS=4096             # D1 — lifted from 512 so Gemma can emit the demo's
-                                   # 4-7 sentence MI Validator and 3-5 clause CBT Stage-1
-                                   # Guide enumerations without mid-word truncation.
+LITERT_BACKEND=gpu                 # gpu (ML Drift, ~4-8x faster on Jetson Orin Nano) | cpu (XNNPack fallback)
+LITERT_CONTEXT_LENGTH=3072         # paragraph-length R-V outputs need headroom; 3072
+                                   # covers RV_VALIDATOR worst-case (~2.2k tokens total)
+                                   # while cutting KV-cache vs the old 4096 default.
+LITERT_MAX_TOKENS=3072             # Engine-level ceiling on prompt + output. Lifted from
+                                   # 512 so Gemma can emit the demo's 4-7 sentence MI
+                                   # Validator without mid-word truncation; tightened to
+                                   # 3072 from 4096 to save KV-cache on the Jetson GPU's
+                                   # unified memory pool.
 
 # Speech I/O
 STT_MODEL=base.en
@@ -993,14 +1072,16 @@ grep -n "WARM_START_ENABLED\|SESSION_ANALYSIS_ENABLED\|SOAP_REPORT_ENABLED\|DIME
 
 These are single-value choices, not toggles — flip between legacy and paper by editing `config.yaml`:
 
-| Knob | Legacy (in use) | Paper §5.1 | Notes |
+| Knob | Current value | Legacy / Paper reference | Notes |
 |---|---|---|---|
-| `rl.epsilon` | `1` | `0.9` | Legacy pure exploitation vs. paper's 10% random exploration. |
-| `rl.alpha` | `0.5` | `0.1` | Legacy aggressive Q-updates vs. paper's conservative learning rate. |
-| `rl.gamma` | `0.9` | `0.9` | Both agree. |
-| `rl.item_importance` | legacy `[0, 5, 98, 99, 5, ..., 97, ...]` with 97/98/99 pins on mood/medication/eat | — | Legacy sentinel pins force the top-3 screening triage order (demo shape). A therapist-rebalanced 1-10 alternate is kept commented in `config.yaml`. |
-| `rl.reward_mode` | `mean` | `mean` | `hybrid = (max+mean)/2` is a safer-revisit research alternate. |
-| `LITERT_MAX_TOKENS` | `4096` | n/a | Lifted from 512 so Gemma can emit the demo's paragraph-length Validator and Stage-1 Guide outputs. |
+| `rl.epsilon` | `1` | legacy prototype (paper: 0.9) | Legacy pure exploitation vs. paper's 10% random exploration. |
+| `rl.alpha` | `0.5` | legacy prototype (paper: 0.1) | Legacy aggressive Q-updates vs. paper's conservative learning rate. |
+| `rl.gamma` | `0.9` | paper + legacy | Both agree. |
+| `rl.item_importance` | legacy `[0, 5, 98, 99, 5, ..., 97, ...]` with 97/98/99 pins on mood/medication/eat | legacy prototype (demo) | Legacy sentinel pins force the top-3 screening triage order (demo shape). A therapist-rebalanced 1-10 alternate is kept commented in `config.yaml`. |
+| `rl.reward_mode` | `mean` | paper §5.1 + legacy | `hybrid = (max+mean)/2` is a safer-revisit research alternate. |
+| `rl.rephrase_probability` | `0.20` | legacy prototype: 0.95 | Tuned down for GPU-backend latency. Each Rephraser call costs ~1.6 s on Jetson GPU; at 0.20 the impact is ~0.3 s/turn averaged across the session. Set to 0.95 to restore legacy wording frequency. |
+| `LITERT_MAX_TOKENS` | `3072` | n/a | Lifted from 512 so Gemma can emit the demo's paragraph-length Validator and Stage-1 Guide outputs; tightened from an earlier 4096 to save KV-cache on the Jetson GPU's unified memory pool (RV_VALIDATOR worst-case lands at ~2.2 k tokens). |
+| `LITERT_BACKEND` | `gpu` | n/a | ML Drift GPU path on Jetson Orin Nano is 4–8× faster per LLM call than the CPU (XNNPack) fallback. Whisper stays on CPU to avoid contention for the same unified-memory pool. |
 
 ### Permanent fixes (not gated)
 
@@ -1188,6 +1269,18 @@ Extend the tag vocabulary for a specific trial via `CLINICIAN_LOG_TAGS="[CUSTOM]
 
 A `_ghost_hunt(50MB)` sweep flags any child process eating > 50 MB RSS.
 
+### Latency audit harness
+
+When you want to measure real per-module latency on whatever box you're on (laptop dev or Jetson live):
+
+```bash
+.venv/bin/python scripts/_audit_latency.py
+```
+
+Prints warm-call timings for STT, TTS, LLM (short prompt), and each **real production prompt** (REPHRASER, ANALYZER, MULTI-DIM, RV_REASONER, RV_VALIDATOR, RV_GUIDE) — plus simulated Score-0/1 and Score-2 turn totals with sum-of-parts vs. end-to-end overhead. On the live Jetson with `LITERT_BACKEND=gpu`, a Score-0/1 turn currently lands at ~10 s and a Score-2 RV turn at ~14 s. Re-run any time you change `.env` / `config.yaml` to see the latency impact before a trial session.
+
+The `scripts/_build_latency_report_pdf.py` helper renders a paginated per-module + per-session latency PDF (Max session walkthrough, critical-path breakdown, before/after config table) to `~/Downloads/CaiTI_Latency_Report_Max.pdf`. Requires `reportlab` (dev-only, install with `pip install reportlab` — not a runtime dependency).
+
 ---
 
 ## Jetson Deployment
@@ -1291,6 +1384,8 @@ Key test files:
 - `dev/tests/test_cbt_decision_parser.py` — strict `_parse_decision` (no stray-zero false-pass).
 - `dev/tests/test_db_persistence.py` + `test_db_extensions.py` — SQLite schema + longitudinal `persistent_rl_state`.
 - `dev/tests/test_multi_dim_classifier.py` — strict-JSON multi-dim output parsing.
+- `scripts/_test_intermission_cut.py` — covers the output-ready watcher in isolation: fires `llm_done` + `stop_playback_event` within ~100 ms of the output queue becoming non-empty, respects the 6 s minimum-engagement floor, and exits cleanly when signalled to stop. Runs without loading any models.
+- `scripts/_test_parallel_turn.py` — covers `_run_parallel_turn` orchestration: happy-path (long utterance → parallel STT + intermission + transcript queued mid-intermission), silence (no frames → no intermission), END command (worker does NOT queue sentinel → handler never sees it), and short-utterance serial fallback (confirms intermission runs AFTER transcription, not during). Both scripts use fake recorder / fake STT stubs so they execute anywhere in ~10 s.
 
 **Before every trial day**, also run the end-to-end dry-run harness:
 

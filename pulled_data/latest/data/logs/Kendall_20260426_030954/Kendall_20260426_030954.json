@@ -1,3 +1,0 @@
-{"ts": "2026-04-26T03:10:37.608183", "event": "agent_turn", "text": "I'd like to start with a couple of questions about how you've been feeling lately.\n\nAre you adhering to the medication regimen prescribed by your physician?"}
-{"ts": "2026-04-26T03:11:20.559951", "event": "user_turn", "transcript": "questions for today.", "emotion": "Neutral", "segments": ["questions for today"]}
-{"ts": "2026-04-26T03:11:48.816537", "event": "agent_turn", "text": "What has been your mood like recently?"}

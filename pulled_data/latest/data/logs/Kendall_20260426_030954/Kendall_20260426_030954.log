@@ -1,7 +1,0 @@
-Timestamp,Type,Speaker,Text
-"2026-04-26T03:09:54.867790","internal","system","Session initialized. User: Kendall_20260426_030954, DB ID: 4"
-"2026-04-26T03:10:37.607915","turn","agent","I'd like to start with a couple of questions about how you've been feeling lately.
-
-Are you adhering to the medication regimen prescribed by your physician?"
-"2026-04-26T03:11:20.470663","turn","user","questions for today."
-"2026-04-26T03:11:48.816271","turn","agent","What has been your mood like recently?"

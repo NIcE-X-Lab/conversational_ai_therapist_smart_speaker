@@ -42,6 +42,18 @@ _EXERCISE_HOLD_SEC = 30.0           # time given per breathing exercise
 _SILENCE_REPROMPT_SEC = 12.0        # seconds of silence before gentle re-prompt
 _TRANSITION_PAUSE = 1.0             # pause after user answers (seconds)
 
+# Minimum engagement before an intermission can be cut short by an
+# llm_done signal. If the LLM answers within the first few seconds of a
+# meditation, we still let the user land at least one breath cycle (or
+# hear a whole line of the music announcement) so the cut doesn't feel
+# jarring. Anything above this threshold is safe to interrupt.
+_INTERMISSION_MIN_ENGAGEMENT_SEC = 6.0
+
+# Fast output-queue poll interval used by the proactive-activity's
+# llm_done watcher. 100 ms is plenty — the activity's natural cadence
+# is sentence-length (~3-5 s), so sub-second poll granularity is free.
+_OUTPUT_READY_POLL_SEC = 0.1
+
 # Bridge phrases spoken after intermission, before LLM response.
 _BRIDGE_PHRASES = [
     "Thank you for reflecting on that with me. Now, going back to what you shared...",
@@ -471,7 +483,14 @@ class SpeechInteractionService:
         return ""
 
     def listen(self, timeout=15.0, apply_priority_gate: bool = False):
-        """Record and transcribe with LED feedback."""
+        """Record and transcribe with LED feedback.
+
+        Kept for call sites (wake listen, intermission screening) that
+        want the whole record-and-transcribe step to run on the calling
+        thread.  The main turn loop now uses `record_utterance_to_wav`
+        + a background STT worker so the intermission can start speaking
+        the moment the user stops speaking instead of waiting on STT.
+        """
         self.state = "main_listen"
         self._led_on()
         audio_frames = self.recorder.record_until_silence(max_duration=timeout)
@@ -494,6 +513,129 @@ class SpeechInteractionService:
         logger.debug(f"User heard: {text}")
         self.state = "idle"
         return text
+
+    # Audio-frames duration threshold below which we fall back to the
+    # serial path (listen() + fragment merge).  Short utterances risk
+    # being partial — the current retry path listens a second time, so
+    # we must not commit to an intermission until we know the full thing.
+    # 3 s of VAD-gated audio is plenty to distinguish "yes" (~0.7s) from
+    # "I have been feeling pretty down lately" (~3-4s).
+    _PARALLEL_MIC_WINDOW_MIN_SEC = 3.0
+
+    def _record_utterance_to_wav(self, timeout: float) -> tuple[str, float] | None:
+        """Record until silence and save to disk.  Returns (wav_path, duration_sec)
+        or None if the mic window produced nothing usable.
+
+        This is the mic-bound half of the old `listen()`.  STT is NOT run
+        here — the caller decides whether to transcribe inline or fire a
+        background worker while it does something else (e.g., intermission).
+        """
+        self.state = "main_listen"
+        self._led_on()
+        audio_frames = self.recorder.record_until_silence(max_duration=timeout)
+        self._led_off()
+
+        if not audio_frames:
+            self.state = "idle"
+            return None
+
+        rms = self.recorder.compute_rms(audio_frames)
+        if rms < 0.005:
+            logger.debug(f"[AUDIO HYGIENE] RMS {rms:.5f} below threshold — skipping disk write.")
+            self.state = "idle"
+            return None
+
+        # Per-turn unique filename so a SCREENING block running in
+        # parallel (which writes to "active_user_input.wav" via listen()
+        # → save_wav) can't overwrite this turn's audio while the STT
+        # worker is still reading it.
+        user_wav = f"active_user_input_{int(time.monotonic() * 1000)}.wav"
+        self.recorder.save_wav(audio_frames, user_wav)
+        # Duration = n_frames * chunk_size / sample_rate (each frame is
+        # one chunk from the PyAudio read loop).
+        chunk = getattr(self.recorder, "chunk", 480)
+        rate = getattr(self.recorder, "rate", 16000)
+        duration = (len(audio_frames) * chunk) / float(rate) if rate else 0.0
+        self.state = "main_process"
+        return user_wav, duration
+
+    def _start_transcription_worker(
+        self,
+        wav_path: str,
+        apply_priority_gate: bool,
+    ) -> tuple[threading.Thread, queue.Queue, threading.Event]:
+        """Transcribe `wav_path` in a daemon thread, hand-off to handler.
+
+        The worker does three things in order:
+
+        1. Transcribe the saved WAV and apply the global command gate.
+        2. On the HAPPY path (non-empty, non-command transcript) push the
+           text onto ``self.input_queue`` so the handler can start its
+           LLM call immediately — BEFORE the intermission finishes.
+           This is what actually makes the pipeline parallel; without
+           it, the handler would sit idle until the main thread reads
+           from `result_q` and puts to input_queue, which only happens
+           AFTER intermission returns.
+        3. Suspend Whisper so Gemma has the memory budget it needs.
+
+        The returned `result_q` carries the transcript (or sentinel)
+        so the main thread can decide whether to deliver the LLM
+        response (happy path) or short-circuit (silence / END / START).
+        On sentinel outcomes the worker does NOT push to input_queue —
+        the handler must never see an empty / command-masquerading-as-
+        answer input.
+
+        `abort_event` is set alongside sentinel outcomes so a main-
+        thread caller (e.g. one driving the intermission) can stop
+        playback promptly without polling the queue.  The VRAM handoff
+        (`stt.suspend_all`) MUST happen inside this worker — if the
+        main thread suspended Whisper before decode completed, the
+        model reference would vanish mid-inference.
+        """
+        result_q: queue.Queue = queue.Queue(maxsize=1)
+        abort_event = threading.Event()
+
+        def _worker():
+            try:
+                text = self.transcribe(wav_path, apply_priority_gate=apply_priority_gate)
+            except Exception as e:
+                logger.error(f"[PARALLEL_STT] Transcription raised: {e}")
+                text = ""
+
+            is_sentinel = text in {"__CMD_END__", "__CMD_START__"} or not text
+            if is_sentinel:
+                abort_event.set()
+            else:
+                # HAPPY PATH: queue the transcript for the handler RIGHT
+                # NOW so its LLM call runs in parallel with the ongoing
+                # intermission. Without this the handler is blocked on
+                # `input_queue.get()` for the full duration of the
+                # intermission block and latency-masking is defeated.
+                try:
+                    self.input_queue.put_nowait(text)
+                except queue.Full:
+                    # input_queue is bounded (see io_record.py); if full,
+                    # fall back to a blocking put so we don't drop the
+                    # user's utterance.
+                    logger.warning("[PARALLEL_STT] input_queue full; blocking put.")
+                    self.input_queue.put(text)
+
+            try:
+                result_q.put_nowait(text)
+            except queue.Full:
+                # Shouldn't happen (maxsize=1 and we only put once), but
+                # defend against a double-put race on reentrancy.
+                logger.warning("[PARALLEL_STT] result_q unexpectedly full; dropping.")
+
+            try:
+                self.stt.suspend_all()
+            except Exception as e:
+                logger.warning(f"[VRAM HANDOFF] STT suspend (worker) failed: {e}")
+
+        thread = threading.Thread(target=_worker, daemon=True,
+                                  name="ParallelSTTWorker")
+        thread.start()
+        return thread, result_q, abort_event
 
     def _listen_with_retry(self, timeout=15.0, confirm_threshold=2, apply_priority_gate: bool = False):
         """Listen with low-confidence fallback.
@@ -521,6 +663,166 @@ class SpeechInteractionService:
                 logger.debug(f"[STT] Merged fragments: '{merged}'")
                 return merged
         return text
+
+    def _run_parallel_turn(self) -> str:
+        """One turn with STT running in parallel with the intermission.
+
+        Orchestration outline:
+
+        1. Record mic until silence (synchronous — mic is a single lock).
+        2. If the captured audio was short (< _PARALLEL_MIC_WINDOW_MIN_SEC)
+           OR we heard nothing, fall back to the old serial path that
+           supports fragment-merge. Short/fragmentary utterances are rare
+           but clinically important; we pay the old ~3 s serialisation
+           cost only on them.
+        3. Otherwise: spawn a STT worker on the saved WAV, and
+           immediately call `_run_one_intermission_activity()` on this
+           thread. Once intermission returns (either naturally or
+           interrupted by `_start_output_ready_watcher` firing), wait
+           briefly for the STT worker so we can deal with empty / END /
+           START results before handing off to the handler.
+        4. If STT outcome was OK, queue the transcript on `input_queue`
+           (if it wasn't queued already by the parallel worker — we
+           handle that inside the worker to avoid another round of
+           gating on the main thread) and run the delivery phase.
+
+        Returns one of:
+          ``"delivered"``   — happy path, LLM output delivered to user.
+          ``"silence"``     — mic silent / sub-RMS / STT empty.
+          ``"session_end"`` — user said an END command.
+          ``"start_echo"``  — user said a START command (already in session).
+        """
+        # Resume STT if a prior turn suspended it; otherwise the upcoming
+        # record→save is fine but the transcription worker would fail.
+        try:
+            self.stt.resume_all()
+        except Exception as e:
+            logger.warning(f"[VRAM HANDOFF] STT resume failed: {e}")
+
+        rec = self._record_utterance_to_wav(timeout=15.0)
+        if rec is None:
+            logger.debug("[TURN] Mic window produced no usable audio.")
+            return "silence"
+        wav_path, duration = rec
+        logger.debug(
+            f"[TURN] Captured {duration:.1f}s of audio -> {wav_path}. "
+            f"{'Parallel' if duration >= self._PARALLEL_MIC_WINDOW_MIN_SEC else 'Serial'} path."
+        )
+
+        try:
+            # ── Short-utterance serial fallback ────────────────────────────
+            # Fragment-merge retry requires reopening the mic for a second
+            # listen, which is incompatible with starting an intermission
+            # (intermission talks on the same audio device and would need to
+            # be torn down to re-listen). Use the old path for these rare
+            # cases.
+            if duration < self._PARALLEL_MIC_WINDOW_MIN_SEC:
+                user_response = self.transcribe(wav_path, apply_priority_gate=True)
+                # Fragment merge if short + no punctuation.
+                if user_response not in ("", "__CMD_END__", "__CMD_START__"):
+                    words = user_response.split()
+                    if len(words) <= 2 and not user_response.rstrip().endswith((".", "!", "?")):
+                        extra = self.listen(timeout=4.0, apply_priority_gate=True)
+                        if extra and extra not in ("__CMD_END__", "__CMD_START__"):
+                            user_response = f"{user_response} {extra}"
+                            logger.debug(f"[STT] Serial-path merged fragments: '{user_response}'")
+                        elif extra in ("__CMD_END__", "__CMD_START__"):
+                            user_response = extra
+                try:
+                    self.stt.suspend_all()
+                except Exception as e:
+                    logger.warning(f"[VRAM HANDOFF] STT suspend (serial) failed: {e}")
+
+                if not user_response:
+                    return "silence"
+                if user_response == "__CMD_END__":
+                    return "session_end"
+                if user_response == "__CMD_START__":
+                    return "start_echo"
+                command = self._apply_global_command_priority(user_response)
+                if command == "END":
+                    return "session_end"
+                if command == "START":
+                    return "start_echo"
+                self.input_queue.put(user_response)
+
+                self._led_off()
+                self.state = "main_process"
+                self._run_one_intermission_activity()
+                self._wait_for_output_with_intermission()
+                return "delivered"
+
+            # ── Parallel path ─────────────────────────────────────────────
+            # Kick off STT decode in the worker immediately, then drop into
+            # the intermission on this thread so the user hears "While I'm
+            # thinking..." / breathing / music starting within ~0.1 s of the
+            # mic closing.
+            stt_thread, result_q, abort_event = self._start_transcription_worker(
+                wav_path, apply_priority_gate=True,
+            )
+
+            self._led_off()
+            self.state = "main_process"
+
+            # Drive the intermission. The output-ready watcher inside will
+            # trip stop_playback_event as soon as the handler produces its
+            # response; the STT-side abort_event handles the rare case
+            # where the user's utterance was empty / a global command.
+            self._run_one_intermission_activity()
+
+            # Give STT a moment to finish if it hasn't already (intermission
+            # may be over; Whisper typically wraps up in under 2 s for a
+            # 3-10 s utterance on CPU). We bound the wait at ~8 s so a
+            # degenerate stuck decode can't block the whole session.
+            try:
+                user_response = result_q.get(timeout=8.0)
+            except queue.Empty:
+                logger.error("[PARALLEL_STT] Worker did not report result within 8s; treating as silence.")
+                try:
+                    self.stt.suspend_all()
+                except Exception:
+                    pass
+                return "silence"
+            finally:
+                # Daemon thread cleanup — don't join hard so a wedged decode
+                # can't block shutdown.
+                stt_thread.join(timeout=0.5)
+
+            # Handle STT outcomes. The worker has already suspended Whisper.
+            if not user_response:
+                logger.info("[TURN] Parallel STT returned empty — silence path.")
+                return "silence"
+            if user_response == "__CMD_END__":
+                logger.info("[TURN] Parallel STT detected END command.")
+                # Cut any still-playing intermission audio.
+                self.stop_playback_event.set()
+                return "session_end"
+            if user_response == "__CMD_START__":
+                logger.info("[TURN] Parallel STT detected START command.")
+                self.stop_playback_event.set()
+                return "start_echo"
+
+            # Normal path: the STT worker has ALREADY queued the
+            # transcript on `input_queue` (see
+            # `_start_transcription_worker`) so the handler is
+            # already busy running its LLM call in parallel with the
+            # intermission we just ran. All we need to do here is run
+            # the delivery phase, whose watcher will short-circuit if
+            # the handler's output is already in output_queue.
+            # (We do NOT re-apply the priority gate here — the worker
+            # already ran it via `transcribe(apply_priority_gate=True)`.)
+            self._wait_for_output_with_intermission()
+            return "delivered"
+        finally:
+            # Per-turn WAV cleanup — best-effort, don't let a missing file
+            # or permission error fail the turn. The unique filename means
+            # leftover WAVs are harmless even if cleanup misses one; this
+            # loop just keeps the working directory tidy over long sessions.
+            try:
+                if os.path.isfile(wav_path):
+                    os.remove(wav_path)
+            except OSError:
+                pass
 
     # ------------------------------------------------------------------ #
     # Session Flows                                                        #
@@ -913,6 +1215,15 @@ class SpeechInteractionService:
         is the highest-leverage source of false positives).
         Speak the guidance and hold for the LLM's remaining latency;
         that's it.
+
+        When `llm_done` is a real (non-dummy) event, the guidance TTS is
+        interruptible — the caller's output-ready watcher trips
+        `self.stop_playback_event` as soon as the next LLM response is
+        ready, which `player.play` already respects.  This gets rid of
+        the ~30 s dead gap that used to happen on GPU turns where the
+        LLM finished long before the full meditation script played out.
+        A minimum-engagement floor keeps very-fast LLM turns from
+        chopping the guidance after a single phrase.
         """
         self.state = "intermission_exercise"
         exercise_text = self.intermission_ladder.next_breathing_exercise()
@@ -921,14 +1232,75 @@ class SpeechInteractionService:
         # dropping to a whisper between MUSIC blocks.  Ducking kicks in
         # automatically while the guidance TTS plays (set_ai_speaking).
         self.music_service.fade_to(_MUSIC_BED_BREATHING, duration=1.2)
+        block_started = time.monotonic()
         self.say(exercise_text)
 
         # Hold the remainder of _EXERCISE_HOLD_SEC but wake immediately if
         # the LLM becomes ready.  If the LLM is still thinking after the
-        # hold, cycle back to another activity.
-        if llm_done.wait(timeout=_EXERCISE_HOLD_SEC):
+        # hold, cycle back to another activity.  The `stop_playback_event`
+        # set by the output-ready watcher will also have cut the
+        # say() above short, so by the time we arrive here the audio is
+        # already fading out or silent.
+        elapsed = time.monotonic() - block_started
+        remaining = max(0.0, _EXERCISE_HOLD_SEC - elapsed)
+        if llm_done.wait(timeout=remaining):
             return {"outcome": "llm_ready"}
         return {"outcome": "completed"}
+
+    def _start_output_ready_watcher(self, llm_done: threading.Event) -> threading.Event:
+        """Fire `llm_done` as soon as the handler queues a response, and
+        cut any in-flight TTS playback short.
+
+        Called from `_run_one_intermission_activity` so the proactive
+        intermission exits as soon as the next LLM answer is ready —
+        instead of holding the user through the remainder of a breathing
+        or music block after the answer is already waiting in the
+        output queue.
+
+        We intentionally only *peek* (via `Queue.empty()`), we do NOT
+        consume the item.  The downstream
+        :meth:`_wait_for_output_with_intermission` is still responsible
+        for pulling the response off the queue and speaking it, so this
+        watcher must be side-effect-free on the queue itself.
+
+        Returns a `stop_event` the caller can set to shut the watcher
+        down cleanly (e.g. on end-of-session) before the queue delivers.
+        """
+        stop_event = threading.Event()
+
+        def _poll():
+            # A minimum-engagement floor protects very-fast GPU turns
+            # from chopping the activity mid-first-phrase.  A cut that
+            # lands 1 s into a meditation feels broken; a cut that lands
+            # after one full breath cycle feels natural.
+            started_at = time.monotonic()
+            while not stop_event.is_set():
+                if not self.output_queue.empty():
+                    engagement = time.monotonic() - started_at
+                    if engagement < _INTERMISSION_MIN_ENGAGEMENT_SEC:
+                        # LLM already ready but we haven't given the
+                        # user their full beat yet — wait out the floor
+                        # before triggering, then trip both events.
+                        stop_event.wait(
+                            timeout=_INTERMISSION_MIN_ENGAGEMENT_SEC - engagement,
+                        )
+                        if stop_event.is_set():
+                            return
+                    logger.info(
+                        "[INTERMISSION] Output ready — interrupting activity "
+                        f"(engagement={time.monotonic() - started_at:.1f}s)."
+                    )
+                    # Cut any playing TTS first, then trip the hold-timer
+                    # event so the block's wait() returns immediately.
+                    self.stop_playback_event.set()
+                    llm_done.set()
+                    return
+                stop_event.wait(timeout=_OUTPUT_READY_POLL_SEC)
+
+        thread = threading.Thread(target=_poll, daemon=True,
+                                  name="IntermissionOutputWatcher")
+        thread.start()
+        return stop_event
 
     def _run_one_intermission_activity(self):
         """Run a single intermission activity proactively while handler works.
@@ -950,21 +1322,20 @@ class SpeechInteractionService:
         :meth:`_wait_for_output_with_intermission` call, which by then
         is essentially a no-wait delivery path.
 
-        The `llm_done` event handed to each block is a dummy in this
-        context — the activity is guaranteed to run its natural duration
-        regardless of LLM state, so the blocks' early-break behaviour
-        doesn't fire here.  This is intentional:  the whole point of
-        running the activity proactively is that we want it to play
-        THROUGH the LLM work rather than cutting it short.
+        Early-exit on LLM ready.  Historically this function handed
+        each block a dummy event that never fires, so the block
+        always ran its full ~30 s hold even if the handler had
+        answered in 5 s (observed on GPU turns — user heard 30 s of
+        dead air after the meditation audio itself ended).  Now we
+        start an output-queue watcher that trips a real `llm_done`
+        and cuts in-flight TTS via `stop_playback_event` as soon as
+        the handler enqueues its response.  A short engagement floor
+        prevents cutting the activity mid-first-phrase when the LLM
+        turn was very fast.
         """
         logger.debug("[INTERMISSION] Proactive pre-wait activity starting.")
         self._sync_intermission_state_from_db()
         self._music_announced_for_turn = False
-
-        # Dummy llm_done — never fires, so blocks run their full length.
-        # This is the per-turn "active waiting" phase; the real LLM
-        # output delivery happens AFTER this returns.
-        never_done = threading.Event()
 
         # Pick SCREENING when a PHQ/GAD question is still pending,
         # else let the ladder pick between BREATHING and MUSIC.
@@ -974,37 +1345,68 @@ class SpeechInteractionService:
             stage = self.intermission_ladder.next_activity()
         logger.info(f"[INTERMISSION] Pre-wait activity: {stage.value}")  # user-engaging activity while LLM thinks
 
-        listener_active = threading.Event()
-        if stage == IntermissionStage.SCREENING:
-            question = self.intermission_ladder.next_screening_question()
-            if question is not None:
-                result = self._run_screening_block(question, never_done, listener_active)
+        # Only BREATHING and MUSIC are safe to interrupt proactively.
+        # SCREENING collects a PHQ/GAD answer from the user — that's
+        # clinical data, and cutting the user mid-answer would lose it.
+        # The downstream `_wait_for_output_with_intermission` already
+        # defers on `listener_active`, so letting SCREENING run its
+        # normal course here costs at most the screening's natural
+        # ~20 s budget (comparable to a full breathing block).
+        llm_done = threading.Event()
+        watcher_stop: threading.Event | None = None
+        if stage in (IntermissionStage.BREATHING_EXERCISE, IntermissionStage.MUSIC):
+            watcher_stop = self._start_output_ready_watcher(llm_done)
+
+        try:
+            listener_active = threading.Event()
+            if stage == IntermissionStage.SCREENING:
+                question = self.intermission_ladder.next_screening_question()
+                if question is not None:
+                    result = self._run_screening_block(question, llm_done, listener_active)
+                    self.intermission_ladder.mark_activity(stage)
+                    if result.get("outcome") in ("declined", "completed", "end"):
+                        # Whether answered / skipped / declined, the user
+                        # has had their activity beat; return without
+                        # chaining further.
+                        return
+                # Defensive: screening picked but no question available — fall through.
+                stage = IntermissionStage.BREATHING_EXERCISE
+                # Only start the watcher now that we are leaving the
+                # clinical-screening path.
+                watcher_stop = self._start_output_ready_watcher(llm_done)
+
+            if stage == IntermissionStage.BREATHING_EXERCISE:
+                # Breathing is passive — user doesn't respond mid-meditation.
+                # The block speaks the guidance and holds silently for the
+                # rest of the exercise window, then returns.  No "declined"
+                # branch is possible any more (opt-out listen was removed
+                # because it was confusing UX and the STT was a false-
+                # positive source for end-session).
+                self._run_breathing_block(llm_done)
                 self.intermission_ladder.mark_activity(stage)
-                if result.get("outcome") in ("declined", "completed", "end"):
-                    # Whether answered / skipped / declined, the user
-                    # has had their activity beat; return without
-                    # chaining further.
-                    return
-            # Defensive: screening picked but no question available — fall through.
-            stage = IntermissionStage.BREATHING_EXERCISE
+                return
 
-        if stage == IntermissionStage.BREATHING_EXERCISE:
-            # Breathing is passive — user doesn't respond mid-meditation.
-            # The block speaks the guidance and holds silently for the
-            # rest of the exercise window, then returns.  No "declined"
-            # branch is possible any more (opt-out listen was removed
-            # because it was confusing UX and the STT was a false-
-            # positive source for end-session).
-            self._run_breathing_block(never_done)
-            self.intermission_ladder.mark_activity(stage)
-            return
-
-        if stage == IntermissionStage.MUSIC:
-            self._run_music_block(never_done)
-            self.intermission_ladder.mark_activity(stage)
+            if stage == IntermissionStage.MUSIC:
+                self._run_music_block(llm_done)
+                self.intermission_ladder.mark_activity(stage)
+        finally:
+            # Always stop the watcher (if we started one) so it can't
+            # leak across turns and accidentally trip stop_playback_event
+            # on the next one.
+            if watcher_stop is not None:
+                watcher_stop.set()
 
     def _run_music_block(self, llm_done):
-        """Raise music bed, wait for LLM output or a hold interval."""
+        """Raise music bed, wait for LLM output or a hold interval.
+
+        Interruptible the same way as `_run_breathing_block`: if the
+        caller's output-ready watcher fires `llm_done`, we return
+        `llm_ready` immediately rather than sitting on the music until
+        the hold-timer expires.  This removes the "~30 s of music after
+        the LLM already answered" tail that used to pad every GPU turn.
+        A short minimum engagement is still respected so the music
+        announcement has time to finish before we hand back.
+        """
         self.state = "music_fallback"
         if not self._music_announced_for_turn:
             self.say("I'm still thinking, enjoy the music while I continue.")
@@ -1019,7 +1421,9 @@ class SpeechInteractionService:
         # long ambient tracks.  No-op if the worker isn't running yet.
         self.music_service.jump_to_random_segment()
         # Give the music a 30 s window before we consider cycling back
-        # (prevents frantic activity churn on long LLM stalls).
+        # (prevents frantic activity churn on long LLM stalls), but wake
+        # early once the LLM response is ready so we don't eat 20+ s of
+        # post-answer music.
         if llm_done.wait(timeout=_EXERCISE_HOLD_SEC):
             return {"outcome": "llm_ready"}
         return {"outcome": "completed"}
@@ -1335,79 +1739,60 @@ class SpeechInteractionService:
                            and io_record.START_SESSION_EVENT.is_set()
                            and not io_record.END_SESSION_EVENT.is_set()):
 
-                        # Resume STT for listening
-                        try:
-                            self.stt.resume_all()
-                        except Exception as e:
-                            logger.warning(f"[VRAM HANDOFF] STT resume failed: {e}")
+                        # STT resume is now handled inside _run_parallel_turn
+                        # (it needs to run AFTER any prior intermission
+                        # completes) so we don't double-resume here.
 
                         if not self.is_hands_free:
                             self.manual_input_event.wait()
                             self.manual_input_event.clear()
 
-                        user_response = self._listen_with_retry(timeout=15.0, apply_priority_gate=True)
-                        if not user_response:
+                        # ── Parallel STT + intermission ─────────────────
+                        # Previously: record → STT → suspend → queue →
+                        # intermission, all serial. That serialisation left
+                        # ~3-4 s of dead air between "mic closes" and
+                        # "intermission starts speaking" because STT +
+                        # suspend take time.
+                        #
+                        # Now: record → save WAV (mic idle) →
+                        #      BRANCH:
+                        #        Thread A (this thread):
+                        #          run intermission immediately; meanwhile
+                        #          keep peeking output_queue so we can exit
+                        #          early when the LLM response is ready.
+                        #        Thread B (parallel_stt worker):
+                        #          transcribe saved WAV, run command gate,
+                        #          put transcript on input_queue, suspend
+                        #          Whisper. Sets abort_event on empty /
+                        #          END / START.
+                        #
+                        # For very short mic windows (< 3 s) we fall back
+                        # to the serial path so the fragment-merge retry
+                        # in _listen_with_retry still works — short
+                        # utterances are the ones most likely to be
+                        # fragments, and we shouldn't commit to an
+                        # intermission for a 1-word clarification.
+                        outcome = self._run_parallel_turn()
+
+                        if outcome == "session_end":
+                            break
+                        if outcome == "start_echo":
+                            self.say("We're already in session, and I'm listening.")
+                            continue
+                        if outcome == "silence":
                             self._consecutive_silence_count += 1
-                            # After 2 consecutive silence rounds, reassure
-                            # the user so the device never feels "broken".
                             if self._consecutive_silence_count >= 2:
                                 self.say("I'm still here, just listening to the music with you. Take your time.")
                                 self._consecutive_silence_count = 0
                             continue
-
-                        self._consecutive_silence_count = 0
-
-                        if user_response == "__CMD_END__":
-                            break
-                        if user_response == "__CMD_START__":
-                            self.say("We're already in session, and I'm listening.")
+                        if outcome == "delivered":
+                            self._consecutive_silence_count = 0
+                            self.post_turn_cleanup()
+                            logger.debug(f"[VRAM HANDOFF] Post-intermission: {get_system_memory_snapshot()}")
                             continue
-
-                        command = self._apply_global_command_priority(user_response)
-                        if command == "END":
-                            break
-                        if command == "START":
-                            self.say("We're already in session, and I'm listening.")
-                            continue
-
-                        # Global command gate is evaluated above before queueing text
-                        # into the downstream response-analyzer path.
-                        self.input_queue.put(user_response)
-
-                        # ── VRAM Handoff: suspend STT for LLM ────────
-                        logger.debug(f"[VRAM HANDOFF] Pre-unload: {get_system_memory_snapshot()}")
-                        try:
-                            self.stt.suspend_all()
-                        except Exception as e:
-                            logger.warning(f"[VRAM HANDOFF] STT suspend failed: {e}")
-
-                        # ── Proactive intermission activity ─────────────────
-                        # Run one intermission activity BEFORE waiting for
-                        # the LLM output.  Critical for latency masking on
-                        # Jetson: LiteRT-LM holds the Python GIL for the
-                        # full 10-30 s of each inference, which means any
-                        # Python-level scheduling inside
-                        # _wait_for_output_with_intermission gets starved
-                        # until the handler finishes.  By entering an
-                        # activity HERE (before the GIL gets taken by
-                        # LiteRT), the speech thread is already inside
-                        # pygame TTS + PyAudio recording calls — both of
-                        # which release the GIL at the C level — so the
-                        # activity plays over the top of the handler's
-                        # LLM work in parallel, exactly as the protocol
-                        # intends.
-                        self._led_off()
-                        self.state = "main_process"
-                        self._run_one_intermission_activity()
-
-                        # Now collect the LLM output and deliver it.  By
-                        # the time we get here the handler's chain is
-                        # usually complete, so this is just the delivery
-                        # path (music fade / bridge phrase / TTS).
-                        self._wait_for_output_with_intermission()
-
-                        self.post_turn_cleanup()
-                        logger.debug(f"[VRAM HANDOFF] Post-intermission: {get_system_memory_snapshot()}")
+                        # Defensive: unknown outcome — loop back.
+                        logger.warning(f"[TURN] Unknown parallel-turn outcome: {outcome!r}")
+                        continue
 
                 except queue.Empty:
                     pass
