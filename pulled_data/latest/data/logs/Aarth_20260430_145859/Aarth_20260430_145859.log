@@ -1,0 +1,11 @@
+Timestamp,Type,Speaker,Text
+"2026-04-30T14:58:59.433969","internal","system","Session initialized. User: Aarth_20260430_145859, DB ID: 2"
+"2026-04-30T14:59:12.098167","turn","agent","I'd like to start with a couple of questions about how you've been feeling lately.
+
+Are you adhering to the prescribed medications your physician has provided?"
+"2026-04-30T15:00:05.605596","turn","user","No, I never take my medication."
+"2026-04-30T15:00:10.898812","turn","agent","You mentioned that answer: you never take your medication. Can you tell me more?"
+"2026-04-30T15:01:07.907525","turn","user","I just dislike taking medication. I feel like it makes me really anxious inside."
+"2026-04-30T15:01:19.062659","turn","agent","It sounds like you genuinely dislike taking medication and that this feeling translates into a real sense of anxiety inside you. It is completely understandable that you feel anxious when facing something you don't want to do. You might try to talk to your doctor about alternative ways to manage your symptoms or explore different types of medication that might feel less burdensome. You could also focus on small, manageable steps, like trying a different time of day to take it, or pairing it with a comforting activity you enjoy. Exploring what specifically triggers that anxiety around taking it could also be a helpful starting point for finding a way forward.
+
+Has your mood been in a place that feels workable to you recently?"

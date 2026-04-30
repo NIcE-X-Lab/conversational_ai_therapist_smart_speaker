@@ -1,0 +1,565 @@
+{
+  "resource_map": {
+    "baseline_ram_gb": 0.085,
+    "static_load_gb": 0.458,
+    "dynamic_spike_gb": 0.234,
+    "top_static_module": "STT/FasterWhisperModelInit",
+    "top_dynamic_zone": "STT/FasterWhisper",
+    "max_prompt_utilization": 0.0,
+    "culprit": "Static STT model load dominates resident memory before first user turn.",
+    "recommendation": "Keep Faster-Whisper at int8/base.en or smaller and avoid loading extra SER backends in parallel.",
+    "samples": {
+      "module_records": 7,
+      "zone_records": 40,
+      "prompt_records": 0,
+      "process_records": 3,
+      "snapshots": 7
+    }
+  },
+  "baseline": {
+    "ts": 1777576669.9133472,
+    "rss_mb": 86.87109375,
+    "vms_mb": 375.81640625,
+    "uss_mb": 76.96484375,
+    "child_rss_mb": 2.42578125,
+    "thread_count": 6,
+    "child_count": 2,
+    "ram_used_gb": 2.5936279296875,
+    "ram_total_gb": 7.441211700439453,
+    "tracemalloc_current_mb": 0.016689300537109375,
+    "tracemalloc_peak_mb": 0.07803821563720703,
+    "label": "process_baseline"
+  },
+  "module_init": [
+    {
+      "module": "SpeechService/AudioRecorder",
+      "elapsed_sec": 0.5061059439904056,
+      "rss_before_mb": 129.1484375,
+      "rss_after_mb": 133.01953125,
+      "rss_delta_mb": 3.87109375
+    },
+    {
+      "module": "STT/FasterWhisperModelInit",
+      "elapsed_sec": 2.6518215570249595,
+      "rss_before_mb": 133.01953125,
+      "rss_after_mb": 364.9296875,
+      "rss_delta_mb": 231.91015625
+    },
+    {
+      "module": "SpeechService/STTGenerator",
+      "elapsed_sec": 2.726593276951462,
+      "rss_before_mb": 133.01953125,
+      "rss_after_mb": 364.9296875,
+      "rss_delta_mb": 231.91015625
+    },
+    {
+      "module": "SpeechService/TTSGenerator",
+      "elapsed_sec": 0.04021020798245445,
+      "rss_before_mb": 364.9296875,
+      "rss_after_mb": 364.9296875,
+      "rss_delta_mb": 0.0
+    },
+    {
+      "module": "SpeechService/BackgroundMusic",
+      "elapsed_sec": 0.03799677197821438,
+      "rss_before_mb": 364.9296875,
+      "rss_after_mb": 364.9296875,
+      "rss_delta_mb": 0.0
+    },
+    {
+      "module": "SpeechService/AudioPlayer",
+      "elapsed_sec": 0.037467862013727427,
+      "rss_before_mb": 364.9296875,
+      "rss_after_mb": 364.9296875,
+      "rss_delta_mb": 0.0
+    },
+    {
+      "module": "SpeechService/GPIOManager",
+      "elapsed_sec": 4.157742275972851,
+      "rss_before_mb": 364.9296875,
+      "rss_after_mb": 365.88671875,
+      "rss_delta_mb": 0.95703125
+    }
+  ],
+  "zone_peaks": [
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.4593286449671723,
+      "sample_count": 14,
+      "rss_start_mb": 376.87109375,
+      "rss_end_mb": 517.03125,
+      "rss_peak_mb": 616.484375,
+      "child_rss_peak_mb": 2.42578125,
+      "total_peak_mb": 618.91015625,
+      "spike_mb": 239.61328125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.2605925959651358,
+      "sample_count": 12,
+      "rss_start_mb": 517.2890625,
+      "rss_end_mb": 519.09375,
+      "rss_peak_mb": 656.296875,
+      "child_rss_peak_mb": 2.42578125,
+      "total_peak_mb": 658.72265625,
+      "spike_mb": 139.0078125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.4600895249750465,
+      "sample_count": 11,
+      "rss_start_mb": 3438.8671875,
+      "rss_end_mb": 3524.53515625,
+      "rss_peak_mb": 3632.78515625,
+      "child_rss_peak_mb": 2.17578125,
+      "total_peak_mb": 3634.9609375,
+      "spike_mb": 193.91796875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.7745424220338464,
+      "sample_count": 13,
+      "rss_start_mb": 3490.38671875,
+      "rss_end_mb": 3567.37109375,
+      "rss_peak_mb": 3672.2734375,
+      "child_rss_peak_mb": 129.53515625,
+      "total_peak_mb": 3801.80859375,
+      "spike_mb": 181.88671875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.7441292279982008,
+      "sample_count": 12,
+      "rss_start_mb": 3724.35546875,
+      "rss_end_mb": 3835.01953125,
+      "rss_peak_mb": 3950.89453125,
+      "child_rss_peak_mb": 2.17578125,
+      "total_peak_mb": 3953.0703125,
+      "spike_mb": 226.5390625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 2.006046140973922,
+      "sample_count": 13,
+      "rss_start_mb": 3794.3203125,
+      "rss_end_mb": 3826.515625,
+      "rss_peak_mb": 3919.6484375,
+      "child_rss_peak_mb": 136.53515625,
+      "total_peak_mb": 4056.18359375,
+      "spike_mb": 125.328125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.6446602339856327,
+      "sample_count": 11,
+      "rss_start_mb": 3869.796875,
+      "rss_end_mb": 3967.71484375,
+      "rss_peak_mb": 4064.40625,
+      "child_rss_peak_mb": 2.171875,
+      "total_peak_mb": 4066.578125,
+      "spike_mb": 194.609375
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.9847970900009386,
+      "sample_count": 13,
+      "rss_start_mb": 3848.2734375,
+      "rss_end_mb": 3858.66796875,
+      "rss_peak_mb": 3990.40625,
+      "child_rss_peak_mb": 150.87890625,
+      "total_peak_mb": 4141.28515625,
+      "spike_mb": 142.1328125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3770985340233892,
+      "sample_count": 9,
+      "rss_start_mb": 3850.2265625,
+      "rss_end_mb": 3883.390625,
+      "rss_peak_mb": 3920.91015625,
+      "child_rss_peak_mb": 2.1640625,
+      "total_peak_mb": 3923.07421875,
+      "spike_mb": 70.68359375
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.698917263012845,
+      "sample_count": 11,
+      "rss_start_mb": 3852.36328125,
+      "rss_end_mb": 3943.91796875,
+      "rss_peak_mb": 4049.5625,
+      "child_rss_peak_mb": 129.0234375,
+      "total_peak_mb": 4178.5859375,
+      "spike_mb": 197.19921875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.5066871440503746,
+      "sample_count": 9,
+      "rss_start_mb": 3918.05078125,
+      "rss_end_mb": 3922.265625,
+      "rss_peak_mb": 4039.91796875,
+      "child_rss_peak_mb": 129.39453125,
+      "total_peak_mb": 4169.3125,
+      "spike_mb": 121.8671875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 2.3928062460036017,
+      "sample_count": 13,
+      "rss_start_mb": 3922.6015625,
+      "rss_end_mb": 3930.0,
+      "rss_peak_mb": 4022.42578125,
+      "child_rss_peak_mb": 176.50390625,
+      "total_peak_mb": 4198.9296875,
+      "spike_mb": 99.82421875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.6126871389569715,
+      "sample_count": 10,
+      "rss_start_mb": 3979.27734375,
+      "rss_end_mb": 3922.80859375,
+      "rss_peak_mb": 4091.20703125,
+      "child_rss_peak_mb": 131.3515625,
+      "total_peak_mb": 4222.55859375,
+      "spike_mb": 111.9296875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 2.2905131650040857,
+      "sample_count": 14,
+      "rss_start_mb": 3908.14453125,
+      "rss_end_mb": 3910.421875,
+      "rss_peak_mb": 4047.4765625,
+      "child_rss_peak_mb": 149.203125,
+      "total_peak_mb": 4196.6796875,
+      "spike_mb": 139.33203125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.4043433989863843,
+      "sample_count": 9,
+      "rss_start_mb": 3914.8515625,
+      "rss_end_mb": 3918.65625,
+      "rss_peak_mb": 4032.6328125,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4034.7734375,
+      "spike_mb": 117.78125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.899619725998491,
+      "sample_count": 12,
+      "rss_start_mb": 3917.21875,
+      "rss_end_mb": 3950.8046875,
+      "rss_peak_mb": 4021.7578125,
+      "child_rss_peak_mb": 131.59765625,
+      "total_peak_mb": 4153.35546875,
+      "spike_mb": 104.5390625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3692985559464432,
+      "sample_count": 9,
+      "rss_start_mb": 3925.2265625,
+      "rss_end_mb": 3925.40625,
+      "rss_peak_mb": 4062.73828125,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4064.87890625,
+      "spike_mb": 137.51171875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.4127531590056606,
+      "sample_count": 9,
+      "rss_start_mb": 3925.40625,
+      "rss_end_mb": 3937.15625,
+      "rss_peak_mb": 4059.75390625,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4061.89453125,
+      "spike_mb": 134.34765625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.384978236979805,
+      "sample_count": 9,
+      "rss_start_mb": 3937.15625,
+      "rss_end_mb": 3936.9921875,
+      "rss_peak_mb": 4074.21484375,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.35546875,
+      "spike_mb": 137.05859375
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3643342009745538,
+      "sample_count": 9,
+      "rss_start_mb": 3936.9921875,
+      "rss_end_mb": 3937.046875,
+      "rss_peak_mb": 4071.31640625,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4073.45703125,
+      "spike_mb": 134.32421875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3498359720106237,
+      "sample_count": 9,
+      "rss_start_mb": 3937.0390625,
+      "rss_end_mb": 3937.1328125,
+      "rss_peak_mb": 4057.359375,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4059.5,
+      "spike_mb": 120.3203125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.415372767020017,
+      "sample_count": 9,
+      "rss_start_mb": 3937.1328125,
+      "rss_end_mb": 3937.1796875,
+      "rss_peak_mb": 4059.37890625,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4061.51953125,
+      "spike_mb": 122.24609375
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.377819552028086,
+      "sample_count": 9,
+      "rss_start_mb": 3937.1796875,
+      "rss_end_mb": 3937.015625,
+      "rss_peak_mb": 4073.2421875,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4075.3828125,
+      "spike_mb": 136.0625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3686006399802864,
+      "sample_count": 9,
+      "rss_start_mb": 3937.015625,
+      "rss_end_mb": 3937.0625,
+      "rss_peak_mb": 4063.33984375,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4065.48046875,
+      "spike_mb": 126.32421875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3883692669915035,
+      "sample_count": 9,
+      "rss_start_mb": 3937.0625,
+      "rss_end_mb": 3937.15625,
+      "rss_peak_mb": 4043.2421875,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4045.3828125,
+      "spike_mb": 106.1796875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3806627169833519,
+      "sample_count": 9,
+      "rss_start_mb": 3937.15625,
+      "rss_end_mb": 3936.9453125,
+      "rss_peak_mb": 4067.48046875,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4069.62109375,
+      "spike_mb": 130.32421875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3755155360559002,
+      "sample_count": 9,
+      "rss_start_mb": 3936.9453125,
+      "rss_end_mb": 3937.0390625,
+      "rss_peak_mb": 4073.265625,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4075.40625,
+      "spike_mb": 136.3203125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.369196867046412,
+      "sample_count": 9,
+      "rss_start_mb": 3937.0390625,
+      "rss_end_mb": 3937.0859375,
+      "rss_peak_mb": 4065.46484375,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4067.60546875,
+      "spike_mb": 128.42578125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3443288399721496,
+      "sample_count": 9,
+      "rss_start_mb": 3937.0859375,
+      "rss_end_mb": 3937.1796875,
+      "rss_peak_mb": 4067.1484375,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4069.2890625,
+      "spike_mb": 130.0625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.3508338909596205,
+      "sample_count": 9,
+      "rss_start_mb": 3937.1796875,
+      "rss_end_mb": 3936.96875,
+      "rss_peak_mb": 4074.2421875,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.3828125,
+      "spike_mb": 137.0625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.4986388660036027,
+      "sample_count": 10,
+      "rss_start_mb": 3936.96875,
+      "rss_end_mb": 3937.0625,
+      "rss_peak_mb": 4074.28515625,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.42578125,
+      "spike_mb": 137.31640625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.464931358001195,
+      "sample_count": 9,
+      "rss_start_mb": 3937.0625,
+      "rss_end_mb": 3937.109375,
+      "rss_peak_mb": 4074.125,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.265625,
+      "spike_mb": 137.0625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.346353998000268,
+      "sample_count": 9,
+      "rss_start_mb": 3937.109375,
+      "rss_end_mb": 3936.9453125,
+      "rss_peak_mb": 4074.16796875,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.30859375,
+      "spike_mb": 137.05859375
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.4008706439635716,
+      "sample_count": 9,
+      "rss_start_mb": 3936.9453125,
+      "rss_end_mb": 3937.0,
+      "rss_peak_mb": 4074.265625,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.40625,
+      "spike_mb": 137.3203125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.5352732890169136,
+      "sample_count": 10,
+      "rss_start_mb": 3936.9921875,
+      "rss_end_mb": 3937.0859375,
+      "rss_peak_mb": 4074.30859375,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.44921875,
+      "spike_mb": 137.31640625
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.5711600970244035,
+      "sample_count": 10,
+      "rss_start_mb": 3937.0859375,
+      "rss_end_mb": 3937.1328125,
+      "rss_peak_mb": 4049.35546875,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4051.49609375,
+      "spike_mb": 112.26953125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.52873311098665,
+      "sample_count": 10,
+      "rss_start_mb": 3937.1328125,
+      "rss_end_mb": 3936.96875,
+      "rss_peak_mb": 4074.19140625,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4076.33203125,
+      "spike_mb": 137.05859375
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 1.635377565980889,
+      "sample_count": 11,
+      "rss_start_mb": 3936.96875,
+      "rss_end_mb": 3937.015625,
+      "rss_peak_mb": 4061.39453125,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4063.53515625,
+      "spike_mb": 124.42578125
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 2.1172757530002855,
+      "sample_count": 14,
+      "rss_start_mb": 3937.015625,
+      "rss_end_mb": 3945.546875,
+      "rss_peak_mb": 4061.3125,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4063.453125,
+      "spike_mb": 124.296875
+    },
+    {
+      "zone": "STT/FasterWhisper",
+      "elapsed_sec": 2.248860753956251,
+      "sample_count": 15,
+      "rss_start_mb": 3945.76171875,
+      "rss_end_mb": 3948.640625,
+      "rss_peak_mb": 4082.82421875,
+      "child_rss_peak_mb": 2.140625,
+      "total_peak_mb": 4084.96484375,
+      "spike_mb": 137.0625
+    }
+  ],
+  "prompt_budget": [],
+  "process_inventory": [
+    {
+      "label": "startup_checklist_inventory",
+      "ts": 1777576671.8765156,
+      "process_pid": 55881,
+      "python_threads": 1,
+      "child_processes": 2,
+      "keyword_counts": {
+        "python": 24,
+        "piper": 0,
+        "ffmpeg": 0
+      }
+    },
+    {
+      "label": "speech_service_init_complete",
+      "ts": 1777576680.4365418,
+      "process_pid": 55881,
+      "python_threads": 3,
+      "child_processes": 2,
+      "keyword_counts": {
+        "python": 24,
+        "piper": 0,
+        "ffmpeg": 0
+      }
+    },
+    {
+      "label": "post_init_ghost_hunt",
+      "ts": 1777576680.8969016,
+      "process_pid": 55881,
+      "python_threads": 5,
+      "child_processes": 2,
+      "keyword_counts": {
+        "python": 24,
+        "piper": 0,
+        "ffmpeg": 0
+      }
+    }
+  ]
+}

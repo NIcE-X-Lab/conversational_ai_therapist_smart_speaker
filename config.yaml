@@ -122,7 +122,7 @@ rl:
   # score-2 dimension to work on today" — observed in session 11 (John,
   # 2026-04-25).  The segment-level pass is a free reuse of the
   # classifier output; only the joined-utterance pass is LLM-gated.
-  multi_dim_backfill_enabled: true
+  multi_dim_backfill_enabled: false
 
   # G9 — LLM-based ReflectiveSummarizer for the "You mentioned that ...
   # Can you tell me more about it?" follow-up on Score-2 dimensions.

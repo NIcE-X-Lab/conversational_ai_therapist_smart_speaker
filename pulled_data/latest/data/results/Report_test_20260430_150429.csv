@@ -1,0 +1,38 @@
+Item Label,Score,Notes
+weight,[],[]
+mood,[2],"[['original_question: How has your mood been? Have you been able to manage your moods?', ""original_resp: No, I'm very stressed and have been very anxious lately""], ['original_question: How has your mood been? Have you been able to manage your moods?', ""original_resp: No, I'm very stressed and have been very anxious lately"", ""followup_resp: I just feel very stressed because of all my exams and I'm not able to deal with it properly."", 'rv_decision: 0', 'rv_guide: ', 'followup_resp_1: ', 'rv_validation: It sounds like the pressure from your exams is creating a significant amount of stress, and that feeling of not being able to deal with it properly is really tough right now. Feeling stressed when facing exams is a very natural response to that high-stakes situation, and it makes sense that you feel overwhelmed. You might find it helpful to break down the exams into smaller, manageable chunks rather than looking at the whole mountain at once. Try scheduling short, focused study sessions followed by genuine breaks to let your mind rest. You could also explore simple grounding techniques when the anxiety spikes to help bring your focus back to the present moment.', 'therapist_resp: ']]"
+medication,[0],"[['original_question: Are you adhering to the medication prescribed by your physician?', 'original_resp: Yes, I take my medication on time']]"
+care,[0],"[['original_question: Are you keeping up with visits to your doctor, therapist, or case manager?', ""original_resp: I think I'm done with questions for today""]]"
+house,[],[]
+talk,[],[]
+emo,[],[]
+safe,[],[]
+risk,[],[]
+sleep,[],[]
+eat,[2],"[['original_question: Are you eating at fairly steady times each day?', ""original_resp: No, I'm not eating any food""], ['original_question: Are you eating at fairly steady times each day?', ""original_resp: No, I'm not eating any food"", ""followup_resp: I just, with all my stress, I'm just not having time to eat my three meals, so I just skip my food."", 'rv_decision: 0', 'rv_guide: ', 'followup_resp_1: ', ""rv_validation: It sounds like the stress is creating a real barrier, making it impossible to find time for your meals and leading you to skip food. Feeling like you just don't have the time for your meals when you are under stress is a very real and painful experience. This is a common way our bodies react when we are overwhelmed, and it doesn't reflect a lack of desire to eat. You might try to schedule very small, non-negotiable eating windows, perhaps just focusing on one small snack or a glass of water at a specific time each day. You could also look into simple meal preparation strategies, like having pre-cut vegetables or quick protein options ready to go, so that when time is tight, you can still manage to fuel yourself. Remember that even tiny amounts of consistent nourishment can help manage that stress response."", 'therapist_resp: ']]"
+work,[1],"[['segment_backfill: true', 'source_question: Have you been meeting your obligations as they come up?', 'original_resp: Now this is going on in the truck', 'inferred_score: 1']]"
+work_dayoff,[1],"[['segment_backfill: true', 'source_question: Have you been meeting your obligations as they come up?', ""original_resp: I also made it so it's multi-dimension"", 'inferred_score: 1']]"
+showup,[],[]
+finance,[],[]
+nutrition,"[0, 0]",[]
+problem,[1],"[['multi_dim_backfill: true', 'source_question: Are you eating at fairly steady times each day?', ""original_resp: No, I'm not eating any food I'm just skipping my meals I'll do like two more and then we'll do CBT"", 'inferred_score: 1']]"
+support,[],[]
+family,[],[]
+alcohol,[],[]
+ciga,[],[]
+drug,[2],"[['segment_backfill: true', 'source_question: Have you been meeting your obligations as they come up?', ""original_resp: I just do drugs and I've been smoking a lot recently"", 'inferred_score: 2']]"
+hobbies,[],[]
+creativity,[],[]
+community,[],[]
+support,[],[]
+social,[],[]
+comfortable,[],[]
+protection,[],[]
+productivity,[],[]
+motivation,[],[]
+coping,[1],"[['multi_dim_backfill: true', 'source_question: Are you eating at fairly steady times each day?', ""original_resp: No, I'm not eating any food I'm just skipping my meals I'll do like two more and then we'll do CBT"", 'inferred_score: 1']]"
+sib,[],[]
+arrest,[],[]
+legal,[],[]
+hygiene,[],[]
+sports,[],[]

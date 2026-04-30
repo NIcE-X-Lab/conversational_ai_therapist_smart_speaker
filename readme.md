@@ -939,7 +939,7 @@ rl:
   # All default false for legacy-parity EXCEPT soap_report_enabled + G8
   # multi-dim back-fill which are silent clinician/paper-research extensions.
   reask_dimension_n: false            # G5  — paper §4.2 re-ask
-  multi_dim_backfill_enabled: true    # G8  — paper §4.1 multi-dim back-fill (GPU-cheap now)
+  multi_dim_backfill_enabled: false    # G8  — paper §4.1 multi-dim back-fill (GPU-cheap now)
   reflective_summarizer_enabled: false # G9 — paper §5.2 MI reflective summarizer
   warm_start_enabled: false           # G11 — returning-user Q nudge + recall greeting
   session_analysis_enabled: false     # G12 — post-session SUMMARY+prefs+safety LLM

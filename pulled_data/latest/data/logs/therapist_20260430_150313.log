@@ -1,0 +1,1692 @@
+2026-04-30 15:03:15,408 arth-desktop ResourceAudit[53992] INFO [RESOURCE] baseline_rss=85.1MB child_rss=2.4MB threads=6
+2026-04-30 15:03:15,541 arth-desktop ResourceAudit[53992] INFO [RESOURCE] main_bootstrap rss=87.2MB child=2.4MB threads=6 trace_cur=1.5MB trace_peak=1.5MB
+2026-04-30 15:03:15,562 arth-desktop MainApp[53992] INFO [RSS AUDIT] Before startup checklist: PID=53992 RSS=87.2MB VMS=377.9MB Children(2)=2.4MB Total=89.6MB
+2026-04-30 15:03:15,586 arth-desktop GPIOManager[53992] INFO Jetson.GPIO loaded — physical hardware active.
+
+=======================================================
+  CaiTI System Boot — Connectivity Audit
+=======================================================
+  [x] GPIO Initialized (Pins 11, 13, 15, 18)
+  [x] LiteRT Model found (./models/litert/gemma-4-E2B-it.litertlm)
+  [x] LiteRT Model Size: 2463MB (gemma-4-E2B-it)
+  [x] Faster-Whisper configured (base.en)
+  [x] Piper Model found (./models/piper/en_US-amy-medium.onnx)
+  [x] Database Connected (data/therapist.db)
+  [x] Free disk: 788159MB available
+=======================================================
+
+2026-04-30 15:03:17,211 arth-desktop ResourceAudit[53992] INFO [RESOURCE] startup_checklist_complete rss=115.5MB child=2.4MB threads=6 trace_cur=7.1MB trace_peak=7.5MB
+2026-04-30 15:03:17,359 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PROC] startup_checklist_inventory child_processes=2 python_threads=1 keywords={'python': 24, 'piper': 0, 'ffmpeg': 0}
+2026-04-30 15:03:17,360 arth-desktop MainApp[53992] DEBUG [BOOT-AUDIT] All critical subsystems passed.
+[SESSION] Subject onboarded: 8080 (session id: 8080_20260430_150317)
+2026-04-30 15:03:17,360 arth-desktop IORecord[53992] INFO [SESSION] Subject onboarded: 8080 (session id: 8080_20260430_150317)
+2026-04-30 15:03:17,369 arth-desktop DBManager[53992] INFO Database initialized at data/therapist.db
+! WARNING: [RECOVERY] Closed 1 dangling session(s) for user_id=1: [1]
+2026-04-30 15:03:17,379 arth-desktop IORecord[53992] WARNING [RECOVERY] Closed 1 dangling session(s) for user_id=1: [1]
+2026-04-30 15:03:17,395 arth-desktop IORecord[53992] DEBUG [RESULTS] Per-session CSVs: data/results/Report_8080_20260430_150317.csv, data/results/Notes_8080_20260430_150317.csv
+2026-04-30 15:03:17,396 arth-desktop IORecord[53992] DEBUG [DOSSIER] Initialized: /home/arth/project/data/sessions/session_8080_20260430_150317.json
+2026-04-30 15:03:17,433 arth-desktop ResourceAudit[53992] INFO [RESOURCE] record_init_complete rss=116.6MB child=2.4MB threads=6 trace_cur=7.6MB trace_peak=7.7MB
+2026-04-30 15:03:17,453 arth-desktop MainApp[53992] INFO [RSS AUDIT] After init_record (before audio stack): PID=53992 RSS=116.9MB VMS=636.9MB Children(2)=2.4MB Total=119.3MB
+2026-04-30 15:03:17,455 arth-desktop MainApp[53992] DEBUG API Server started on port 8000
+2026-04-30 15:03:17,554 arth-desktop ResourceAudit[53992] INFO [RESOURCE] api_thread_started rss=116.9MB child=2.4MB threads=7 trace_cur=8.1MB trace_peak=8.2MB
+2026-04-30 15:03:18,028 arth-desktop SpeechService[53992] DEBUG Initializing Unified Speech Interaction Service...
+2026-04-30 15:03:18,508 arth-desktop ResourceAudit[53992] INFO [RESOURCE_INIT] module=SpeechService/AudioRecorder rss_delta=+3.6MB rss_after=130.2MB elapsed=0.45s
+2026-04-30 15:03:18,541 arth-desktop STTGenerator[53992] INFO Loading Faster-Whisper model: base.en on cpu (compute_type=int8, beam_size=2, best_of=1)
+2026-04-30 15:03:21,355 arth-desktop ResourceAudit[53992] INFO [RESOURCE_INIT] module=STT/FasterWhisperModelInit rss_delta=+230.1MB rss_after=360.3MB elapsed=2.78s
+2026-04-30 15:03:21,356 arth-desktop STTGenerator[53992] INFO Faster-Whisper model loaded successfully. RSS delta: +230.1MB (now 360.3MB)
+2026-04-30 15:03:21,398 arth-desktop ResourceAudit[53992] INFO [RESOURCE_INIT] module=SpeechService/STTGenerator rss_delta=+230.1MB rss_after=360.3MB elapsed=2.86s
+2026-04-30 15:03:21,479 arth-desktop ResourceAudit[53992] INFO [RESOURCE_INIT] module=SpeechService/TTSGenerator rss_delta=+0.0MB rss_after=360.3MB elapsed=0.04s
+2026-04-30 15:03:21,556 arth-desktop ResourceAudit[53992] INFO [RESOURCE_INIT] module=SpeechService/BackgroundMusic rss_delta=+0.0MB rss_after=360.3MB elapsed=0.04s
+2026-04-30 15:03:21,632 arth-desktop ResourceAudit[53992] INFO [RESOURCE_INIT] module=SpeechService/AudioPlayer rss_delta=+0.0MB rss_after=360.3MB elapsed=0.04s
+2026-04-30 15:03:25,698 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:25,700 arth-desktop GPIOManager[53992] INFO GPIO configured. Listening LED: 18, Buttons: [11, 13, 15, 16]
+2026-04-30 15:03:25,831 arth-desktop ResourceAudit[53992] INFO [RESOURCE_INIT] module=SpeechService/GPIOManager rss_delta=+0.9MB rss_after=361.2MB elapsed=4.16s
+2026-04-30 15:03:25,961 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PROC] speech_service_init_complete child_processes=2 python_threads=3 keywords={'python': 24, 'piper': 0, 'ffmpeg': 0}
+pygame 2.6.1 (SDL 2.28.4, Python 3.10.12)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+2026-04-30 15:03:26,290 arth-desktop AudioRecorder[53992] INFO Background music duration probe: assets/audio/ambient_therapy.mp3 = 18647.5s
+2026-04-30 15:03:26,303 arth-desktop MainApp[53992] INFO [RSS AUDIT] After SpeechService init (Whisper+SER+TTS loaded): PID=53992 RSS=361.2MB VMS=1488.1MB Children(2)=2.4MB Total=363.6MB
+2026-04-30 15:03:26,304 arth-desktop SpeechService[53992] DEBUG Speech Interaction Service started.
+2026-04-30 15:03:26,304 arth-desktop MainApp[53992] DEBUG Unified SpeechInteractionService started.
+2026-04-30 15:03:26,355 arth-desktop ResourceAudit[53992] INFO [RESOURCE] speech_service_started rss=369.6MB child=2.4MB threads=21 trace_cur=21.5MB trace_peak=21.6MB
+2026-04-30 15:03:26,381 arth-desktop MainApp[53992] INFO [RSS AUDIT] After SpeechService thread started (baseline): PID=53992 RSS=369.6MB VMS=2567.6MB Children(2)=2.4MB Total=372.1MB
+2026-04-30 15:03:26,403 arth-desktop MainApp[53992] DEBUG [GHOST HUNT] No child processes > 50.0MB. Clean.
+2026-04-30 15:03:26,523 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PROC] post_init_ghost_hunt child_processes=2 python_threads=5 keywords={'python': 24, 'piper': 0, 'ffmpeg': 0}
+2026-04-30 15:03:26,851 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:26,853 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:26,854 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:26,854 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:28,035 arth-desktop AudioRecorder[53992] INFO Background music segment start: offset=12453.0s
+2026-04-30 15:03:28,036 arth-desktop AudioRecorder[53992] INFO Background music started: assets/audio/ambient_therapy.mp3
+2026-04-30 15:03:28,230 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:28,231 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:28,232 arth-desktop AudioRecorder[53992] INFO Speech too short (3 chunks < 10 min). Discarding as noise.
+2026-04-30 15:03:28,738 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:28,738 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:28,739 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:30,084 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:31,457 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:31,458 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:31,458 arth-desktop AudioRecorder[53992] INFO Speech too short (3 chunks < 10 min). Discarding as noise.
+2026-04-30 15:03:31,949 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:31,950 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:31,951 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:36,113 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:37,117 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:03:37,121 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:37,121 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:37,122 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 35 speech chunks.
+2026-04-30 15:03:37,125 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0547)
+2026-04-30 15:03:37,204 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:03:38,668 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:03:38,717 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+207.1MB rss_peak=576.9MB total_peak=579.3MB elapsed=1.51s samples=14
+2026-04-30 15:03:38,717 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:03:38,817 arth-desktop STTGenerator[53992] INFO Transcription: So right now I've kept the...
+2026-04-30 15:03:38,823 arth-desktop SpeechService[53992] DEBUG Wake transcription: so right now ive kept the
+2026-04-30 15:03:39,308 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:39,309 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:39,309 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:39,349 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:40,363 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:03:40,366 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:40,367 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:40,367 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 27 speech chunks.
+2026-04-30 15:03:40,371 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0239)
+2026-04-30 15:03:40,465 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:03:41,665 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:03:41,721 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+190.0MB rss_peak=617.3MB total_peak=619.7MB elapsed=1.26s samples=12
+2026-04-30 15:03:41,721 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:03:41,829 arth-desktop STTGenerator[53992] INFO Transcription: a little bit.
+2026-04-30 15:03:41,832 arth-desktop SpeechService[53992] DEBUG Wake transcription: a little bit
+2026-04-30 15:03:42,348 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:42,349 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:42,358 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:42,359 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:43,744 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:43,746 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:43,746 arth-desktop AudioRecorder[53992] INFO Recording complete: 47 chunks, 18 speech chunks.
+2026-04-30 15:03:43,750 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.1370)
+2026-04-30 15:03:43,824 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:03:45,004 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:03:45,054 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+178.7MB rss_peak=621.0MB total_peak=623.4MB elapsed=1.23s samples=12
+2026-04-30 15:03:45,055 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:03:45,150 arth-desktop STTGenerator[53992] INFO Transcription: Katie.
+2026-04-30 15:03:45,151 arth-desktop SpeechService[53992] DEBUG Wake transcription: katie
+2026-04-30 15:03:45,639 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:45,640 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:45,640 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:45,669 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:47,065 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:47,067 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:47,067 arth-desktop AudioRecorder[53992] INFO Recording complete: 47 chunks, 12 speech chunks.
+2026-04-30 15:03:47,071 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0109)
+2026-04-30 15:03:47,151 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:03:48,382 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:03:48,441 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+147.2MB rss_peak=635.0MB total_peak=637.4MB elapsed=1.29s samples=12
+2026-04-30 15:03:48,442 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:03:48,545 arth-desktop STTGenerator[53992] INFO Transcription: 
+2026-04-30 15:03:48,546 arth-desktop SpeechService[53992] DEBUG Wake transcription: 
+2026-04-30 15:03:49,032 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:49,033 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:49,033 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:49,162 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:50,205 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:03:50,209 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:50,211 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:50,211 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 20 speech chunks.
+2026-04-30 15:03:50,215 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.1321)
+2026-04-30 15:03:50,305 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:03:52,067 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:03:52,155 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+179.0MB rss_peak=621.2MB total_peak=623.7MB elapsed=1.85s samples=18
+2026-04-30 15:03:52,155 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:03:52,252 arth-desktop STTGenerator[53992] INFO Transcription: Hey K
+2026-04-30 15:03:52,255 arth-desktop SpeechService[53992] DEBUG Wake transcription: hey k
+2026-04-30 15:03:52,741 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:52,741 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:52,742 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:52,771 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:53,855 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:03:53,858 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:53,859 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:53,860 arth-desktop AudioRecorder[53992] INFO Recording complete: 37 chunks, 10 speech chunks.
+2026-04-30 15:03:53,863 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0111)
+2026-04-30 15:03:53,949 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:03:55,105 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:03:55,171 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.2MB rss_peak=636.8MB total_peak=639.3MB elapsed=1.22s samples=12
+2026-04-30 15:03:55,172 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:03:55,265 arth-desktop STTGenerator[53992] INFO Transcription: 
+2026-04-30 15:03:55,265 arth-desktop SpeechService[53992] DEBUG Wake transcription: 
+2026-04-30 15:03:55,760 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:55,761 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:55,761 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:55,790 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:03:57,135 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:03:57,138 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:03:57,139 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:03:57,140 arth-desktop AudioRecorder[53992] INFO Recording complete: 46 chunks, 14 speech chunks.
+2026-04-30 15:03:57,143 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0115)
+2026-04-30 15:03:57,218 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:03:58,375 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:03:58,466 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+136.8MB rss_peak=636.4MB total_peak=638.9MB elapsed=1.25s samples=12
+2026-04-30 15:03:58,467 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:03:58,562 arth-desktop STTGenerator[53992] INFO Transcription: 
+2026-04-30 15:03:58,563 arth-desktop SpeechService[53992] DEBUG Wake transcription: 
+2026-04-30 15:03:59,069 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:03:59,070 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:03:59,070 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:03:59,099 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:04:00,373 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:04:00,377 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:04:00,379 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:00,379 arth-desktop AudioRecorder[53992] INFO Recording complete: 43 chunks, 12 speech chunks.
+2026-04-30 15:04:00,381 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0114)
+2026-04-30 15:04:00,462 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:04:01,610 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:04:01,708 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+144.2MB rss_peak=643.9MB total_peak=646.4MB elapsed=1.25s samples=12
+2026-04-30 15:04:01,709 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:04:01,808 arth-desktop STTGenerator[53992] INFO Transcription: 
+2026-04-30 15:04:01,809 arth-desktop SpeechService[53992] DEBUG Wake transcription: 
+2026-04-30 15:04:02,294 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:04:02,295 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:04:02,296 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:04:02,325 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:04:03,626 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:04:03,629 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:04:03,630 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:03,631 arth-desktop AudioRecorder[53992] INFO Recording complete: 44 chunks, 12 speech chunks.
+2026-04-30 15:04:03,633 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0115)
+2026-04-30 15:04:03,722 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:04:04,972 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:04:05,083 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+178.9MB rss_peak=632.9MB total_peak=635.4MB elapsed=1.36s samples=13
+2026-04-30 15:04:05,084 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:04:05,187 arth-desktop STTGenerator[53992] INFO Transcription: 
+2026-04-30 15:04:05,188 arth-desktop SpeechService[53992] DEBUG Wake transcription: 
+2026-04-30 15:04:05,704 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:04:05,705 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:04:05,705 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:04:05,706 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:04:06,758 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:04:06,761 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:04:06,762 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:06,763 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 29 speech chunks.
+2026-04-30 15:04:06,766 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.1194)
+2026-04-30 15:04:06,842 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:04:08,229 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:04:08,281 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.2MB rss_peak=636.8MB total_peak=639.2MB elapsed=1.44s samples=14
+2026-04-30 15:04:08,282 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:04:08,385 arth-desktop STTGenerator[53992] INFO Transcription: So, hi.
+2026-04-30 15:04:08,386 arth-desktop SpeechService[53992] DEBUG Wake transcription: so hi
+
+[SESSION START]
+[SESSION] Wake command heard — starting new session.
+2026-04-30 15:04:08,386 arth-desktop SpeechService[53992] INFO [SESSION] Wake command heard — starting new session.
+[SESSION] Onboarding — capturing subject name.
+2026-04-30 15:04:08,386 arth-desktop SpeechService[53992] INFO [SESSION] Onboarding — capturing subject name.
+2026-04-30 15:04:08,387 arth-desktop SpeechService[53992] DEBUG Agent Action: Hello, I'm CaiTI.
+[TTS] Hello, I'm CaiTI.
+2026-04-30 15:04:08,387 arth-desktop SpeechService[53992] INFO [TTS] Hello, I'm CaiTI.
+2026-04-30 15:04:08,387 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Hello, I'm CaiTI.' -> active_ai_response.wav
+2026-04-30 15:04:10,344 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:04:10,345 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:10,346 arth-desktop AudioPlayer[53992] INFO Pygame mixer ready: (22050, -16, 2)
+2026-04-30 15:04:10,346 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (1.6s)
+2026-04-30 15:04:11,950 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:04:13,154 arth-desktop SpeechService[53992] DEBUG Agent Action: Who am I speaking with today?
+2026-04-30 15:04:13,155 arth-desktop SpeechService[53992] INFO [TTS] Who am I speaking with today?
+[TTS] Who am I speaking with today?
+2026-04-30 15:04:13,156 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Who am I speaking with today?' -> active_ai_response.wav
+2026-04-30 15:04:15,124 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:04:15,124 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:15,125 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (1.7s)
+2026-04-30 15:04:16,883 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:04:16,886 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:04:17,394 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:04:17,395 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:04:17,395 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:04:17,424 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:04:27,559 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:04:27,564 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:04:27,564 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:27,565 arth-desktop AudioRecorder[53992] INFO Recording complete: 338 chunks, 166 speech chunks.
+2026-04-30 15:04:27,565 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:27,569 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input.wav (RMS=0.0373)
+2026-04-30 15:04:27,660 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:04:28,845 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:04:28,901 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.3MB rss_peak=637.0MB total_peak=639.4MB elapsed=1.24s samples=12
+2026-04-30 15:04:28,902 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:04:29,004 arth-desktop STTGenerator[53992] INFO Transcription: test
+2026-04-30 15:04:29,005 arth-desktop SpeechService[53992] DEBUG User heard: test
+2026-04-30 15:04:29,006 arth-desktop SpeechService[53992] DEBUG [NAME GUARD] Accepted raw transcript 'test' as valid name.
+[SESSION] Initializing session for subject: test
+2026-04-30 15:04:29,007 arth-desktop SpeechService[53992] INFO [SESSION] Initializing session for subject: test
+2026-04-30 15:04:29,008 arth-desktop IORecord[53992] DEBUG Overriding SUBJECT_BASE_ID with test
+[SESSION] Subject onboarded: test (session id: test_20260430_150429)
+2026-04-30 15:04:29,008 arth-desktop IORecord[53992] INFO [SESSION] Subject onboarded: test (session id: test_20260430_150429)
+2026-04-30 15:04:29,010 arth-desktop DBManager[53992] INFO Database initialized at data/therapist.db
+2026-04-30 15:04:29,034 arth-desktop IORecord[53992] DEBUG [RESULTS] Per-session CSVs: data/results/Report_test_20260430_150429.csv, data/results/Notes_test_20260430_150429.csv
+2026-04-30 15:04:29,035 arth-desktop IORecord[53992] DEBUG [DOSSIER] Saved 0 interactions to /home/arth/project/data/sessions/session_8080_20260430_150317.json
+2026-04-30 15:04:29,036 arth-desktop IORecord[53992] DEBUG [DOSSIER] Initialized: /home/arth/project/data/sessions/session_test_20260430_150429.json
+2026-04-30 15:04:29,036 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Pre-session: suspending STT before pipeline starts.
+2026-04-30 15:04:29,168 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:04:29,259 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 53.7MB
+2026-04-30 15:04:29,260 arth-desktop SpeechService[53992] DEBUG Agent Action: Hello, test. I'm CaiTI, your intelligent therapist. Thank you for joining me today.
+[TTS] Hello, test. I'm CaiTI, your intelligent therapist. Thank you for joining me today.
+2026-04-30 15:04:29,260 arth-desktop SpeechService[53992] INFO [TTS] Hello, test. I'm CaiTI, your intelligent therapist. Thank you for joining me today.
+2026-04-30 15:04:29,260 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Hello, test. I'm CaiTI, your intelligent therapist. Thank you for joining me today.' -> active_ai_response.wav
+[SESSION] Clinical pipeline starting (DB session_id=4).
+2026-04-30 15:04:29,629 arth-desktop MainApp[53992] INFO [SESSION] Clinical pipeline starting (DB session_id=4).
+
+[SCREENING LOOP]
+[PIPELINE] Screening loop starting (Q-learning questioner over 37 dimensions).
+2026-04-30 15:04:29,630 arth-desktop HandlerRL[53992] INFO [PIPELINE] Screening loop starting (Q-learning questioner over 37 dimensions).
+2026-04-30 15:04:29,631 arth-desktop HandlerRL[53992] DEBUG Initializing RL handler setup: loading records and question library.
+2026-04-30 15:04:29,631 arth-desktop IORecord[53992] DEBUG init_record already ran this session (SESSION_ID=4); skipping duplicate init.
+2026-04-30 15:04:29,643 arth-desktop RLQTables[53992] DEBUG Initializing Q-table for item RL states using item importance.
+2026-04-30 15:04:29,645 arth-desktop RLQTables[53992] DEBUG Built Q-table with shape (38, 38) and actions: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37']
+2026-04-30 15:04:29,689 arth-desktop RLQTables[53992] INFO [RL] Q-table seeded with therapist item_importance priors: [0, 5, 98, 99, 5, 4, 4, 4, 2, 2, 5, 97, 5, 5, 5, 2, 2, 1, 3, 3, 4, 4, 4, 3, 3, 1, 4, 2, 2, 2, 4, 4, 3, 1, 1, 1, 4, 4]
+
+[INITIALIZATION & RL SEEDING]
+[RL] Q-table seeded with therapist item_importance priors: [0, 5, 98, 99, 5, 4, 4, 4, 2, 2, 5, 97, 5, 5, 5, 2, 2, 1, 3, 3, 4, 4, 4, 3, 3, 1, 4, 2, 2, 2, 4, 4, 3, 1, 1, 1, 4, 4]
+[RL] No prior Q-table for subject test; initialising from item_importance priors.
+2026-04-30 15:04:29,691 arth-desktop HandlerRL[53992] INFO [RL] No prior Q-table for subject test; initialising from item_importance priors.
+2026-04-30 15:04:29,691 arth-desktop HandlerRL[53992] DEBUG Warm-start disabled (rl.warm_start_enabled=false); skipping.
+2026-04-30 15:04:29,692 arth-desktop HandlerRL[53992] DEBUG RL handler setup complete.
+2026-04-30 15:04:29,707 arth-desktop IORecord[53992] DEBUG Logged Reasoning (reasoner_decision) to DB.
+2026-04-30 15:04:29,708 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=general, model=gemma-4-E2B-it)
+2026-04-30 15:04:29,709 arth-desktop LLMClient[53992] DEBUG [LiteRT] Loading model from ./models/litert/gemma-4-E2B-it.litertlm (backend=gpu)
+2026-04-30 15:04:29,847 arth-desktop LLMClient[53992] DEBUG [LiteRT] Using GPU backend (ML Drift).
+2026-04-30 15:04:37,284 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:04:37,285 arth-desktop LLMClient[53992] DEBUG [LiteRT] Model loaded. RSS delta: +2624.4MB (now 3070.7MB)
+2026-04-30 15:04:37,286 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:37,286 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/general
+2026-04-30 15:04:39,129 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (8.5s)
+2026-04-30 15:04:39,129 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/general
+2026-04-30 15:04:39,130 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 9.42s (role=general)
+2026-04-30 15:04:39,133 arth-desktop RLQTables[53992] DEBUG Choosing action for state 0 (epsilon=1.000)
+2026-04-30 15:04:39,134 arth-desktop RLQTables[53992] DEBUG Mask before: [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-30 15:04:39,137 arth-desktop RLQTables[53992] DEBUG Q-values after masking: [0.0,5.0,98.0,99.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,97.0,5.0,5.0,5.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+[RL] Exploiting: best dims ['3'] with Q-value 99.0
+2026-04-30 15:04:39,141 arth-desktop RLQTables[53992] INFO [RL] Exploiting: best dims ['3'] with Q-value 99.0
+
+[NEXT TURN SELECTION]
+[RL] Action chosen: dim=3 (medication)
+2026-04-30 15:04:39,142 arth-desktop RLQTables[53992] INFO [RL] Action chosen: dim=3 (medication)
+2026-04-30 15:04:39,158 arth-desktop IORecord[53992] DEBUG Logged Reasoning (rl_decision) to DB.
+[QUESTIONER] Starting turn for dim state S=3.
+2026-04-30 15:04:39,159 arth-desktop Questioner[53992] INFO [QUESTIONER] Starting turn for dim state S=3.
+[PIPELINE] Rephraser — varying question wording for this turn.
+2026-04-30 15:04:39,159 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Rephraser — varying question wording for this turn.
+2026-04-30 15:04:39,159 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been taking medication according to doctor's recommendation?
+2026-04-30 15:04:39,160 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rephraser, model=gemma-4-E2B-it)
+2026-04-30 15:04:39,160 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rephraser
+2026-04-30 15:04:40,767 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rephraser
+2026-04-30 15:04:40,768 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 1.61s (role=rephraser)
+2026-04-30 15:04:40,768 arth-desktop Questioner[53992] DEBUG [REPHRASER] 'Have you been taking medication according to doctor's recommendation?' -> 'Are you adhering to the medication prescribed by your physician?'
+2026-04-30 15:04:40,769 arth-desktop IORecord[53992] DEBUG Combining pending prefix with next question.
+[AGENT] I'd like to start with a couple of questions about how you've been.
+
+Are you adhering to the medication prescribed by your physician?
+2026-04-30 15:04:40,785 arth-desktop IORecord[53992] INFO [AGENT] I'd like to start with a couple of questions about how you've been.
+
+Are you adhering to the medication prescribed by your physician?
+2026-04-30 15:04:40,785 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+2026-04-30 15:04:47,630 arth-desktop AudioPlayer[53992] INFO Playback finished.
+[SESSION] Routing first agent utterance through intermission pipeline.
+2026-04-30 15:04:47,632 arth-desktop SpeechService[53992] INFO [SESSION] Routing first agent utterance through intermission pipeline.
+2026-04-30 15:04:47,633 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+
+[INTERMISSION & PHQ-4 GATING]
+[INTERMISSION] Pre-wait activity: SCREENING
+2026-04-30 15:04:47,635 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: SCREENING
+[PHQ4] Asking screening question: gad_1
+2026-04-30 15:04:47,635 arth-desktop SpeechService[53992] INFO [PHQ4] Asking screening question: gad_1
+2026-04-30 15:04:47,636 arth-desktop SpeechService[53992] DEBUG Agent Action: While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by...
+[TTS] While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by feeling nervous, anxious, or on edge?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:04:47,636 arth-desktop SpeechService[53992] INFO [TTS] While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by feeling nervous, anxious, or on edge?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:04:47,636 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by feeling nervous, anxious, or on edge?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.' -> active_ai_response.wav
+2026-04-30 15:04:50,703 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:04:50,703 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:04:50,706 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (14.9s)
+2026-04-30 15:05:05,635 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:05:07,226 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +130.7MB
+2026-04-30 15:05:07,226 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:05:07,739 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:05:07,740 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:05:07,741 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:05:07,779 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:05:13,147 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:05:13,149 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:05:13,150 arth-desktop AudioRecorder[53992] INFO Recording complete: 180 chunks, 115 speech chunks.
+2026-04-30 15:05:13,151 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:05:13,156 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input.wav (RMS=0.0723)
+2026-04-30 15:05:13,263 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:05:15,229 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:05:15,313 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+205.8MB rss_peak=3677.7MB total_peak=3680.0MB elapsed=2.05s samples=15
+2026-04-30 15:05:15,314 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:05:15,408 arth-desktop STTGenerator[53992] INFO Transcription: So I'm using it's an intermission not at all
+2026-04-30 15:05:15,414 arth-desktop SpeechService[53992] DEBUG User heard: So I'm using it's an intermission not at all
+2026-04-30 15:05:15,546 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:05:15,636 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 71.3MB
+[PHQ4] gad_1 ANSWERED: 'so i'm using it's an intermission not at all' -> score=0
+2026-04-30 15:05:15,656 arth-desktop SpeechService[53992] INFO [PHQ4] gad_1 ANSWERED: 'so i'm using it's an intermission not at all' -> score=0
+2026-04-30 15:05:16,664 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=True, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:05:16,666 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:05:17,868 arth-desktop SpeechService[53992] DEBUG Agent Action: I'd like to start with a couple of questions about how you've been.
+
+Are you adhering to the medication prescribed by yo...
+2026-04-30 15:05:17,869 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'I'd like to start with a couple of questions about how you've been.
+
+Are you adhering to the medication prescribed by your physician?' -> active_ai_response.wav
+2026-04-30 15:05:20,420 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:05:20,421 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:05:20,423 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (6.7s)
+2026-04-30 15:05:27,085 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:05:28,518 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +25.7MB
+2026-04-30 15:05:28,518 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:05:29,041 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:05:29,042 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:05:29,043 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:05:29,071 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:05:33,790 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:05:33,791 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:05:33,792 arth-desktop AudioRecorder[53992] INFO Recording complete: 158 chunks, 78 speech chunks.
+2026-04-30 15:05:33,792 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:05:33,798 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_419847544.wav (RMS=0.1214)
+2026-04-30 15:05:33,800 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 4.7s of audio -> active_user_input_419847544.wav. Parallel path.
+2026-04-30 15:05:33,804 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:05:33,804 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+[INTERMISSION] Pre-wait activity: SCREENING
+2026-04-30 15:05:33,806 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: SCREENING
+[PHQ4] Asking screening question: gad_2
+2026-04-30 15:05:33,807 arth-desktop SpeechService[53992] INFO [PHQ4] Asking screening question: gad_2
+2026-04-30 15:05:33,807 arth-desktop SpeechService[53992] DEBUG Agent Action: It's taking me a moment to reflect. Let me ask you this in the meantime. Over the last 2 weeks, how often have you been ...
+[TTS] It's taking me a moment to reflect. Let me ask you this in the meantime. Over the last 2 weeks, how often have you been bothered by not being able to stop or control worrying?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:05:33,807 arth-desktop SpeechService[53992] INFO [TTS] It's taking me a moment to reflect. Let me ask you this in the meantime. Over the last 2 weeks, how often have you been bothered by not being able to stop or control worrying?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:05:33,808 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'It's taking me a moment to reflect. Let me ask you this in the meantime. Over the last 2 weeks, how often have you been bothered by not being able to stop or control worrying?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.' -> active_ai_response.wav
+2026-04-30 15:05:33,892 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:05:35,655 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:05:35,734 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+209.4MB rss_peak=3659.4MB total_peak=3789.7MB elapsed=1.84s samples=13
+2026-04-30 15:05:35,735 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:05:35,830 arth-desktop STTGenerator[53992] INFO Transcription: Yes, I take my medication on time.
+[USER] Yes, I take my medication on time.
+2026-04-30 15:05:35,836 arth-desktop IORecord[53992] INFO [USER] Yes, I take my medication on time.
+2026-04-30 15:05:36,004 arth-desktop Questioner[53992] DEBUG Classifying user segments. Total segments: 1
+
+[RESPONSE ANALYSIS & SCORING]
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:05:36,004 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:05:36,005 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Are you adhering to the medication prescribed by your physician?
+2026-04-30 15:05:36,005 arth-desktop ResponseAnalyzer[53992] DEBUG User input: Yes, I take my medication on time
+2026-04-30 15:05:36,005 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:05:36,016 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:05:36,116 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:05:40,586 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:05:40,587 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 4.58s (role=analyzer)
+2026-04-30 15:05:40,590 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=medication, score=0
+2026-04-30 15:05:40,591 arth-desktop Questioner[53992] DEBUG Segment classified: 'Yes, I take my medication on time' -> (dim: medication, val: 0)
+[DLA] Classification result: [('medication', 0)]
+2026-04-30 15:05:40,591 arth-desktop Questioner[53992] INFO [DLA] Classification result: [('medication', 0)]
+2026-04-30 15:05:40,592 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:05:40,593 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:05:40,594 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: -59.6MB
+2026-04-30 15:05:40,596 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (17.8s)
+2026-04-30 15:05:40,605 arth-desktop IORecord[53992] DEBUG Logged Reasoning (semantic_scores) to DB.
+2026-04-30 15:05:40,606 arth-desktop Questioner[53992] DEBUG Evaluating result for item 3, question 1.
+2026-04-30 15:05:40,606 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: medication, 0
+[SCORE] dim=medication score=0 (via Response Analyzer)
+2026-04-30 15:05:40,606 arth-desktop Questioner[53992] INFO [SCORE] dim=medication score=0 (via Response Analyzer)
+2026-04-30 15:05:40,614 arth-desktop Questioner[53992] DEBUG Appended note to question_lib[3][1]['notes'].
+[QUESTIONER] Finished dim S=3. Reward (mean (paper §5.1 / legacy)): 0.00
+2026-04-30 15:05:40,615 arth-desktop Questioner[53992] INFO [QUESTIONER] Finished dim S=3. Reward (mean (paper §5.1 / legacy)): 0.00
+2026-04-30 15:05:40,615 arth-desktop RLQTables[53992] DEBUG Getting environment feedback: S=0, A=3, reward=0.0, terminate_flag=0, item_mask=[0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+[RL] Reward this turn: 0.0 (next state: dim=3)
+2026-04-30 15:05:40,615 arth-desktop RLQTables[53992] INFO [RL] Reward this turn: 0.0 (next state: dim=3)
+2026-04-30 15:05:40,618 arth-desktop HandlerRL[53992] DEBUG Q update applied at action: Q(S=0,A=3) 99.0 -> 94.05000000000001 (target=89.10000000000001)
+2026-04-30 15:05:40,618 arth-desktop RLQTables[53992] DEBUG Choosing action for state 3 (epsilon=1.000)
+2026-04-30 15:05:40,619 arth-desktop RLQTables[53992] DEBUG Mask before: [0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-30 15:05:40,621 arth-desktop RLQTables[53992] DEBUG Q-values after masking: [0.0,5.0,98.0,0.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,97.0,5.0,5.0,5.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+[RL] Exploiting: best dims ['2'] with Q-value 98.0
+2026-04-30 15:05:40,624 arth-desktop RLQTables[53992] INFO [RL] Exploiting: best dims ['2'] with Q-value 98.0
+
+[NEXT TURN SELECTION]
+[RL] Action chosen: dim=2 (mood)
+2026-04-30 15:05:40,625 arth-desktop RLQTables[53992] INFO [RL] Action chosen: dim=2 (mood)
+2026-04-30 15:05:40,634 arth-desktop IORecord[53992] DEBUG Logged Reasoning (rl_decision) to DB.
+[QUESTIONER] Starting turn for dim state S=2.
+2026-04-30 15:05:40,635 arth-desktop Questioner[53992] INFO [QUESTIONER] Starting turn for dim state S=2.
+2026-04-30 15:05:40,650 arth-desktop IORecord[53992] INFO [AGENT] How has your mood been? Have you been able to manage your moods?
+[AGENT] How has your mood been? Have you been able to manage your moods?
+2026-04-30 15:05:40,650 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+2026-04-30 15:05:58,430 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:05:59,117 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +24.9MB
+2026-04-30 15:05:59,118 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:05:59,651 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:05:59,652 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:05:59,652 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:05:59,653 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:06:04,138 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:06:04,140 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:04,141 arth-desktop AudioRecorder[53992] INFO Recording complete: 150 chunks, 50 speech chunks.
+2026-04-30 15:06:04,141 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:04,145 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input.wav (RMS=0.1187)
+2026-04-30 15:06:04,277 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:06:05,974 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:06:06,135 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+188.8MB rss_peak=3784.1MB total_peak=3786.4MB elapsed=1.86s samples=13
+2026-04-30 15:06:06,135 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:06:06,238 arth-desktop STTGenerator[53992] INFO Transcription: Nearly every day.
+2026-04-30 15:06:06,241 arth-desktop SpeechService[53992] DEBUG User heard: Nearly every day.
+2026-04-30 15:06:06,378 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:06:06,469 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 61.9MB
+
+[INTERMISSION & PHQ-4 GATING]
+[PHQ4] gad_2 ANSWERED: 'nearly every day.' -> score=3
+2026-04-30 15:06:06,487 arth-desktop SpeechService[53992] INFO [PHQ4] gad_2 ANSWERED: 'nearly every day.' -> score=3
+2026-04-30 15:06:07,490 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+2026-04-30 15:06:07,493 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:06:08,395 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'Thank you for being open with me. Let me respond to what's on your mind.'
+2026-04-30 15:06:08,396 arth-desktop SpeechService[53992] DEBUG Agent Action: Thank you for being open with me. Let me respond to what's on your mind.
+2026-04-30 15:06:08,396 arth-desktop SpeechService[53992] INFO [TTS] Thank you for being open with me. Let me respond to what's on your mind.
+[TTS] Thank you for being open with me. Let me respond to what's on your mind.
+2026-04-30 15:06:08,397 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Thank you for being open with me. Let me respond to what's on your mind.' -> active_ai_response.wav
+2026-04-30 15:06:10,885 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:06:10,886 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:10,888 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.6s)
+2026-04-30 15:06:16,546 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:06:16,848 arth-desktop SpeechService[53992] DEBUG Agent Action: How has your mood been? Have you been able to manage your moods?
+2026-04-30 15:06:16,848 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'How has your mood been? Have you been able to manage your moods?' -> active_ai_response.wav
+2026-04-30 15:06:18,956 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:06:18,956 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:18,957 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (4.9s)
+2026-04-30 15:06:23,865 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:06:23,878 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.6Gi       305Mi        21Mi       2.6Gi       2.6Gi | GPU Load: 0.0% | MemAvail: 2695MB
+2026-04-30 15:06:25,054 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +25.7MB
+2026-04-30 15:06:25,055 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:06:25,588 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:06:25,591 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:06:25,592 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:06:25,592 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:06:31,897 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:06:31,898 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:31,899 arth-desktop AudioRecorder[53992] INFO Recording complete: 211 chunks, 124 speech chunks.
+2026-04-30 15:06:31,899 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:31,902 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_419905649.wav (RMS=0.1130)
+2026-04-30 15:06:31,903 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 6.3s of audio -> active_user_input_419905649.wav. Parallel path.
+2026-04-30 15:06:31,905 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:31,905 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+2026-04-30 15:06:31,909 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: SCREENING
+[INTERMISSION] Pre-wait activity: SCREENING
+[PHQ4] Asking screening question: phq_1
+2026-04-30 15:06:31,910 arth-desktop SpeechService[53992] INFO [PHQ4] Asking screening question: phq_1
+2026-04-30 15:06:31,911 arth-desktop SpeechService[53992] DEBUG Agent Action: While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by...
+[TTS] While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by little interest or pleasure in doing things?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:06:31,911 arth-desktop SpeechService[53992] INFO [TTS] While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by little interest or pleasure in doing things?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:06:31,911 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'While I work through your response, let me check in with you. Over the last 2 weeks, how often have you been bothered by little interest or pleasure in doing things?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.' -> active_ai_response.wav
+2026-04-30 15:06:32,012 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:06:33,915 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:06:34,086 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+145.5MB rss_peak=3793.4MB total_peak=3929.5MB elapsed=2.07s samples=14
+2026-04-30 15:06:34,086 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:06:34,194 arth-desktop STTGenerator[53992] INFO Transcription: No, I'm very stressed and have been very anxious lately.
+[USER] No, I'm very stressed and have been very anxious lately.
+2026-04-30 15:06:34,202 arth-desktop IORecord[53992] INFO [USER] No, I'm very stressed and have been very anxious lately.
+2026-04-30 15:06:34,347 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:06:34,455 arth-desktop Questioner[53992] DEBUG Classifying user segments. Total segments: 1
+
+[RESPONSE ANALYSIS & SCORING]
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:06:34,456 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:06:34,456 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: How has your mood been? Have you been able to manage your moods?
+2026-04-30 15:06:34,456 arth-desktop ResponseAnalyzer[53992] DEBUG User input: No, I'm very stressed and have been very anxious lately
+2026-04-30 15:06:34,456 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:06:34,457 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 66.4MB
+2026-04-30 15:06:34,458 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:06:36,832 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:06:36,833 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.38s (role=analyzer)
+2026-04-30 15:06:36,833 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=mood, score=2
+2026-04-30 15:06:36,834 arth-desktop Questioner[53992] DEBUG Segment classified: 'No, I'm very stressed and have been very anxious lately' -> (dim: mood, val: 2)
+[DLA] Classification result: [('mood', 2)]
+2026-04-30 15:06:36,834 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:06:36,834 arth-desktop Questioner[53992] INFO [DLA] Classification result: [('mood', 2)]
+2026-04-30 15:06:36,835 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:36,838 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (14.8s)
+2026-04-30 15:06:36,851 arth-desktop IORecord[53992] DEBUG Logged Reasoning (semantic_scores) to DB.
+2026-04-30 15:06:36,851 arth-desktop Questioner[53992] DEBUG Evaluating result for item 2, question 1.
+2026-04-30 15:06:36,851 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: mood, 2
+[SCORE] dim=mood score=2 (via Response Analyzer)
+2026-04-30 15:06:36,851 arth-desktop Questioner[53992] INFO [SCORE] dim=mood score=2 (via Response Analyzer)
+2026-04-30 15:06:36,860 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=reflective_summarizer, model=gemma-4-E2B-it)
+2026-04-30 15:06:36,861 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/reflective_summarizer
+2026-04-30 15:06:37,558 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/reflective_summarizer
+2026-04-30 15:06:37,559 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 0.70s (role=reflective_summarizer)
+2026-04-30 15:06:37,559 arth-desktop TextGenerators[53992] DEBUG You are very stressed and have been very anxious lately.
+2026-04-30 15:06:37,559 arth-desktop Questioner[53992] DEBUG Appended note to question_lib[2][1]['notes'].
+2026-04-30 15:06:37,560 arth-desktop Questioner[53992] DEBUG Logging AI follow-up question and collecting user response for item 2, question 1.
+[AGENT] You mentioned that you are very stressed and have been very anxious lately. Can you tell me more?
+2026-04-30 15:06:37,576 arth-desktop IORecord[53992] INFO [AGENT] You mentioned that you are very stressed and have been very anxious lately. Can you tell me more?
+2026-04-30 15:06:37,576 arth-desktop IORecord[53992] DEBUG Waiting for user response (raw)...
+2026-04-30 15:06:51,639 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:06:53,118 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +34.6MB
+2026-04-30 15:06:53,119 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:06:53,632 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:06:53,633 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:06:53,634 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:06:53,662 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:06:57,467 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:06:57,469 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:57,469 arth-desktop AudioRecorder[53992] INFO Recording complete: 127 chunks, 39 speech chunks.
+2026-04-30 15:06:57,470 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:06:57,473 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input.wav (RMS=0.0931)
+2026-04-30 15:06:57,594 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:06:59,321 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:06:59,472 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+212.9MB rss_peak=3891.5MB total_peak=3893.9MB elapsed=1.88s samples=13
+2026-04-30 15:06:59,473 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:06:59,574 arth-desktop STTGenerator[53992] INFO Transcription: Not at all.
+2026-04-30 15:06:59,577 arth-desktop SpeechService[53992] DEBUG User heard: Not at all.
+2026-04-30 15:06:59,707 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:06:59,799 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 73.8MB
+
+[INTERMISSION & PHQ-4 GATING]
+[PHQ4] phq_1 ANSWERED: 'not at all.' -> score=0
+2026-04-30 15:06:59,816 arth-desktop SpeechService[53992] INFO [PHQ4] phq_1 ANSWERED: 'not at all.' -> score=0
+2026-04-30 15:07:00,820 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+2026-04-30 15:07:00,823 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:07:01,725 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'I appreciate your patience while I gathered my thoughts.'
+2026-04-30 15:07:01,725 arth-desktop SpeechService[53992] DEBUG Agent Action: I appreciate your patience while I gathered my thoughts.
+[TTS] I appreciate your patience while I gathered my thoughts.
+2026-04-30 15:07:01,726 arth-desktop SpeechService[53992] INFO [TTS] I appreciate your patience while I gathered my thoughts.
+2026-04-30 15:07:01,726 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'I appreciate your patience while I gathered my thoughts.' -> active_ai_response.wav
+2026-04-30 15:07:04,024 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:07:04,024 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:07:04,025 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (3.0s)
+2026-04-30 15:07:07,031 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:07:07,333 arth-desktop SpeechService[53992] DEBUG Agent Action: You mentioned that you are very stressed and have been very anxious lately. Can you tell me more?
+2026-04-30 15:07:07,334 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'You mentioned that you are very stressed and have been very anxious lately. Can you tell me more?' -> active_ai_response.wav
+2026-04-30 15:07:09,590 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:07:09,590 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:07:09,591 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (6.5s)
+2026-04-30 15:07:16,101 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:07:16,116 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.6Gi       329Mi        21Mi       2.5Gi       2.6Gi | GPU Load: 0.0% | MemAvail: 2612MB
+2026-04-30 15:07:17,283 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +33.8MB
+2026-04-30 15:07:17,283 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:07:17,797 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:07:17,798 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:07:17,798 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:07:17,867 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:07:29,107 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:07:29,109 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:07:29,110 arth-desktop AudioRecorder[53992] INFO Recording complete: 376 chunks, 253 speech chunks.
+2026-04-30 15:07:29,110 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:07:29,120 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_419962864.wav (RMS=0.1040)
+2026-04-30 15:07:29,122 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 11.3s of audio -> active_user_input_419962864.wav. Parallel path.
+2026-04-30 15:07:29,124 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:07:29,124 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+[INTERMISSION] Pre-wait activity: SCREENING
+2026-04-30 15:07:29,127 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: SCREENING
+[PHQ4] Asking screening question: phq_2
+2026-04-30 15:07:29,127 arth-desktop SpeechService[53992] INFO [PHQ4] Asking screening question: phq_2
+2026-04-30 15:07:29,128 arth-desktop SpeechService[53992] DEBUG Agent Action: Give me just a moment. In the meantime, I'd like to ask... Over the last 2 weeks, how often have you been bothered by fe...
+[TTS] Give me just a moment. In the meantime, I'd like to ask... Over the last 2 weeks, how often have you been bothered by feeling down, depressed, or hopeless?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:07:29,128 arth-desktop SpeechService[53992] INFO [TTS] Give me just a moment. In the meantime, I'd like to ask... Over the last 2 weeks, how often have you been bothered by feeling down, depressed, or hopeless?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.
+2026-04-30 15:07:29,128 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Give me just a moment. In the meantime, I'd like to ask... Over the last 2 weeks, how often have you been bothered by feeling down, depressed, or hopeless?
+You can answer: Not at all, Several days, More than half the days, or Nearly every day.' -> active_ai_response.wav
+2026-04-30 15:07:29,231 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:07:31,980 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:07:32,196 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+189.3MB rss_peak=3917.6MB total_peak=4094.6MB elapsed=2.97s samples=17
+2026-04-30 15:07:32,197 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:07:32,408 arth-desktop STTGenerator[53992] INFO Transcription: I just feel very stressed because of all my exams and I'm not able to deal with it properly.
+2026-04-30 15:07:32,603 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:07:32,706 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 33.8MB
+[USER] I just feel very stressed because of all my exams and I'm not able to deal with it properly.
+2026-04-30 15:07:32,713 arth-desktop IORecord[53992] INFO [USER] I just feel very stressed because of all my exams and I'm not able to deal with it properly.
+[RV] Topic 'mood' — Reasoner evaluating follow-up.
+2026-04-30 15:07:32,714 arth-desktop Questioner[53992] INFO [RV] Topic 'mood' — Reasoner evaluating follow-up.
+
+[REFLECTION-VALIDATION]
+[PIPELINE] Reflection-Validation — Reasoner deciding on-topic vs off-topic.
+2026-04-30 15:07:32,714 arth-desktop ReflectionValidation[53992] INFO [PIPELINE] Reflection-Validation — Reasoner deciding on-topic vs off-topic.
+2026-04-30 15:07:32,714 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rv_reasoner, model=gemma-4-E2B-it)
+2026-04-30 15:07:32,716 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rv_reasoner
+2026-04-30 15:07:35,666 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rv_reasoner
+2026-04-30 15:07:35,666 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.95s (role=rv_reasoner)
+2026-04-30 15:07:35,666 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+[RV] Reasoner verdict: ON-TOPIC -> running Validator for empathic reflection.
+2026-04-30 15:07:35,667 arth-desktop ReflectionValidation[53992] INFO [RV] Reasoner verdict: ON-TOPIC -> running Validator for empathic reflection.
+2026-04-30 15:07:35,667 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:07:35,667 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rv_validator, model=gemma-4-E2B-it)
+2026-04-30 15:07:35,668 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rv_validator
+2026-04-30 15:07:43,790 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (15.0s)
+2026-04-30 15:07:43,791 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rv_validator
+2026-04-30 15:07:43,792 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 8.12s (role=rv_validator)
+[RV] Decision: ON-TOPIC (Validator)
+2026-04-30 15:07:43,807 arth-desktop Questioner[53992] INFO [RV] Decision: ON-TOPIC (Validator)
+2026-04-30 15:07:43,816 arth-desktop IORecord[53992] DEBUG Logged Reasoning (reasoner_decision) to DB.
+2026-04-30 15:07:43,816 arth-desktop Questioner[53992] DEBUG Queued RV validation to prepend before next question output.
+2026-04-30 15:07:43,827 arth-desktop IORecord[53992] DEBUG Logged Reasoning (validation_flag) to DB.
+2026-04-30 15:07:43,827 arth-desktop Questioner[53992] DEBUG Recording notes for this question/response.
+[QUESTIONER] Finished dim S=2. Reward (mean (paper §5.1 / legacy)): 2.00
+2026-04-30 15:07:43,827 arth-desktop Questioner[53992] INFO [QUESTIONER] Finished dim S=2. Reward (mean (paper §5.1 / legacy)): 2.00
+2026-04-30 15:07:43,828 arth-desktop RLQTables[53992] DEBUG Getting environment feedback: S=3, A=2, reward=2.0, terminate_flag=0, item_mask=[0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+[RL] Reward this turn: 2.0 (next state: dim=2)
+2026-04-30 15:07:43,828 arth-desktop RLQTables[53992] INFO [RL] Reward this turn: 2.0 (next state: dim=2)
+2026-04-30 15:07:43,830 arth-desktop HandlerRL[53992] DEBUG Q update applied at action: Q(S=3,A=2) 98.0 -> 94.55000000000001 (target=91.10000000000001)
+2026-04-30 15:07:43,830 arth-desktop RLQTables[53992] DEBUG Choosing action for state 2 (epsilon=1.000)
+2026-04-30 15:07:43,831 arth-desktop RLQTables[53992] DEBUG Mask before: [0,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-30 15:07:43,834 arth-desktop RLQTables[53992] DEBUG Q-values after masking: [0.0,5.0,0.0,0.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,97.0,5.0,5.0,5.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+[RL] Exploiting: best dims ['11'] with Q-value 97.0
+2026-04-30 15:07:43,837 arth-desktop RLQTables[53992] INFO [RL] Exploiting: best dims ['11'] with Q-value 97.0
+
+[NEXT TURN SELECTION]
+[RL] Action chosen: dim=11 (eat)
+2026-04-30 15:07:43,837 arth-desktop RLQTables[53992] INFO [RL] Action chosen: dim=11 (eat)
+2026-04-30 15:07:43,852 arth-desktop IORecord[53992] DEBUG Logged Reasoning (rl_decision) to DB.
+2026-04-30 15:07:43,852 arth-desktop Questioner[53992] INFO [QUESTIONER] Starting turn for dim state S=11.
+[QUESTIONER] Starting turn for dim state S=11.
+2026-04-30 15:07:43,853 arth-desktop IORecord[53992] DEBUG Combining pending prefix with next question.
+2026-04-30 15:07:43,862 arth-desktop IORecord[53992] INFO [AGENT] It sounds like the pressure from your exams is creating a significant amount of stress, and that feeling of not being able to deal with it properly is really tough right now. Feeling stressed when facing exams is a very natural response to that high-stakes situation, and it makes sense that you feel overwhelmed. You might find it helpful to break down the exams into smaller, manageable chunks rather than looking at the whole mountain at once. Try scheduling short, focused study sessions followed by genuine breaks to let your mind rest. You could also explore simple grounding techniques when the anxiety spikes to help bring your focus back to the present moment.
+
+Are you eating at fairly steady times each day?
+[AGENT] It sounds like the pressure from your exams is creating a significant amount of stress, and that feeling of not being able to deal with it properly is really tough right now. Feeling stressed when facing exams is a very natural response to that high-stakes situation, and it makes sense that you feel overwhelmed. You might find it helpful to break down the exams into smaller, manageable chunks rather than looking at the whole mountain at once. Try scheduling short, focused study sessions followed by genuine breaks to let your mind rest. You could also explore simple grounding techniques when the anxiety spikes to help bring your focus back to the present moment.
+
+Are you eating at fairly steady times each day?
+2026-04-30 15:07:43,862 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+2026-04-30 15:07:58,867 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:07:59,910 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +37.0MB
+2026-04-30 15:07:59,910 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:08:00,424 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:08:00,425 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:08:00,425 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:08:00,465 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:08:04,618 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:08:04,619 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:08:04,619 arth-desktop AudioRecorder[53992] INFO Recording complete: 139 chunks, 51 speech chunks.
+2026-04-30 15:08:04,620 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:08:04,626 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input.wav (RMS=0.0945)
+2026-04-30 15:08:04,752 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:08:06,498 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:08:06,629 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+172.1MB rss_peak=4004.8MB total_peak=4007.2MB elapsed=1.88s samples=13
+2026-04-30 15:08:06,629 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:08:06,721 arth-desktop STTGenerator[53992] INFO Transcription: I don't want to answer
+2026-04-30 15:08:06,726 arth-desktop SpeechService[53992] DEBUG User heard: I don't want to answer
+2026-04-30 15:08:06,850 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:08:06,939 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 29.6MB
+
+[INTERMISSION & PHQ-4 GATING]
+[PHQ4] Declined by user (user_skip_phrase); falling through to breathing.
+2026-04-30 15:08:06,939 arth-desktop SpeechService[53992] INFO [PHQ4] Declined by user (user_skip_phrase); falling through to breathing.
+2026-04-30 15:08:06,957 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:08:06,958 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:08:07,859 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'That was a nice moment of stillness. Now, about what you mentioned...'
+2026-04-30 15:08:07,860 arth-desktop SpeechService[53992] DEBUG Agent Action: That was a nice moment of stillness. Now, about what you mentioned...
+[TTS] That was a nice moment of stillness. Now, about what you mentioned...
+2026-04-30 15:08:07,861 arth-desktop SpeechService[53992] INFO [TTS] That was a nice moment of stillness. Now, about what you mentioned...
+2026-04-30 15:08:07,861 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'That was a nice moment of stillness. Now, about what you mentioned...' -> active_ai_response.wav
+2026-04-30 15:08:10,197 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:08:10,198 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:08:10,199 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.4s)
+2026-04-30 15:08:15,559 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:08:15,860 arth-desktop SpeechService[53992] DEBUG Agent Action: It sounds like the pressure from your exams is creating a significant amount of stress, and that feeling of not being ab...
+2026-04-30 15:08:15,861 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'It sounds like the pressure from your exams is creating a significant amount of stress, and that feeling of not being able to deal with it properly is really tough right now. Feeling stressed when facing exams is a very natural response to that high-stakes situation, and it makes sense that you feel overwhelmed. You might find it helpful to break down the exams into smaller, manageable chunks rather than looking at the whole mountain at once. Try scheduling short, focused study sessions followed by genuine breaks to let your mind rest. You could also explore simple grounding techniques when the anxiety spikes to help bring your focus back to the present moment.
+
+Are you eating at fairly steady times each day?' -> active_ai_response.wav
+2026-04-30 15:08:20,854 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:08:20,855 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:08:20,860 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (43.5s)
+2026-04-30 15:09:04,388 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:09:04,404 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.7Gi       449Mi        21Mi       2.3Gi       2.5Gi | GPU Load: 0.0% | MemAvail: 2554MB
+2026-04-30 15:09:05,092 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +0.0MB
+2026-04-30 15:09:05,093 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:09:05,626 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:09:05,628 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:09:05,628 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:09:05,887 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:09:18,375 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:09:18,376 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:09:18,376 arth-desktop AudioRecorder[53992] INFO Recording complete: 417 chunks, 211 speech chunks.
+2026-04-30 15:09:18,377 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:09:18,385 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_420072128.wav (RMS=0.1008)
+2026-04-30 15:09:18,389 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 12.5s of audio -> active_user_input_420072128.wav. Parallel path.
+2026-04-30 15:09:18,392 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:09:18,393 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+2026-04-30 15:09:18,394 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: MUSIC
+[INTERMISSION] Pre-wait activity: MUSIC
+2026-04-30 15:09:18,395 arth-desktop SpeechService[53992] DEBUG Agent Action: I'm still thinking, enjoy the music while I continue.
+[TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:09:18,396 arth-desktop SpeechService[53992] INFO [TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:09:18,396 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'I'm still thinking, enjoy the music while I continue.' -> active_ai_response.wav
+2026-04-30 15:09:18,492 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:09:20,648 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:09:20,796 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+152.5MB rss_peak=3995.4MB total_peak=4132.5MB elapsed=2.30s samples=15
+2026-04-30 15:09:20,796 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:09:20,984 arth-desktop STTGenerator[53992] INFO Transcription: No, I'm not eating any food. I'm just skipping my meals. I'll do like two more and then we'll do CBT.
+2026-04-30 15:09:21,002 arth-desktop IORecord[53992] INFO [USER] No, I'm not eating any food. I'm just skipping my meals. I'll do like two more and then we'll do CBT.
+[USER] No, I'm not eating any food. I'm just skipping my meals. I'll do like two more and then we'll do CBT.
+2026-04-30 15:09:21,020 arth-desktop Questioner[53992] DEBUG Classifying user segments. Total segments: 3
+2026-04-30 15:09:21,020 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:09:21,021 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Are you eating at fairly steady times each day?
+2026-04-30 15:09:21,021 arth-desktop ResponseAnalyzer[53992] DEBUG User input: No, I'm not eating any food
+
+[RESPONSE ANALYSIS & SCORING]
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:09:21,021 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:09:21,160 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:24,340 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:24,341 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 3.32s (role=analyzer)
+2026-04-30 15:09:24,342 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=eat, score=2
+2026-04-30 15:09:24,342 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:09:24,342 arth-desktop Questioner[53992] DEBUG Segment classified: 'No, I'm not eating any food' -> (dim: eat, val: 2)
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:09:24,343 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:09:24,418 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:09:24,419 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Are you eating at fairly steady times each day?
+2026-04-30 15:09:24,419 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:09:24,419 arth-desktop ResponseAnalyzer[53992] DEBUG User input: I'm just skipping my meals
+2026-04-30 15:09:24,420 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:09:24,420 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 38.5MB
+2026-04-30 15:09:24,420 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (3.2s)
+2026-04-30 15:09:24,421 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:26,514 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:26,514 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.09s (role=analyzer)
+2026-04-30 15:09:26,515 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=eat, score=2
+2026-04-30 15:09:26,515 arth-desktop Questioner[53992] DEBUG Segment classified: 'I'm just skipping my meals' -> (dim: eat, val: 2)
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:09:26,515 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:09:26,515 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Are you eating at fairly steady times each day?
+2026-04-30 15:09:26,515 arth-desktop ResponseAnalyzer[53992] DEBUG User input: I'll do like two more and then we'll do CBT
+2026-04-30 15:09:26,515 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:09:26,516 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:28,549 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:09:28,549 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:28,550 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.03s (role=analyzer)
+2026-04-30 15:09:28,550 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=eat, score=1
+2026-04-30 15:09:28,550 arth-desktop Questioner[53992] DEBUG Segment classified: 'I'll do like two more and then we'll do CBT' -> (dim: eat, val: 1)
+[DLA] Classification result: [('eat', 2), ('eat', 2), ('eat', 1)]
+2026-04-30 15:09:28,550 arth-desktop Questioner[53992] INFO [DLA] Classification result: [('eat', 2), ('eat', 2), ('eat', 1)]
+2026-04-30 15:09:28,566 arth-desktop IORecord[53992] DEBUG Logged Reasoning (semantic_scores) to DB.
+2026-04-30 15:09:28,566 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:09:28,567 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:31,252 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:09:31,252 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.69s (role=analyzer)
+[DLA] Multi-dim back-fill credited dims: [('problem', 1), ('coping', 1)]
+2026-04-30 15:09:31,269 arth-desktop Questioner[53992] INFO [DLA] Multi-dim back-fill credited dims: [('problem', 1), ('coping', 1)]
+2026-04-30 15:09:31,277 arth-desktop IORecord[53992] DEBUG Logged Reasoning (multi_dim_backfill) to DB.
+2026-04-30 15:09:31,278 arth-desktop Questioner[53992] DEBUG Evaluating result for item 11, question 1.
+2026-04-30 15:09:31,278 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: eat, 2
+[SCORE] dim=eat score=2 (via Response Analyzer)
+2026-04-30 15:09:31,278 arth-desktop Questioner[53992] INFO [SCORE] dim=eat score=2 (via Response Analyzer)
+2026-04-30 15:09:31,286 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=reflective_summarizer, model=gemma-4-E2B-it)
+2026-04-30 15:09:31,287 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/reflective_summarizer
+2026-04-30 15:09:31,805 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/reflective_summarizer
+2026-04-30 15:09:31,806 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 0.52s (role=reflective_summarizer)
+2026-04-30 15:09:31,806 arth-desktop TextGenerators[53992] DEBUG Answer: You are not eating any food.
+2026-04-30 15:09:31,806 arth-desktop Questioner[53992] DEBUG Appended note to question_lib[11][1]['notes'].
+2026-04-30 15:09:31,806 arth-desktop Questioner[53992] DEBUG Logging AI follow-up question and collecting user response for item 11, question 1.
+[AGENT] You mentioned that answer: you are not eating any food. Can you tell me more?
+2026-04-30 15:09:31,844 arth-desktop IORecord[53992] INFO [AGENT] You mentioned that answer: you are not eating any food. Can you tell me more?
+2026-04-30 15:09:31,844 arth-desktop IORecord[53992] DEBUG Waiting for user response (raw)...
+2026-04-30 15:09:31,861 arth-desktop AudioRecorder[53992] INFO Background music segment start: offset=4624.5s
+
+[INTERMISSION & PHQ-4 GATING]
+[INTERMISSION] Output ready — interrupting activity (engagement=13.5s).
+2026-04-30 15:09:31,905 arth-desktop SpeechService[53992] INFO [INTERMISSION] Output ready — interrupting activity (engagement=13.5s).
+2026-04-30 15:09:31,906 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:09:31,908 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:09:32,810 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'Thank you for reflecting on that with me. Now, going back to what you shared...'
+2026-04-30 15:09:32,810 arth-desktop SpeechService[53992] DEBUG Agent Action: Thank you for reflecting on that with me. Now, going back to what you shared...
+[TTS] Thank you for reflecting on that with me. Now, going back to what you shared...
+2026-04-30 15:09:32,810 arth-desktop SpeechService[53992] INFO [TTS] Thank you for reflecting on that with me. Now, going back to what you shared...
+2026-04-30 15:09:32,811 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Thank you for reflecting on that with me. Now, going back to what you shared...' -> active_ai_response.wav
+2026-04-30 15:09:35,071 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:09:35,072 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:09:35,073 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.8s)
+2026-04-30 15:09:40,934 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:09:41,236 arth-desktop SpeechService[53992] DEBUG Agent Action: You mentioned that answer: you are not eating any food. Can you tell me more?
+2026-04-30 15:09:41,237 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'You mentioned that answer: you are not eating any food. Can you tell me more?' -> active_ai_response.wav
+2026-04-30 15:09:43,411 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:09:43,411 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:09:43,412 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.5s)
+2026-04-30 15:09:49,026 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:09:49,037 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.8Gi       294Mi        21Mi       2.4Gi       2.4Gi | GPU Load: 0.0% | MemAvail: 2478MB
+2026-04-30 15:09:49,663 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +-1.3MB
+2026-04-30 15:09:49,664 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:09:50,158 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:09:50,160 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:09:50,161 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:09:50,440 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:10:00,837 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:10:00,838 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:10:00,839 arth-desktop AudioRecorder[53992] INFO Recording complete: 347 chunks, 235 speech chunks.
+2026-04-30 15:10:00,839 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:10:00,847 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_420114591.wav (RMS=0.0861)
+2026-04-30 15:10:00,849 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 10.4s of audio -> active_user_input_420114591.wav. Parallel path.
+2026-04-30 15:10:00,852 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:10:00,852 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+[INTERMISSION] Pre-wait activity: BREATHING_EXERCISE
+2026-04-30 15:10:00,853 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: BREATHING_EXERCISE
+[INTERMISSION] Guiding a breathing exercise while LLM generates.
+2026-04-30 15:10:00,854 arth-desktop SpeechService[53992] INFO [INTERMISSION] Guiding a breathing exercise while LLM generates.
+2026-04-30 15:10:00,855 arth-desktop SpeechService[53992] DEBUG Agent Action: Give me just a moment — and while we wait, let's try a little awareness practice together. Breath at the Nostrils. Sit c...
+[TTS] Give me just a moment — and while we wait, let's try a little awareness practice together. Breath at the Nostrils. Sit comfortably and bring attention to the tip of your nose. Notice the subtle sensation of air entering the nostrils as you inhale. It may feel slightly cool. As you exhale, notice the warmth of the air leaving the body. Allow your attention to stay with these small sensations of breathing. When the mind wanders, gently return to the feeling of the breath at the nostrils. Remain with this simple awareness for the next few breaths.
+2026-04-30 15:10:00,855 arth-desktop SpeechService[53992] INFO [TTS] Give me just a moment — and while we wait, let's try a little awareness practice together. Breath at the Nostrils. Sit comfortably and bring attention to the tip of your nose. Notice the subtle sensation of air entering the nostrils as you inhale. It may feel slightly cool. As you exhale, notice the warmth of the air leaving the body. Allow your attention to stay with these small sensations of breathing. When the mind wanders, gently return to the feeling of the breath at the nostrils. Remain with this simple awareness for the next few breaths.
+2026-04-30 15:10:00,855 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Give me just a moment — and while we wait, let's try a little awareness practice together. Breath at the Nostrils. Sit comfortably and bring attention to the tip of your nose. Notice the subtle sensation of air entering the nostrils as you inhale. It may feel slightly cool. As you exhale, notice the warmth of the air leaving the body. Allow your attention to stay with these small sensations of breathing. When the mind wanders, gently return to the feeling of the breath at the nostrils. Remain with this simple awareness for the next few breaths.' -> active_ai_response.wav
+2026-04-30 15:10:00,953 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:10:03,184 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:10:03,280 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+119.0MB rss_peak=4003.1MB total_peak=4135.0MB elapsed=2.33s samples=15
+2026-04-30 15:10:03,282 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:10:03,385 arth-desktop STTGenerator[53992] INFO Transcription: I just, with all my stress, I'm just not having time to eat my three meals, so I just skip my food.
+[USER] I just, with all my stress, I'm just not having time to eat my three meals, so I just skip my food.
+2026-04-30 15:10:03,415 arth-desktop IORecord[53992] INFO [USER] I just, with all my stress, I'm just not having time to eat my three meals, so I just skip my food.
+[RV] Topic 'eat' — Reasoner evaluating follow-up.
+2026-04-30 15:10:03,416 arth-desktop Questioner[53992] INFO [RV] Topic 'eat' — Reasoner evaluating follow-up.
+
+[REFLECTION-VALIDATION]
+[PIPELINE] Reflection-Validation — Reasoner deciding on-topic vs off-topic.
+2026-04-30 15:10:03,416 arth-desktop ReflectionValidation[53992] INFO [PIPELINE] Reflection-Validation — Reasoner deciding on-topic vs off-topic.
+2026-04-30 15:10:03,416 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rv_reasoner, model=gemma-4-E2B-it)
+2026-04-30 15:10:03,424 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rv_reasoner
+2026-04-30 15:10:04,873 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rv_reasoner
+2026-04-30 15:10:04,874 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:10:04,875 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 1.46s (role=rv_reasoner)
+[RV] Reasoner verdict: ON-TOPIC -> running Validator for empathic reflection.
+2026-04-30 15:10:04,955 arth-desktop ReflectionValidation[53992] INFO [RV] Reasoner verdict: ON-TOPIC -> running Validator for empathic reflection.
+2026-04-30 15:10:04,956 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rv_validator, model=gemma-4-E2B-it)
+2026-04-30 15:10:04,957 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 39.0MB
+2026-04-30 15:10:04,957 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rv_validator
+2026-04-30 15:10:13,657 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rv_validator
+2026-04-30 15:10:13,657 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 8.70s (role=rv_validator)
+2026-04-30 15:10:13,658 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:10:13,659 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:10:13,665 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (42.8s)
+[RV] Decision: ON-TOPIC (Validator)
+2026-04-30 15:10:13,675 arth-desktop Questioner[53992] INFO [RV] Decision: ON-TOPIC (Validator)
+2026-04-30 15:10:13,683 arth-desktop IORecord[53992] DEBUG Logged Reasoning (reasoner_decision) to DB.
+2026-04-30 15:10:13,683 arth-desktop Questioner[53992] DEBUG Queued RV validation to prepend before next question output.
+2026-04-30 15:10:13,699 arth-desktop IORecord[53992] DEBUG Logged Reasoning (validation_flag) to DB.
+2026-04-30 15:10:13,699 arth-desktop Questioner[53992] DEBUG Recording notes for this question/response.
+[QUESTIONER] Finished dim S=11. Reward (mean (paper §5.1 / legacy)): 2.00
+2026-04-30 15:10:13,699 arth-desktop Questioner[53992] INFO [QUESTIONER] Finished dim S=11. Reward (mean (paper §5.1 / legacy)): 2.00
+2026-04-30 15:10:13,700 arth-desktop RLQTables[53992] DEBUG Getting environment feedback: S=2, A=11, reward=2.0, terminate_flag=0, item_mask=[0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+[RL] Reward this turn: 2.0 (next state: dim=11)
+2026-04-30 15:10:13,700 arth-desktop RLQTables[53992] INFO [RL] Reward this turn: 2.0 (next state: dim=11)
+2026-04-30 15:10:13,703 arth-desktop HandlerRL[53992] DEBUG Q update applied at action: Q(S=2,A=11) 97.0 -> 94.05000000000001 (target=91.10000000000001)
+2026-04-30 15:10:13,703 arth-desktop RLQTables[53992] DEBUG Choosing action for state 11 (epsilon=1.000)
+2026-04-30 15:10:13,704 arth-desktop RLQTables[53992] DEBUG Mask before: [0,1,0,0,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-30 15:10:13,707 arth-desktop RLQTables[53992] DEBUG Q-values after masking: [0.0,5.0,0.0,0.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,0.0,5.0,5.0,5.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+[RL] Exploiting: best dims ['1', '4', '10', '12', '13', '14'] with Q-value 5.0
+2026-04-30 15:10:13,710 arth-desktop RLQTables[53992] INFO [RL] Exploiting: best dims ['1', '4', '10', '12', '13', '14'] with Q-value 5.0
+
+[NEXT TURN SELECTION]
+[RL] Action chosen: dim=14 (showup)
+2026-04-30 15:10:13,711 arth-desktop RLQTables[53992] INFO [RL] Action chosen: dim=14 (showup)
+2026-04-30 15:10:13,720 arth-desktop IORecord[53992] DEBUG Logged Reasoning (rl_decision) to DB.
+[QUESTIONER] Starting turn for dim state S=14.
+2026-04-30 15:10:13,720 arth-desktop Questioner[53992] INFO [QUESTIONER] Starting turn for dim state S=14.
+2026-04-30 15:10:13,721 arth-desktop IORecord[53992] DEBUG Combining pending prefix with next question.
+[AGENT] It sounds like the stress is creating a real barrier, making it impossible to find time for your meals and leading you to skip food. Feeling like you just don't have the time for your meals when you are under stress is a very real and painful experience. This is a common way our bodies react when we are overwhelmed, and it doesn't reflect a lack of desire to eat. You might try to schedule very small, non-negotiable eating windows, perhaps just focusing on one small snack or a glass of water at a specific time each day. You could also look into simple meal preparation strategies, like having pre-cut vegetables or quick protein options ready to go, so that when time is tight, you can still manage to fuel yourself. Remember that even tiny amounts of consistent nourishment can help manage that stress response.
+
+Have you been meeting your obligations as they come up?
+2026-04-30 15:10:13,730 arth-desktop IORecord[53992] INFO [AGENT] It sounds like the stress is creating a real barrier, making it impossible to find time for your meals and leading you to skip food. Feeling like you just don't have the time for your meals when you are under stress is a very real and painful experience. This is a common way our bodies react when we are overwhelmed, and it doesn't reflect a lack of desire to eat. You might try to schedule very small, non-negotiable eating windows, perhaps just focusing on one small snack or a glass of water at a specific time each day. You could also look into simple meal preparation strategies, like having pre-cut vegetables or quick protein options ready to go, so that when time is tight, you can still manage to fuel yourself. Remember that even tiny amounts of consistent nourishment can help manage that stress response.
+
+Have you been meeting your obligations as they come up?
+2026-04-30 15:10:13,730 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+
+[INTERMISSION & PHQ-4 GATING]
+[INTERMISSION] Output ready — interrupting activity (engagement=12.9s).
+2026-04-30 15:10:13,758 arth-desktop SpeechService[53992] INFO [INTERMISSION] Output ready — interrupting activity (engagement=12.9s).
+2026-04-30 15:10:13,765 arth-desktop AudioPlayer[53992] INFO Playback interrupted by stop_event.
+2026-04-30 15:10:13,766 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:10:13,767 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:10:13,768 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:10:14,670 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'That was a nice moment of stillness. Now, about what you mentioned...'
+2026-04-30 15:10:14,670 arth-desktop SpeechService[53992] DEBUG Agent Action: That was a nice moment of stillness. Now, about what you mentioned...
+[TTS] That was a nice moment of stillness. Now, about what you mentioned...
+2026-04-30 15:10:14,670 arth-desktop SpeechService[53992] INFO [TTS] That was a nice moment of stillness. Now, about what you mentioned...
+2026-04-30 15:10:14,671 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'That was a nice moment of stillness. Now, about what you mentioned...' -> active_ai_response.wav
+2026-04-30 15:10:16,871 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:10:16,872 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:10:16,874 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.5s)
+2026-04-30 15:10:22,336 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:10:22,637 arth-desktop SpeechService[53992] DEBUG Agent Action: It sounds like the stress is creating a real barrier, making it impossible to find time for your meals and leading you t...
+2026-04-30 15:10:22,638 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'It sounds like the stress is creating a real barrier, making it impossible to find time for your meals and leading you to skip food. Feeling like you just don't have the time for your meals when you are under stress is a very real and painful experience. This is a common way our bodies react when we are overwhelmed, and it doesn't reflect a lack of desire to eat. You might try to schedule very small, non-negotiable eating windows, perhaps just focusing on one small snack or a glass of water at a specific time each day. You could also look into simple meal preparation strategies, like having pre-cut vegetables or quick protein options ready to go, so that when time is tight, you can still manage to fuel yourself. Remember that even tiny amounts of consistent nourishment can help manage that stress response.
+
+Have you been meeting your obligations as they come up?' -> active_ai_response.wav
+2026-04-30 15:10:28,240 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:10:28,240 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:10:28,248 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (54.6s)
+2026-04-30 15:11:22,936 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:11:22,966 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.8Gi       440Mi        21Mi       2.3Gi       2.4Gi | GPU Load: 0.0% | MemAvail: 2493MB
+2026-04-30 15:11:24,161 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +0.0MB
+2026-04-30 15:11:24,161 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:11:24,666 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:11:24,666 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:11:24,667 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:11:24,775 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:11:39,806 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:11:39,810 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:11:39,811 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:11:39,811 arth-desktop AudioRecorder[53992] INFO Recording complete: 502 chunks, 315 speech chunks.
+2026-04-30 15:11:39,812 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:11:39,828 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_420213566.wav (RMS=0.1062)
+2026-04-30 15:11:39,831 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 15.1s of audio -> active_user_input_420213566.wav. Parallel path.
+2026-04-30 15:11:39,833 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:11:39,833 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+[INTERMISSION] Pre-wait activity: MUSIC
+2026-04-30 15:11:39,835 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: MUSIC
+2026-04-30 15:11:39,837 arth-desktop SpeechService[53992] DEBUG Agent Action: I'm still thinking, enjoy the music while I continue.
+[TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:11:39,837 arth-desktop SpeechService[53992] INFO [TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:11:39,837 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'I'm still thinking, enjoy the music while I continue.' -> active_ai_response.wav
+2026-04-30 15:11:39,940 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:11:41,695 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:11:41,866 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+205.7MB rss_peak=4056.8MB total_peak=4186.0MB elapsed=1.93s samples=13
+2026-04-30 15:11:41,867 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:11:42,020 arth-desktop STTGenerator[53992] INFO Transcription: I just do drugs and I've been smoking a lot recently
+[USER] I just do drugs and I've been smoking a lot recently
+2026-04-30 15:11:42,027 arth-desktop IORecord[53992] INFO [USER] I just do drugs and I've been smoking a lot recently
+2026-04-30 15:11:42,039 arth-desktop Questioner[53992] DEBUG Classifying user segments. Total segments: 1
+
+[RESPONSE ANALYSIS & SCORING]
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:11:42,039 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:11:42,040 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been meeting your obligations as they come up?
+2026-04-30 15:11:42,040 arth-desktop ResponseAnalyzer[53992] DEBUG User input: I just do drugs and I've been smoking a lot recently
+2026-04-30 15:11:42,040 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:11:42,051 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:11:44,419 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:11:44,420 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.38s (role=analyzer)
+2026-04-30 15:11:44,420 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=drug, score=2
+2026-04-30 15:11:44,421 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:11:44,422 arth-desktop Questioner[53992] DEBUG Segment classified: 'I just do drugs and I've been smoking a lot recently' -> (dim: drug, val: 2)
+[DLA] Classification result: [('drug', 2)]
+2026-04-30 15:11:44,422 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:11:44,515 arth-desktop Questioner[53992] INFO [DLA] Classification result: [('drug', 2)]
+2026-04-30 15:11:44,516 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:11:44,517 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 30.3MB
+2026-04-30 15:11:44,517 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (3.1s)
+2026-04-30 15:11:44,534 arth-desktop IORecord[53992] DEBUG Logged Reasoning (semantic_scores) to DB.
+[DLA] Segment-level back-fill credited dims: [('drug', 2)]
+2026-04-30 15:11:44,544 arth-desktop Questioner[53992] INFO [DLA] Segment-level back-fill credited dims: [('drug', 2)]
+2026-04-30 15:11:44,558 arth-desktop IORecord[53992] DEBUG Logged Reasoning (segment_level_backfill) to DB.
+2026-04-30 15:11:44,559 arth-desktop Questioner[53992] DEBUG Evaluating result for item 14, question 1.
+2026-04-30 15:11:44,559 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: drug, 2
+[QUESTIONER] No primary match — will re-ask the same dimension question.
+2026-04-30 15:11:44,559 arth-desktop Questioner[53992] INFO [QUESTIONER] No primary match — will re-ask the same dimension question.
+[PIPELINE] Retry Guide — user response unclear, generating clarification.
+2026-04-30 15:11:44,560 arth-desktop Questioner[53992] INFO [PIPELINE] Retry Guide — user response unclear, generating clarification.
+2026-04-30 15:11:44,560 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rv_guide, model=gemma-4-E2B-it)
+2026-04-30 15:11:44,561 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rv_guide
+2026-04-30 15:11:48,571 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:11:48,572 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rv_guide
+2026-04-30 15:11:48,572 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 4.01s (role=rv_guide)
+[AGENT] Could you tell me more about how your recent drug and smoking habits are affecting your ability to meet your obligations?
+2026-04-30 15:11:48,589 arth-desktop IORecord[53992] INFO [AGENT] Could you tell me more about how your recent drug and smoking habits are affecting your ability to meet your obligations?
+2026-04-30 15:11:48,589 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+
+[INTERMISSION & PHQ-4 GATING]
+[INTERMISSION] Output ready — interrupting activity (engagement=8.8s).
+2026-04-30 15:11:48,671 arth-desktop SpeechService[53992] INFO [INTERMISSION] Output ready — interrupting activity (engagement=8.8s).
+2026-04-30 15:11:48,672 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:11:48,674 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:11:49,282 arth-desktop AudioRecorder[53992] INFO Background music segment start: offset=10906.7s
+2026-04-30 15:11:49,576 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'Thank you for being open with me. Let me respond to what's on your mind.'
+2026-04-30 15:11:49,577 arth-desktop SpeechService[53992] DEBUG Agent Action: Thank you for being open with me. Let me respond to what's on your mind.
+[TTS] Thank you for being open with me. Let me respond to what's on your mind.
+2026-04-30 15:11:49,577 arth-desktop SpeechService[53992] INFO [TTS] Thank you for being open with me. Let me respond to what's on your mind.
+2026-04-30 15:11:49,577 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Thank you for being open with me. Let me respond to what's on your mind.' -> active_ai_response.wav
+2026-04-30 15:11:51,800 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:11:51,801 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:11:51,802 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.7s)
+2026-04-30 15:11:57,562 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:11:57,865 arth-desktop SpeechService[53992] DEBUG Agent Action: Could you tell me more about how your recent drug and smoking habits are affecting your ability to meet your obligations...
+2026-04-30 15:11:57,866 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Could you tell me more about how your recent drug and smoking habits are affecting your ability to meet your obligations?' -> active_ai_response.wav
+2026-04-30 15:12:00,246 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:12:00,247 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:12:00,247 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.9s)
+2026-04-30 15:12:06,208 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:12:06,231 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.8Gi       364Mi        20Mi       2.3Gi       2.4Gi | GPU Load: 0.0% | MemAvail: 2467MB
+2026-04-30 15:12:07,392 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +0.0MB
+2026-04-30 15:12:07,393 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:12:07,897 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:12:07,897 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:12:07,898 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:12:07,927 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:12:23,370 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:12:23,371 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:12:23,371 arth-desktop AudioRecorder[53992] INFO Recording complete: 514 chunks, 334 speech chunks.
+2026-04-30 15:12:23,372 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:12:23,384 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_420257123.wav (RMS=0.0203)
+2026-04-30 15:12:23,386 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 15.4s of audio -> active_user_input_420257123.wav. Parallel path.
+2026-04-30 15:12:23,388 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:12:23,388 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+2026-04-30 15:12:23,390 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: BREATHING_EXERCISE
+[INTERMISSION] Pre-wait activity: BREATHING_EXERCISE
+[INTERMISSION] Guiding a breathing exercise while LLM generates.
+2026-04-30 15:12:23,391 arth-desktop SpeechService[53992] INFO [INTERMISSION] Guiding a breathing exercise while LLM generates.
+2026-04-30 15:12:23,391 arth-desktop SpeechService[53992] DEBUG Agent Action: Let's try this while I work through your response. Short Body Scan. Sit or lie down comfortably and bring attention to t...
+[TTS] Let's try this while I work through your response. Short Body Scan. Sit or lie down comfortably and bring attention to the body. Notice the sensation of your feet touching the floor or surface beneath you. Move your awareness slowly up to the legs… simply noticing any sensations. Bring attention to the belly and chest, noticing the gentle movement of breathing. Now notice the shoulders, letting them soften if they are holding tension. Finally, bring awareness to the face — jaw, cheeks, forehead — allowing them to relax. Rest for a few breaths, feeling the body as a whole.
+2026-04-30 15:12:23,391 arth-desktop SpeechService[53992] INFO [TTS] Let's try this while I work through your response. Short Body Scan. Sit or lie down comfortably and bring attention to the body. Notice the sensation of your feet touching the floor or surface beneath you. Move your awareness slowly up to the legs… simply noticing any sensations. Bring attention to the belly and chest, noticing the gentle movement of breathing. Now notice the shoulders, letting them soften if they are holding tension. Finally, bring awareness to the face — jaw, cheeks, forehead — allowing them to relax. Rest for a few breaths, feeling the body as a whole.
+2026-04-30 15:12:23,392 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Let's try this while I work through your response. Short Body Scan. Sit or lie down comfortably and bring attention to the body. Notice the sensation of your feet touching the floor or surface beneath you. Move your awareness slowly up to the legs… simply noticing any sensations. Bring attention to the belly and chest, noticing the gentle movement of breathing. Now notice the shoulders, letting them soften if they are holding tension. Finally, bring awareness to the face — jaw, cheeks, forehead — allowing them to relax. Rest for a few breaths, feeling the body as a whole.' -> active_ai_response.wav
+2026-04-30 15:12:23,486 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:12:27,777 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:12:28,034 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+134.5MB rss_peak=4065.7MB total_peak=4282.0MB elapsed=4.55s samples=23
+2026-04-30 15:12:28,034 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:12:28,237 arth-desktop STTGenerator[53992] INFO Transcription: Now this is going on in the truck. I also made it so it's multi-dimension. So if I mention drug and obligation, it'll score for all. Okay, so this is something should not happen. I can turn that on. Yeah, turn it off.
+2026-04-30 15:12:28,299 arth-desktop IORecord[53992] INFO [USER] Now this is going on in the truck. I also made it so it's multi-dimension. So if I mention drug and obligation, it'll score for all. Okay, so this is something should not happen. I can turn that on. Yeah, turn it off.
+[USER] Now this is going on in the truck. I also made it so it's multi-dimension. So if I mention drug and obligation, it'll score for all. Okay, so this is something should not happen. I can turn that on. Yeah, turn it off.
+2026-04-30 15:12:28,318 arth-desktop Questioner[53992] DEBUG Classifying user segments. Total segments: 6
+2026-04-30 15:12:28,318 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:28,319 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been meeting your obligations as they come up?
+2026-04-30 15:12:28,319 arth-desktop ResponseAnalyzer[53992] DEBUG User input: Now this is going on in the truck
+
+[RESPONSE ANALYSIS & SCORING]
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:28,319 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:12:28,573 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:30,836 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:30,837 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.52s (role=analyzer)
+2026-04-30 15:12:30,837 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:12:30,991 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=work, score=1
+2026-04-30 15:12:30,991 arth-desktop Questioner[53992] DEBUG Segment classified: 'Now this is going on in the truck' -> (dim: work, val: 1)
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:30,992 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:30,992 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been meeting your obligations as they come up?
+2026-04-30 15:12:30,993 arth-desktop ResponseAnalyzer[53992] DEBUG User input: I also made it so it's multi-dimension
+2026-04-30 15:12:30,993 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:12:30,994 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:33,212 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:33,212 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.22s (role=analyzer)
+2026-04-30 15:12:33,213 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 33.3MB
+2026-04-30 15:12:33,214 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=work_dayoff, score=1
+2026-04-30 15:12:33,214 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:12:33,214 arth-desktop Questioner[53992] DEBUG Segment classified: 'I also made it so it's multi-dimension' -> (dim: work_dayoff, val: 1)
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:33,215 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:12:33,215 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:33,216 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been meeting your obligations as they come up?
+2026-04-30 15:12:33,216 arth-desktop ResponseAnalyzer[53992] DEBUG User input: So if I mention drug and obligation, it'll score for all
+2026-04-30 15:12:33,216 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:12:33,216 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:35,197 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:35,197 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (44.0s)
+2026-04-30 15:12:35,198 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 1.98s (role=analyzer)
+2026-04-30 15:12:35,198 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=drug, score=2
+2026-04-30 15:12:35,198 arth-desktop Questioner[53992] DEBUG Segment classified: 'So if I mention drug and obligation, it'll score for all' -> (dim: drug, val: 2)
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:35,199 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:35,199 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been meeting your obligations as they come up?
+2026-04-30 15:12:35,199 arth-desktop ResponseAnalyzer[53992] DEBUG User input: Okay, so this is something should not happen
+2026-04-30 15:12:35,199 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:12:35,200 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:37,310 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:37,311 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.11s (role=analyzer)
+2026-04-30 15:12:37,311 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=work_dayoff, score=1
+2026-04-30 15:12:37,311 arth-desktop Questioner[53992] DEBUG Segment classified: 'Okay, so this is something should not happen' -> (dim: work_dayoff, val: 1)
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:37,312 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:37,312 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been meeting your obligations as they come up?
+2026-04-30 15:12:37,312 arth-desktop ResponseAnalyzer[53992] DEBUG User input: I can turn that on
+2026-04-30 15:12:37,312 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:12:37,313 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:39,449 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:39,450 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.14s (role=analyzer)
+2026-04-30 15:12:39,450 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=work_motivation, score=1
+2026-04-30 15:12:39,451 arth-desktop Questioner[53992] DEBUG Segment classified: 'I can turn that on' -> (dim: work_motivation, val: 1)
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:39,451 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:12:39,451 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Have you been meeting your obligations as they come up?
+2026-04-30 15:12:39,451 arth-desktop ResponseAnalyzer[53992] DEBUG User input: Yeah, turn it off
+2026-04-30 15:12:39,451 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:12:39,452 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:41,628 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:41,628 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.18s (role=analyzer)
+2026-04-30 15:12:41,629 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=work_dayoff, score=1
+2026-04-30 15:12:41,629 arth-desktop Questioner[53992] DEBUG Segment classified: 'Yeah, turn it off' -> (dim: work_dayoff, val: 1)
+[DLA] Classification result: [('work', 1), ('work_dayoff', 1), ('drug', 2), ('work_dayoff', 1), ('work_motivation', 1), ('work_dayoff', 1)]
+2026-04-30 15:12:41,629 arth-desktop Questioner[53992] INFO [DLA] Classification result: [('work', 1), ('work_dayoff', 1), ('drug', 2), ('work_dayoff', 1), ('work_motivation', 1), ('work_dayoff', 1)]
+2026-04-30 15:12:41,645 arth-desktop IORecord[53992] DEBUG Logged Reasoning (semantic_scores) to DB.
+[DLA] Segment-level back-fill credited dims: [('work', 1), ('work_dayoff', 1)]
+2026-04-30 15:12:41,662 arth-desktop Questioner[53992] INFO [DLA] Segment-level back-fill credited dims: [('work', 1), ('work_dayoff', 1)]
+2026-04-30 15:12:41,677 arth-desktop IORecord[53992] DEBUG Logged Reasoning (segment_level_backfill) to DB.
+2026-04-30 15:12:41,677 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:12:41,678 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:43,636 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:12:43,636 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 1.96s (role=analyzer)
+2026-04-30 15:12:43,637 arth-desktop Questioner[53992] DEBUG Evaluating result for item 14, question 1.
+2026-04-30 15:12:43,637 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: work, 1
+2026-04-30 15:12:43,637 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: work_dayoff, 1
+2026-04-30 15:12:43,637 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: drug, 2
+2026-04-30 15:12:43,637 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: work_dayoff, 1
+2026-04-30 15:12:43,638 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: work_motivation, 1
+2026-04-30 15:12:43,638 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: work_dayoff, 1
+[QUESTIONER] No primary match — will re-ask the same dimension question.
+2026-04-30 15:12:43,638 arth-desktop Questioner[53992] INFO [QUESTIONER] No primary match — will re-ask the same dimension question.
+[QUESTIONER] Finished dim S=14. Reward (empty): 0.00
+2026-04-30 15:12:43,638 arth-desktop Questioner[53992] INFO [QUESTIONER] Finished dim S=14. Reward (empty): 0.00
+2026-04-30 15:12:43,638 arth-desktop RLQTables[53992] DEBUG Getting environment feedback: S=11, A=14, reward=0.0, terminate_flag=0, item_mask=[0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+[RL] Reward this turn: 0.0 (next state: dim=14)
+2026-04-30 15:12:43,638 arth-desktop RLQTables[53992] INFO [RL] Reward this turn: 0.0 (next state: dim=14)
+2026-04-30 15:12:43,641 arth-desktop HandlerRL[53992] DEBUG Q update applied at action: Q(S=11,A=14) 5.0 -> 47.050000000000004 (target=89.10000000000001)
+2026-04-30 15:12:43,641 arth-desktop RLQTables[53992] DEBUG Choosing action for state 14 (epsilon=1.000)
+2026-04-30 15:12:43,642 arth-desktop RLQTables[53992] DEBUG Mask before: [0,1,0,0,1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-30 15:12:43,644 arth-desktop RLQTables[53992] DEBUG Q-values after masking: [0.0,5.0,0.0,0.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,0.0,5.0,5.0,0.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+[RL] Exploiting: best dims ['1', '4', '10', '12', '13'] with Q-value 5.0
+2026-04-30 15:12:43,647 arth-desktop RLQTables[53992] INFO [RL] Exploiting: best dims ['1', '4', '10', '12', '13'] with Q-value 5.0
+
+[NEXT TURN SELECTION]
+[RL] Action chosen: dim=12 (work)
+2026-04-30 15:12:43,647 arth-desktop RLQTables[53992] INFO [RL] Action chosen: dim=12 (work)
+2026-04-30 15:12:43,664 arth-desktop IORecord[53992] DEBUG Logged Reasoning (rl_decision) to DB.
+2026-04-30 15:12:43,664 arth-desktop Questioner[53992] INFO [QUESTIONER] Starting turn for dim state S=12.
+[QUESTIONER] Starting turn for dim state S=12.
+[QUESTIONER] Finished dim S=12. Reward (mean (paper §5.1 / legacy)): 1.00
+2026-04-30 15:12:43,664 arth-desktop Questioner[53992] INFO [QUESTIONER] Finished dim S=12. Reward (mean (paper §5.1 / legacy)): 1.00
+2026-04-30 15:12:43,665 arth-desktop RLQTables[53992] DEBUG Getting environment feedback: S=14, A=12, reward=1.0, terminate_flag=0, item_mask=[0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+2026-04-30 15:12:43,665 arth-desktop RLQTables[53992] INFO [RL] Reward this turn: 1.0 (next state: dim=12)
+[RL] Reward this turn: 1.0 (next state: dim=12)
+2026-04-30 15:12:43,667 arth-desktop HandlerRL[53992] DEBUG Q update applied at action: Q(S=14,A=12) 5.0 -> 47.550000000000004 (target=90.10000000000001)
+2026-04-30 15:12:43,667 arth-desktop RLQTables[53992] DEBUG Choosing action for state 12 (epsilon=1.000)
+2026-04-30 15:12:43,668 arth-desktop RLQTables[53992] DEBUG Mask before: [0,1,0,0,1,1,1,1,1,1,1,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-30 15:12:43,670 arth-desktop RLQTables[53992] DEBUG Q-values after masking: [0.0,5.0,0.0,0.0,5.0,4.0,4.0,4.0,2.0,2.0,5.0,0.0,0.0,5.0,0.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+[RL] Exploiting: best dims ['1', '4', '10', '13'] with Q-value 5.0
+2026-04-30 15:12:43,672 arth-desktop RLQTables[53992] INFO [RL] Exploiting: best dims ['1', '4', '10', '13'] with Q-value 5.0
+[RL] Action chosen: dim=4 (care)
+2026-04-30 15:12:43,673 arth-desktop RLQTables[53992] INFO [RL] Action chosen: dim=4 (care)
+2026-04-30 15:12:43,682 arth-desktop IORecord[53992] DEBUG Logged Reasoning (rl_decision) to DB.
+[QUESTIONER] Starting turn for dim state S=4.
+2026-04-30 15:12:43,682 arth-desktop Questioner[53992] INFO [QUESTIONER] Starting turn for dim state S=4.
+[AGENT] Are you keeping up with visits to your doctor, therapist, or case manager?
+2026-04-30 15:12:43,691 arth-desktop IORecord[53992] INFO [AGENT] Are you keeping up with visits to your doctor, therapist, or case manager?
+2026-04-30 15:12:43,691 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+
+[INTERMISSION & PHQ-4 GATING]
+[INTERMISSION] Output ready — interrupting activity (engagement=20.3s).
+2026-04-30 15:12:43,735 arth-desktop SpeechService[53992] INFO [INTERMISSION] Output ready — interrupting activity (engagement=20.3s).
+2026-04-30 15:12:43,786 arth-desktop AudioPlayer[53992] INFO Playback interrupted by stop_event.
+2026-04-30 15:12:43,786 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:12:43,788 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:12:43,789 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:12:44,690 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'Thank you for staying with me through that. Here's what I'd like to say...'
+2026-04-30 15:12:44,691 arth-desktop SpeechService[53992] DEBUG Agent Action: Thank you for staying with me through that. Here's what I'd like to say...
+[TTS] Thank you for staying with me through that. Here's what I'd like to say...
+2026-04-30 15:12:44,691 arth-desktop SpeechService[53992] INFO [TTS] Thank you for staying with me through that. Here's what I'd like to say...
+2026-04-30 15:12:44,692 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Thank you for staying with me through that. Here's what I'd like to say...' -> active_ai_response.wav
+2026-04-30 15:12:46,888 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:12:46,889 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:12:46,890 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.4s)
+2026-04-30 15:12:52,300 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:12:52,602 arth-desktop SpeechService[53992] DEBUG Agent Action: Are you keeping up with visits to your doctor, therapist, or case manager?
+2026-04-30 15:12:52,602 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Are you keeping up with visits to your doctor, therapist, or case manager?' -> active_ai_response.wav
+2026-04-30 15:12:54,753 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:12:54,754 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:12:54,754 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (4.0s)
+2026-04-30 15:12:58,811 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:12:58,824 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.8Gi       378Mi        20Mi       2.2Gi       2.4Gi | GPU Load: 0.0% | MemAvail: 2423MB
+2026-04-30 15:12:59,913 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +0.0MB
+2026-04-30 15:12:59,914 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:13:00,430 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:13:00,432 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:13:00,433 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:13:00,470 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:13:05,967 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:13:05,969 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:05,969 arth-desktop AudioRecorder[53992] INFO Recording complete: 184 chunks, 83 speech chunks.
+2026-04-30 15:13:05,970 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:05,974 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_420299721.wav (RMS=0.1022)
+2026-04-30 15:13:05,975 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 5.5s of audio -> active_user_input_420299721.wav. Parallel path.
+2026-04-30 15:13:05,976 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:05,977 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+2026-04-30 15:13:05,979 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: MUSIC
+[INTERMISSION] Pre-wait activity: MUSIC
+2026-04-30 15:13:05,981 arth-desktop SpeechService[53992] DEBUG Agent Action: I'm still thinking, enjoy the music while I continue.
+[TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:13:05,981 arth-desktop SpeechService[53992] INFO [TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:13:05,982 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'I'm still thinking, enjoy the music while I continue.' -> active_ai_response.wav
+2026-04-30 15:13:06,087 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:13:07,732 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:13:07,824 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+140.2MB rss_peak=4067.8MB total_peak=4197.0MB elapsed=1.74s samples=11
+2026-04-30 15:13:07,824 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:13:07,980 arth-desktop STTGenerator[53992] INFO Transcription: I think I'm done with questions for today.
+[USER] I think I'm done with questions for today.
+2026-04-30 15:13:07,987 arth-desktop IORecord[53992] INFO [USER] I think I'm done with questions for today.
+2026-04-30 15:13:08,005 arth-desktop Questioner[53992] DEBUG Classifying user segments. Total segments: 1
+2026-04-30 15:13:08,005 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+
+[RESPONSE ANALYSIS & SCORING]
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:13:08,006 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: Are you keeping up with visits to your doctor, therapist, or case manager?
+2026-04-30 15:13:08,006 arth-desktop ResponseAnalyzer[53992] DEBUG User input: I think I'm done with questions for today
+2026-04-30 15:13:08,006 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:13:08,256 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:13:10,406 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:13:10,406 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.40s (role=analyzer)
+2026-04-30 15:13:10,407 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:13:10,407 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:13:10,407 arth-desktop ResponseBridge[53992] DEBUG Normalizing dimension and score: dim=care, score=0
+2026-04-30 15:13:10,498 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:10,499 arth-desktop Questioner[53992] DEBUG Segment classified: 'I think I'm done with questions for today' -> (dim: care, val: 0)
+[DLA] Classification result: [('care', 0)]
+2026-04-30 15:13:10,499 arth-desktop Questioner[53992] INFO [DLA] Classification result: [('care', 0)]
+2026-04-30 15:13:10,500 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (3.2s)
+2026-04-30 15:13:10,501 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 50.2MB
+2026-04-30 15:13:10,516 arth-desktop IORecord[53992] DEBUG Logged Reasoning (semantic_scores) to DB.
+2026-04-30 15:13:10,517 arth-desktop Questioner[53992] DEBUG Evaluating result for item 4, question 1.
+2026-04-30 15:13:10,517 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: care, 0
+[SCORE] dim=care score=0 (via Response Analyzer)
+2026-04-30 15:13:10,517 arth-desktop Questioner[53992] INFO [SCORE] dim=care score=0 (via Response Analyzer)
+2026-04-30 15:13:10,526 arth-desktop Questioner[53992] DEBUG Appended note to question_lib[4][1]['notes'].
+[QUESTIONER] Finished dim S=4. Reward (mean (paper §5.1 / legacy)): 0.00
+2026-04-30 15:13:10,526 arth-desktop Questioner[53992] INFO [QUESTIONER] Finished dim S=4. Reward (mean (paper §5.1 / legacy)): 0.00
+2026-04-30 15:13:10,526 arth-desktop RLQTables[53992] DEBUG Getting environment feedback: S=12, A=4, reward=0.0, terminate_flag=0, item_mask=[0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+[RL] Reward this turn: 0.0 (next state: dim=4)
+2026-04-30 15:13:10,527 arth-desktop RLQTables[53992] INFO [RL] Reward this turn: 0.0 (next state: dim=4)
+2026-04-30 15:13:10,530 arth-desktop HandlerRL[53992] DEBUG Q update applied at action: Q(S=12,A=4) 5.0 -> 47.050000000000004 (target=89.10000000000001)
+2026-04-30 15:13:10,530 arth-desktop RLQTables[53992] DEBUG Choosing action for state 4 (epsilon=1.000)
+2026-04-30 15:13:10,532 arth-desktop RLQTables[53992] DEBUG Mask before: [0,1,0,0,0,1,1,1,1,1,1,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+2026-04-30 15:13:10,536 arth-desktop RLQTables[53992] DEBUG Q-values after masking: [0.0,5.0,0.0,0.0,0.0,4.0,4.0,4.0,2.0,2.0,5.0,0.0,0.0,5.0,0.0,2.0,2.0,1.0,3.0,3.0,4.0,4.0,4.0,3.0,3.0,1.0,4.0,2.0,2.0,2.0,4.0,4.0,3.0,1.0,1.0,1.0,4.0,4.0]
+[RL] Exploiting: best dims ['1', '10', '13'] with Q-value 5.0
+2026-04-30 15:13:10,540 arth-desktop RLQTables[53992] INFO [RL] Exploiting: best dims ['1', '10', '13'] with Q-value 5.0
+
+[NEXT TURN SELECTION]
+[RL] Action chosen: dim=10 (sleep)
+2026-04-30 15:13:10,541 arth-desktop RLQTables[53992] INFO [RL] Action chosen: dim=10 (sleep)
+2026-04-30 15:13:10,552 arth-desktop IORecord[53992] DEBUG Logged Reasoning (rl_decision) to DB.
+[QUESTIONER] Starting turn for dim state S=10.
+2026-04-30 15:13:10,552 arth-desktop Questioner[53992] INFO [QUESTIONER] Starting turn for dim state S=10.
+[AGENT] How has your sleep been holding up lately?
+2026-04-30 15:13:10,566 arth-desktop IORecord[53992] INFO [AGENT] How has your sleep been holding up lately?
+2026-04-30 15:13:10,567 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+
+[INTERMISSION & PHQ-4 GATING]
+[INTERMISSION] Output ready — interrupting activity (engagement=6.0s).
+2026-04-30 15:13:11,981 arth-desktop SpeechService[53992] INFO [INTERMISSION] Output ready — interrupting activity (engagement=6.0s).
+2026-04-30 15:13:12,004 arth-desktop AudioPlayer[53992] INFO Playback interrupted by stop_event.
+2026-04-30 15:13:12,004 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:13:12,005 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:13:12,007 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:13:12,501 arth-desktop AudioRecorder[53992] INFO Background music segment start: offset=10309.0s
+2026-04-30 15:13:12,908 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'Thank you for staying with me through that. Here's what I'd like to say...'
+2026-04-30 15:13:12,909 arth-desktop SpeechService[53992] DEBUG Agent Action: Thank you for staying with me through that. Here's what I'd like to say...
+[TTS] Thank you for staying with me through that. Here's what I'd like to say...
+2026-04-30 15:13:12,909 arth-desktop SpeechService[53992] INFO [TTS] Thank you for staying with me through that. Here's what I'd like to say...
+2026-04-30 15:13:12,910 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Thank you for staying with me through that. Here's what I'd like to say...' -> active_ai_response.wav
+2026-04-30 15:13:15,040 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:13:15,040 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:15,041 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.3s)
+2026-04-30 15:13:20,399 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:13:20,700 arth-desktop SpeechService[53992] DEBUG Agent Action: How has your sleep been holding up lately?
+2026-04-30 15:13:20,701 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'How has your sleep been holding up lately?' -> active_ai_response.wav
+2026-04-30 15:13:22,715 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:13:22,716 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:22,717 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (2.3s)
+2026-04-30 15:13:25,071 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:13:25,079 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.8Gi       385Mi        20Mi       2.2Gi       2.4Gi | GPU Load: 0.0% | MemAvail: 2432MB
+2026-04-30 15:13:25,701 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +3.8MB
+2026-04-30 15:13:25,701 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:13:26,226 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:13:26,227 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:13:26,228 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:13:26,266 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:13:37,163 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:13:39,275 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:13:39,276 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:39,276 arth-desktop AudioRecorder[53992] INFO Recording complete: 434 chunks, 203 speech chunks.
+2026-04-30 15:13:39,276 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:39,283 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_420333028.wav (RMS=0.0795)
+2026-04-30 15:13:39,287 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 13.0s of audio -> active_user_input_420333028.wav. Parallel path.
+2026-04-30 15:13:39,291 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:39,291 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+[INTERMISSION] Pre-wait activity: BREATHING_EXERCISE
+2026-04-30 15:13:39,295 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: BREATHING_EXERCISE
+2026-04-30 15:13:39,296 arth-desktop SpeechService[53992] INFO [INTERMISSION] Guiding a breathing exercise while LLM generates.
+[INTERMISSION] Guiding a breathing exercise while LLM generates.
+2026-04-30 15:13:39,297 arth-desktop SpeechService[53992] DEBUG Agent Action: I'm still thinking — let's use this moment well. Expanding Breath Through the Body. Sit or lie down comfortably. Take a ...
+[TTS] I'm still thinking — let's use this moment well. Expanding Breath Through the Body. Sit or lie down comfortably. Take a slow breath in and notice the chest gently expand. Exhale and feel the body soften. Now imagine the breath spreading through the body. As you inhale, feel the breath reaching the ribs… the back… the belly. As you exhale, allow the shoulders and jaw to release any tension. Each breath expands awareness slightly through the body. Each exhale invites a sense of ease.
+2026-04-30 15:13:39,297 arth-desktop SpeechService[53992] INFO [TTS] I'm still thinking — let's use this moment well. Expanding Breath Through the Body. Sit or lie down comfortably. Take a slow breath in and notice the chest gently expand. Exhale and feel the body soften. Now imagine the breath spreading through the body. As you inhale, feel the breath reaching the ribs… the back… the belly. As you exhale, allow the shoulders and jaw to release any tension. Each breath expands awareness slightly through the body. Each exhale invites a sense of ease.
+2026-04-30 15:13:39,297 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'I'm still thinking — let's use this moment well. Expanding Breath Through the Body. Sit or lie down comfortably. Take a slow breath in and notice the chest gently expand. Exhale and feel the body soften. Now imagine the breath spreading through the body. As you inhale, feel the breath reaching the ribs… the back… the belly. As you exhale, allow the shoulders and jaw to release any tension. Each breath expands awareness slightly through the body. Each exhale invites a sense of ease.' -> active_ai_response.wav
+2026-04-30 15:13:39,391 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:13:41,152 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:13:41,354 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+139.0MB rss_peak=4074.7MB total_peak=4211.9MB elapsed=1.95s samples=13
+2026-04-30 15:13:41,355 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:13:41,458 arth-desktop STTGenerator[53992] INFO Transcription: That's enough for today and questions.
+[USER] That's enough for today and questions.
+2026-04-30 15:13:41,464 arth-desktop IORecord[53992] INFO [USER] That's enough for today and questions.
+2026-04-30 15:13:41,598 arth-desktop Questioner[53992] DEBUG Classifying user segments. Total segments: 1
+
+[RESPONSE ANALYSIS & SCORING]
+[PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:13:41,599 arth-desktop ResponseAnalyzer[53992] INFO [PIPELINE] Response Analyzer — classifying user input (Dim, Score).
+2026-04-30 15:13:41,599 arth-desktop ResponseAnalyzer[53992] DEBUG Original question: How has your sleep been holding up lately?
+2026-04-30 15:13:41,599 arth-desktop ResponseAnalyzer[53992] DEBUG User input: That's enough for today and questions
+2026-04-30 15:13:41,599 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=analyzer, model=gemma-4-E2B-it)
+2026-04-30 15:13:41,600 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:13:41,701 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:13:43,831 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 1.4MB
+2026-04-30 15:13:43,837 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/analyzer
+2026-04-30 15:13:43,837 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 2.24s (role=analyzer)
+2026-04-30 15:13:43,839 arth-desktop Questioner[53992] DEBUG Segment classified: 'That's enough for today and questions' -> (dim: NA, val: 99)
+[DLA] Classification result: [('NA', 99)]
+2026-04-30 15:13:43,839 arth-desktop Questioner[53992] INFO [DLA] Classification result: [('NA', 99)]
+2026-04-30 15:13:43,857 arth-desktop IORecord[53992] DEBUG Logged Reasoning (semantic_scores) to DB.
+2026-04-30 15:13:43,858 arth-desktop Questioner[53992] DEBUG Evaluating result for item 10, question 1.
+2026-04-30 15:13:43,858 arth-desktop Questioner[53992] DEBUG Processing dla_result entry: NA, 99
+2026-04-30 15:13:43,858 arth-desktop Questioner[53992] INFO [QUESTIONER] No primary match — will re-ask the same dimension question.
+2026-04-30 15:13:43,858 arth-desktop Questioner[53992] INFO [PIPELINE] Retry Guide — user response unclear, generating clarification.
+2026-04-30 15:13:43,859 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=rv_guide, model=gemma-4-E2B-it)
+[QUESTIONER] No primary match — will re-ask the same dimension question.
+[PIPELINE] Retry Guide — user response unclear, generating clarification.
+2026-04-30 15:13:43,865 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/rv_guide
+2026-04-30 15:13:45,630 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/rv_guide
+2026-04-30 15:13:45,630 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 1.77s (role=rv_guide)
+2026-04-30 15:13:45,647 arth-desktop IORecord[53992] INFO [AGENT] Could you please describe how your sleep has been generally holding up over the past week?
+2026-04-30 15:13:45,647 arth-desktop IORecord[53992] DEBUG Waiting for user answer...
+[AGENT] Could you please describe how your sleep has been generally holding up over the past week?
+2026-04-30 15:13:45,730 arth-desktop SpeechService[53992] INFO [INTERMISSION] Output ready — interrupting activity (engagement=6.4s).
+
+[INTERMISSION & PHQ-4 GATING]
+[INTERMISSION] Output ready — interrupting activity (engagement=6.4s).
+2026-04-30 15:13:46,148 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:13:46,149 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:13:46,154 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (41.0s)
+2026-04-30 15:14:27,131 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:14:27,135 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Delivery pipeline entered (session_start=False, llm_done=True).
+[INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:14:27,137 arth-desktop SpeechService[53992] INFO [INTERMISSION] Complete — delivering agent response.
+2026-04-30 15:14:28,039 arth-desktop SpeechService[53992] DEBUG [HANDOFF] Bridge phrase: 'Thank you for reflecting on that with me. Now, going back to what you shared...'
+2026-04-30 15:14:28,039 arth-desktop SpeechService[53992] DEBUG Agent Action: Thank you for reflecting on that with me. Now, going back to what you shared...
+[TTS] Thank you for reflecting on that with me. Now, going back to what you shared...
+2026-04-30 15:14:28,040 arth-desktop SpeechService[53992] INFO [TTS] Thank you for reflecting on that with me. Now, going back to what you shared...
+2026-04-30 15:14:28,040 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Thank you for reflecting on that with me. Now, going back to what you shared...' -> active_ai_response.wav
+2026-04-30 15:14:30,214 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:14:30,215 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:14:30,216 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (5.8s)
+2026-04-30 15:14:36,076 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:14:36,378 arth-desktop SpeechService[53992] DEBUG Agent Action: Could you please describe how your sleep has been generally holding up over the past week?
+2026-04-30 15:14:36,378 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Could you please describe how your sleep has been generally holding up over the past week?' -> active_ai_response.wav
+2026-04-30 15:14:38,576 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:14:38,577 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:14:38,578 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (4.5s)
+2026-04-30 15:14:43,088 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:14:43,100 arth-desktop SpeechService[53992] DEBUG [VRAM HANDOFF] Post-intermission: RAM: Mem:           7.4Gi       4.8Gi       357Mi        20Mi       2.2Gi       2.4Gi | GPU Load: 0.0% | MemAvail: 2408MB
+2026-04-30 15:14:43,841 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +0.0MB
+2026-04-30 15:14:43,842 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:14:44,357 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:14:44,359 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:14:44,360 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:14:44,387 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:14:50,860 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:14:50,862 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:14:50,862 arth-desktop AudioRecorder[53992] INFO Recording complete: 217 chunks, 116 speech chunks.
+2026-04-30 15:14:50,863 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:14:50,867 arth-desktop AudioRecorder[53992] INFO Saved audio to active_user_input_420404614.wav (RMS=0.1299)
+2026-04-30 15:14:50,867 arth-desktop SpeechService[53992] DEBUG [TURN] Captured 6.5s of audio -> active_user_input_420404614.wav. Parallel path.
+2026-04-30 15:14:50,869 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:14:50,870 arth-desktop SpeechService[53992] DEBUG [INTERMISSION] Proactive pre-wait activity starting.
+[INTERMISSION] Pre-wait activity: MUSIC
+2026-04-30 15:14:50,872 arth-desktop SpeechService[53992] INFO [INTERMISSION] Pre-wait activity: MUSIC
+2026-04-30 15:14:50,873 arth-desktop SpeechService[53992] DEBUG Agent Action: I'm still thinking, enjoy the music while I continue.
+[TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:14:50,873 arth-desktop SpeechService[53992] INFO [TTS] I'm still thinking, enjoy the music while I continue.
+2026-04-30 15:14:50,874 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'I'm still thinking, enjoy the music while I continue.' -> active_ai_response.wav
+2026-04-30 15:14:50,979 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:14:52,882 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:14:53,103 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+169.2MB rss_peak=4114.5MB total_peak=4269.8MB elapsed=2.13s samples=13
+2026-04-30 15:14:53,104 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:14:53,309 arth-desktop STTGenerator[53992] INFO Transcription: I don't want to answer any more questions. Let's end the session.
+[SESSION] End command heard — closing session.
+2026-04-30 15:14:53,310 arth-desktop SpeechService[53992] INFO [SESSION] End command heard — closing session.
+
+[SESSION END]
+[SESSION] Ending via hardware button or voice command.
+2026-04-30 15:14:53,310 arth-desktop SpeechService[53992] INFO [SESSION] Ending via hardware button or voice command.
+2026-04-30 15:14:53,401 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:14:53,402 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:14:53,403 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (3.2s)
+2026-04-30 15:14:53,461 arth-desktop AudioRecorder[53992] INFO Background music stopped.
+[USER] SESSION_END
+2026-04-30 15:14:53,463 arth-desktop IORecord[53992] INFO [USER] SESSION_END
+[SESSION] End signal received during retry_guide — closing session.
+2026-04-30 15:14:53,486 arth-desktop Questioner[53992] INFO [SESSION] End signal received during retry_guide — closing session.
+2026-04-30 15:14:53,486 arth-desktop RLQTables[53992] DEBUG Getting environment feedback: S=4, A=10, reward=0.0, terminate_flag=1, item_mask=[0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+[RL] Terminate flag set — screening loop ending early (reward=0).
+2026-04-30 15:14:53,487 arth-desktop RLQTables[53992] INFO [RL] Terminate flag set — screening loop ending early (reward=0).
+2026-04-30 15:14:53,490 arth-desktop HandlerRL[53992] DEBUG Q update applied at action: Q(S=4,A=10) 5.0 -> 2.5 (target=0)
+2026-04-30 15:14:53,493 arth-desktop LLMClient[53992] DEBUG [LLM_CLIENT] Requesting in-process LiteRT inference (role=general, model=gemma-4-E2B-it)
+2026-04-30 15:14:53,495 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: LLM/gemma-4-E2B-it/general
+2026-04-30 15:14:57,893 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:14:57,896 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: LLM/gemma-4-E2B-it/general
+2026-04-30 15:14:57,897 arth-desktop LLMClient[53992] DEBUG Received response for LLM (client.responses) after 4.40s (role=general)
+2026-04-30 15:14:57,900 arth-desktop ContextManager[53992] INFO [TAKEAWAY] Closing reflection generated (259 chars).
+2026-04-30 15:14:57,901 arth-desktop SpeechService[53992] DEBUG Agent Action: It sounds like we've touched on some important things today, and I really appreciate you sharing your thoughts on how yo...
+[TTS] It sounds like we've touched on some important things today, and I really appreciate you sharing your thoughts on how you're managing things. Remember to be gentle with yourself as you navigate these feelings, and I'm here whenever you're ready to talk again.
+2026-04-30 15:14:57,903 arth-desktop SpeechService[53992] INFO [TTS] It sounds like we've touched on some important things today, and I really appreciate you sharing your thoughts on how you're managing things. Remember to be gentle with yourself as you navigate these feelings, and I'm here whenever you're ready to talk again.
+2026-04-30 15:14:57,903 arth-desktop HandlerRL[53992] DEBUG Saved question library to data/libs/question_lib_v4_1777576493.json after DLA termination.
+2026-04-30 15:14:57,903 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'It sounds like we've touched on some important things today, and I really appreciate you sharing your thoughts on how you're managing things. Remember to be gentle with yourself as you navigate these feelings, and I'm here whenever you're ready to talk again.' -> active_ai_response.wav
+2026-04-30 15:14:57,903 arth-desktop HandlerRL[53992] DEBUG Goodbye. We will do the screening in another time.
+2026-04-30 15:14:57,913 arth-desktop HandlerRL[53992] DEBUG Saved question library to data/libs/question_lib_v4_1777576497.json after session termination.
+
+[POST-SESSION PERSISTENCE]
+[RL] Created initial Q-table for subject test (persisted to CSV).
+2026-04-30 15:14:57,948 arth-desktop HandlerRL[53992] INFO [RL] Created initial Q-table for subject test (persisted to CSV).
+[SESSION] Early termination — skipping CBT.
+2026-04-30 15:14:57,948 arth-desktop HandlerRL[53992] INFO [SESSION] Early termination — skipping CBT.
+[PIPELINE] Per-session Report/Notes CSVs written.
+2026-04-30 15:14:57,950 arth-desktop HandlerRL[53992] INFO [PIPELINE] Per-session Report/Notes CSVs written.
+[SESSION] Interrupted — skipping post-session analysis for prompt exit.
+2026-04-30 15:14:57,950 arth-desktop HandlerRL[53992] INFO [SESSION] Interrupted — skipping post-session analysis for prompt exit.
+2026-04-30 15:14:57,953 arth-desktop IORecord[53992] INFO ========== SESSION HISTORY BEGIN ==========
+2026-04-30 15:14:57,953 arth-desktop IORecord[53992] INFO [001] SYSTEM: [REASONER_DECISION]
+2026-04-30 15:14:57,953 arth-desktop IORecord[53992] INFO [002] SYSTEM: [RL_DECISION]
+2026-04-30 15:14:57,953 arth-desktop IORecord[53992] INFO [003] AGENT: I'd like to start with a couple of questions about how you've been.
+
+Are you adhering to the medication prescribed by your physician?
+2026-04-30 15:14:57,953 arth-desktop IORecord[53992] INFO [004] USER: Yes, I take my medication on time.
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [005] SYSTEM: [SEMANTIC_SCORES]
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [006] SYSTEM: [RL_DECISION]
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [007] AGENT: How has your mood been? Have you been able to manage your moods?
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [008] USER: No, I'm very stressed and have been very anxious lately.
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [009] SYSTEM: [SEMANTIC_SCORES]
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [010] AGENT: You mentioned that you are very stressed and have been very anxious lately. Can you tell me more?
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [011] USER: I just feel very stressed because of all my exams and I'm not able to deal with it properly.
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [012] SYSTEM: [REASONER_DECISION]
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [013] SYSTEM: [VALIDATION_FLAG]
+2026-04-30 15:14:57,954 arth-desktop IORecord[53992] INFO [014] SYSTEM: [RL_DECISION]
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [015] AGENT: It sounds like the pressure from your exams is creating a significant amount of stress, and that feeling of not being able to deal with it properly is really tough right now. Feeling stressed when facing exams is a very natural response to that high-stakes situation, and it makes sense that you feel overwhelmed. You might find it helpful to break down the exams into smaller, manageable chunks rather than looking at the whole mountain at once. Try scheduling short, focused study sessions followed by genuine breaks to let your mind rest. You could also explore simple grounding techniques when the anxiety spikes to help bring your focus back to the present moment.
+
+Are you eating at fairly steady times each day?
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [016] USER: No, I'm not eating any food. I'm just skipping my meals. I'll do like two more and then we'll do CBT.
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [017] SYSTEM: [SEMANTIC_SCORES]
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [018] SYSTEM: [MULTI_DIM_BACKFILL]
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [019] AGENT: You mentioned that answer: you are not eating any food. Can you tell me more?
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [020] USER: I just, with all my stress, I'm just not having time to eat my three meals, so I just skip my food.
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [021] SYSTEM: [REASONER_DECISION]
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [022] SYSTEM: [VALIDATION_FLAG]
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [023] SYSTEM: [RL_DECISION]
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [024] AGENT: It sounds like the stress is creating a real barrier, making it impossible to find time for your meals and leading you to skip food. Feeling like you just don't have the time for your meals when you are under stress is a very real and painful experience. This is a common way our bodies react when we are overwhelmed, and it doesn't reflect a lack of desire to eat. You might try to schedule very small, non-negotiable eating windows, perhaps just focusing on one small snack or a glass of water at a specific time each day. You could also look into simple meal preparation strategies, like having pre-cut vegetables or quick protein options ready to go, so that when time is tight, you can still manage to fuel yourself. Remember that even tiny amounts of consistent nourishment can help manage that stress response.
+
+Have you been meeting your obligations as they come up?
+2026-04-30 15:14:57,955 arth-desktop IORecord[53992] INFO [025] USER: I just do drugs and I've been smoking a lot recently
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [026] SYSTEM: [SEMANTIC_SCORES]
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [027] SYSTEM: [SEGMENT_LEVEL_BACKFILL]
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [028] AGENT: Could you tell me more about how your recent drug and smoking habits are affecting your ability to meet your obligations?
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [029] USER: Now this is going on in the truck. I also made it so it's multi-dimension. So if I mention drug and obligation, it'll score for all. Okay, so this is something should not happen. I can turn that on. Yeah, turn it off.
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [030] SYSTEM: [SEMANTIC_SCORES]
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [031] SYSTEM: [SEGMENT_LEVEL_BACKFILL]
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [032] SYSTEM: [RL_DECISION]
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [033] SYSTEM: [RL_DECISION]
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [034] AGENT: Are you keeping up with visits to your doctor, therapist, or case manager?
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [035] USER: I think I'm done with questions for today.
+2026-04-30 15:14:57,956 arth-desktop IORecord[53992] INFO [036] SYSTEM: [SEMANTIC_SCORES]
+2026-04-30 15:14:57,957 arth-desktop IORecord[53992] INFO [037] SYSTEM: [RL_DECISION]
+2026-04-30 15:14:57,957 arth-desktop IORecord[53992] INFO [038] AGENT: How has your sleep been holding up lately?
+2026-04-30 15:14:57,957 arth-desktop IORecord[53992] INFO [039] USER: That's enough for today and questions.
+2026-04-30 15:14:57,957 arth-desktop IORecord[53992] INFO [040] SYSTEM: [SEMANTIC_SCORES]
+2026-04-30 15:14:57,957 arth-desktop IORecord[53992] INFO [041] AGENT: Could you please describe how your sleep has been generally holding up over the past week?
+2026-04-30 15:14:57,957 arth-desktop IORecord[53992] INFO [042] USER: SESSION_END
+2026-04-30 15:14:57,957 arth-desktop IORecord[53992] INFO =========== SESSION HISTORY END ===========
+2026-04-30 15:14:58,035 arth-desktop ResourceAudit[53992] INFO [RESOURCE] session_end rss=4035.0MB child=23.7MB threads=39 trace_cur=22.5MB trace_peak=38.5MB
+2026-04-30 15:14:58,123 arth-desktop HandlerRL[53992] DEBUG [FORENSIC] Session resource report written to data/logs/resource_map_latest.json
+2026-04-30 15:14:58,123 arth-desktop HandlerRL[53992] DEBUG Garbage collected ML DataFrame for HandlerRL Context wipe.
+2026-04-30 15:14:58,254 arth-desktop TherapistReport[53992] INFO [REPORT] Wrote clinical report: /home/arth/project/data/clinical/clinical_report_test_4.csv (9 scored dims, 2 interventions, 42 turns, 3 crisis rows)
+2026-04-30 15:14:58,629 arth-desktop IORecord[53992] DEBUG [DOSSIER] Saved 10 interactions to /home/arth/project/data/sessions/session_test_20260430_150429.json
+2026-04-30 15:14:58,648 arth-desktop MainApp[53992] INFO [SESSION] Clinical pipeline finished — returning to idle, awaiting next wake.
+
+[SESSION END]
+[SESSION] Clinical pipeline finished — returning to idle, awaiting next wake.
+2026-04-30 15:14:59,631 arth-desktop AudioRecorder[53992] INFO Background music segment start: offset=10676.9s
+2026-04-30 15:14:59,631 arth-desktop AudioRecorder[53992] INFO Background music started: assets/audio/ambient_therapy.mp3
+2026-04-30 15:15:00,197 arth-desktop AudioRecorder[53992] INFO Background music segment start: offset=4593.3s
+2026-04-30 15:15:00,864 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:15:00,865 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:00,874 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (14.0s)
+2026-04-30 15:15:14,906 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:15:14,907 arth-desktop SpeechService[53992] DEBUG Agent Action: Ending our session now. Goodbye.
+2026-04-30 15:15:14,907 arth-desktop SpeechService[53992] INFO [TTS] Ending our session now. Goodbye.
+2026-04-30 15:15:14,907 arth-desktop TTSGenerator[53992] INFO Generating TTS for: 'Ending our session now. Goodbye.' -> active_ai_response.wav
+[TTS] Ending our session now. Goodbye.
+2026-04-30 15:15:17,048 arth-desktop TTSGenerator[53992] INFO TTS generation successful.
+2026-04-30 15:15:17,049 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:17,049 arth-desktop AudioPlayer[53992] INFO Playing active_ai_response.wav via pygame mixer (3.8s)
+2026-04-30 15:15:20,906 arth-desktop AudioPlayer[53992] INFO Playback finished.
+2026-04-30 15:15:21,409 arth-desktop InferenceGuard[53992] INFO Clear Cache command: STT model suspended for LLM VRAM headroom
+2026-04-30 15:15:21,507 arth-desktop STTGenerator[53992] INFO STT model suspended. RSS freed: 39.1MB
+2026-04-30 15:15:27,900 arth-desktop SpeechService[53992] INFO [TURN] Parallel STT detected END command.
+2026-04-30 15:15:28,612 arth-desktop STTGenerator[53992] INFO STT model resumed. RSS delta: +0.0MB
+2026-04-30 15:15:29,158 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:15:29,160 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:15:29,161 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:15:29,172 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:15:30,202 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:15:30,205 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:15:30,206 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:30,207 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 35 speech chunks.
+2026-04-30 15:15:30,220 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0317)
+2026-04-30 15:15:30,342 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:15:32,188 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:15:32,338 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.1MB rss_peak=4075.8MB total_peak=4078.1MB elapsed=2.00s samples=13
+2026-04-30 15:15:32,338 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:15:32,432 arth-desktop STTGenerator[53992] INFO Transcription: I say like I don't want to talk.
+2026-04-30 15:15:32,437 arth-desktop SpeechService[53992] DEBUG Wake transcription: i say like i dont want to talk
+2026-04-30 15:15:32,932 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:15:32,934 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:15:32,934 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:15:32,972 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:15:33,988 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:15:33,991 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:15:33,992 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:33,993 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 20 speech chunks.
+2026-04-30 15:15:33,995 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0215)
+2026-04-30 15:15:34,127 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:15:36,142 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:15:36,281 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+149.1MB rss_peak=4124.4MB total_peak=4126.7MB elapsed=2.15s samples=14
+2026-04-30 15:15:36,282 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:15:36,375 arth-desktop STTGenerator[53992] INFO Transcription: Then.
+2026-04-30 15:15:36,377 arth-desktop SpeechService[53992] DEBUG Wake transcription: then
+2026-04-30 15:15:36,894 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:15:36,894 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:15:36,895 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:15:36,895 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:15:37,928 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:15:37,932 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:15:37,933 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:37,942 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 27 speech chunks.
+2026-04-30 15:15:37,943 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0310)
+2026-04-30 15:15:38,080 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:15:39,466 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:15:39,567 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.4MB rss_peak=4124.9MB total_peak=4127.2MB elapsed=1.49s samples=10
+2026-04-30 15:15:39,567 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:15:39,664 arth-desktop STTGenerator[53992] INFO Transcription: Yeah.
+2026-04-30 15:15:39,666 arth-desktop SpeechService[53992] DEBUG Wake transcription: yeah
+2026-04-30 15:15:40,171 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:15:40,172 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:15:40,172 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:15:40,201 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:15:41,225 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:15:41,228 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:15:41,229 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:41,230 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 21 speech chunks.
+2026-04-30 15:15:41,232 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0211)
+2026-04-30 15:15:41,358 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:15:42,684 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:15:42,777 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.2MB rss_peak=4124.8MB total_peak=4127.1MB elapsed=1.42s samples=9
+2026-04-30 15:15:42,777 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:15:42,870 arth-desktop STTGenerator[53992] INFO Transcription: Yes.
+2026-04-30 15:15:42,872 arth-desktop SpeechService[53992] DEBUG Wake transcription: yes
+2026-04-30 15:15:43,387 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:15:43,387 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:15:43,388 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:15:43,388 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:15:44,442 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:15:44,445 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:15:44,447 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:44,447 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 35 speech chunks.
+2026-04-30 15:15:44,452 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0489)
+2026-04-30 15:15:44,583 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:15:46,166 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:15:46,356 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.4MB rss_peak=4124.6MB total_peak=4126.9MB elapsed=1.77s samples=12
+2026-04-30 15:15:46,357 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:15:46,452 arth-desktop STTGenerator[53992] INFO Transcription: So, first of all, all right.
+2026-04-30 15:15:46,456 arth-desktop SpeechService[53992] DEBUG Wake transcription: so first of all all right
+2026-04-30 15:15:46,974 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:15:46,975 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:15:46,976 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:15:46,976 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:15:48,086 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:15:48,088 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:15:48,088 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:48,089 arth-desktop AudioRecorder[53992] INFO Recording complete: 37 chunks, 26 speech chunks.
+2026-04-30 15:15:48,091 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0172)
+2026-04-30 15:15:48,226 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:15:49,617 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:15:49,725 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.6MB rss_peak=4130.8MB total_peak=4133.1MB elapsed=1.50s samples=10
+2026-04-30 15:15:49,725 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:15:49,825 arth-desktop STTGenerator[53992] INFO Transcription: Yeah.
+2026-04-30 15:15:49,827 arth-desktop SpeechService[53992] DEBUG Wake transcription: yeah
+2026-04-30 15:15:50,332 arth-desktop AudioRecorder[53992] INFO Audio stream started and OS buffer flushed.
+2026-04-30 15:15:50,332 arth-desktop AudioRecorder[53992] INFO Listening (waiting for speech)...
+2026-04-30 15:15:50,333 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to True (requested ON=True)
+2026-04-30 15:15:50,362 arth-desktop AudioRecorder[53992] INFO Speech detected, recording started.
+2026-04-30 15:15:51,367 arth-desktop AudioRecorder[53992] INFO Trailing speech detected, extending recording.
+2026-04-30 15:15:51,370 arth-desktop AudioRecorder[53992] INFO Audio stream stopped.
+2026-04-30 15:15:51,371 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:51,372 arth-desktop AudioRecorder[53992] INFO Recording complete: 35 chunks, 35 speech chunks.
+2026-04-30 15:15:51,374 arth-desktop AudioRecorder[53992] INFO Saved audio to wake_temp.wav (RMS=0.0424)
+2026-04-30 15:15:51,514 arth-desktop InferenceGuard[53992] DEBUG Entering heavy stage: STT/FasterWhisper
+2026-04-30 15:15:51,738 arth-desktop MainApp[53992] INFO Application interrupted.
+2026-04-30 15:15:51,889 arth-desktop AudioRecorder[53992] INFO Background music stopped.
+2026-04-30 15:15:51,890 arth-desktop GPIOManager[53992] DEBUG LED (Pin 18) set to False (requested ON=False)
+2026-04-30 15:15:53,019 arth-desktop InferenceGuard[53992] DEBUG Exiting heavy stage: STT/FasterWhisper
+2026-04-30 15:15:53,150 arth-desktop ResourceAudit[53992] INFO [RESOURCE_PEAK] zone=STT/FasterWhisper spike=+137.7MB rss_peak=4131.0MB total_peak=4133.3MB elapsed=1.64s samples=11
+2026-04-30 15:15:53,150 arth-desktop InferenceGuard[53992] INFO Clear Cache command: After STT phase
+2026-04-30 15:15:53,247 arth-desktop STTGenerator[53992] INFO Transcription: I don't like the Ari guy because...
+2026-04-30 15:15:53,253 arth-desktop SpeechService[53992] DEBUG Wake transcription: i dont like the ari guy because
+2026-04-30 15:15:53,893 arth-desktop GPIOManager[53992] INFO GPIO cleaned up.
+2026-04-30 15:15:53,925 arth-desktop ResourceAudit[53992] INFO [Baseline RAM]: 0.08 GB used at process baseline
+2026-04-30 15:15:53,926 arth-desktop ResourceAudit[53992] INFO [Static Load]: +0.45 GB consumed on module init (STT/FasterWhisperModelInit)
+2026-04-30 15:15:53,927 arth-desktop ResourceAudit[53992] INFO [Dynamic Spike]: +0.21 GB during peak zone (STT/FasterWhisper)
+2026-04-30 15:15:53,927 arth-desktop ResourceAudit[53992] INFO [The Culprit]: Static STT model load dominates resident memory before first user turn.
+2026-04-30 15:15:53,927 arth-desktop ResourceAudit[53992] INFO [Refactor/CAP Recommendation]: Keep Faster-Whisper at int8/base.en or smaller and avoid loading extra SER backends in parallel.
+2026-04-30 15:15:53,931 arth-desktop ResourceAudit[53992] INFO [RESOURCE_REPORT] data/logs/resource_map_latest.json
+2026-04-30 15:15:54,236 arth-desktop ResourceAudit[53992] INFO [Baseline RAM]: 0.08 GB used at process baseline
+2026-04-30 15:15:54,237 arth-desktop ResourceAudit[53992] INFO [Static Load]: +0.45 GB consumed on module init (STT/FasterWhisperModelInit)
+2026-04-30 15:15:54,237 arth-desktop ResourceAudit[53992] INFO [Dynamic Spike]: +0.21 GB during peak zone (STT/FasterWhisper)
+2026-04-30 15:15:54,238 arth-desktop ResourceAudit[53992] INFO [The Culprit]: Static STT model load dominates resident memory before first user turn.
+2026-04-30 15:15:54,238 arth-desktop ResourceAudit[53992] INFO [Refactor/CAP Recommendation]: Keep Faster-Whisper at int8/base.en or smaller and avoid loading extra SER backends in parallel.
+2026-04-30 15:15:54,246 arth-desktop ResourceAudit[53992] INFO [RESOURCE_REPORT] data/logs/resource_map_latest.json
