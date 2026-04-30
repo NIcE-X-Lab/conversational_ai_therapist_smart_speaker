@@ -187,8 +187,29 @@ class HandlerRL:
         qdir = os.path.join(DATA_DIR, "q_tables")
         qfile = os.path.join(qdir, f"item_qtable_{subject}.csv")
         if os.path.exists(qfile):
-            self.item_q_table = pd.read_csv(qfile, index_col=0)
-            logger.info(f"[RL] Loaded prior Q-table for subject {subject} (longitudinal warm-start).")
+            try:
+                restored = pd.read_csv(qfile, index_col=0)
+                # Guard against a stale CSV whose dims don't match the
+                # current ITEM_N_STATES (e.g. config edit between runs).
+                # A mismatched shape would crash the first action select.
+                if restored.shape == self.item_q_table.shape:
+                    restored.columns = restored.columns.astype(str)
+                    self.item_q_table = restored
+                    logger.info(
+                        f"[RL] Loaded prior Q-table for subject {subject} "
+                        f"(longitudinal warm-start, shape={restored.shape})."
+                    )
+                else:
+                    logger.warning(
+                        f"[RL] Prior Q-table for subject {subject} has shape "
+                        f"{restored.shape}, expected {self.item_q_table.shape}; "
+                        "discarding and initialising from item_importance priors."
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"[RL] Failed to load prior Q-table for subject {subject}: {e}. "
+                    "Initialising from item_importance priors."
+                )
         else:
             logger.info(f"[RL] No prior Q-table for subject {subject}; initialising from item_importance priors.")
 

@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "subject_id": "8080_20260430_175828",
+    "session_id": 1,
+    "started_at": "2026-04-30T17:58:28.754484",
+    "ended_at": "2026-04-30T17:58:28.963621",
+    "total_interactions": 1
+  },
+  "interactions": [
+    {
+      "timestamp": "2026-04-30T17:58:28.758949",
+      "raw_transcription": "",
+      "llm_response": "Test Question for Jetson",
+      "rl_decision_logic": {},
+      "ser_metrics": {
+        "emotion_tag": "Neutral",
+        "screening_scores": {
+          "anxiety": null,
+          "depression": null,
+          "total": null
+        }
+      },
+      "resource_telemetry": {}
+    }
+  ]
+}

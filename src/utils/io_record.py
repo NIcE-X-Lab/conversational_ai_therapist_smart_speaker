@@ -133,6 +133,13 @@ def _safe_output_put(item):
 
 END_SESSION_EVENT = threading.Event()
 START_SESSION_EVENT = threading.Event()
+# Bug-2 fix: distinguishes screening-phase from CBT-phase end-intent.
+# Set by HandlerRL immediately before run_cbt() fires; cleared by
+# reset_session(). Pre-CBT, an ambiguous "end the session"-style voice
+# command is routed to the Response Analyzer as a Stop keyword so the
+# paper-specified flow (terminate screening → run CBT) is preserved.
+# Once CBT is active, any end-command hard-terminates as before.
+CBT_STARTED_EVENT = threading.Event()
 
 
 # ── Global session state (protected by _INIT_LOCK) ───────────────────────
@@ -292,6 +299,10 @@ def init_record(user_id_override: str = None, force: bool = False):
             OUTPUT_QUEUE.queue.clear()
         with INPUT_QUEUE.mutex:
             INPUT_QUEUE.queue.clear()
+        # Bug-2 fix: fresh session starts in the pre-CBT screening phase,
+        # so end-commands route softly to CBT. CBT.run_cbt() will set this
+        # when it starts; this keeps the flag from carrying over sessions.
+        CBT_STARTED_EVENT.clear()
 
         try:
             DB = DBManager(DB_PATH)

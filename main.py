@@ -18,6 +18,8 @@ from src.utils import io_record
 from src.utils.config_loader import (
     SUBJECT_ID, LLM_MODEL, LITERT_MODEL_PATH,
     DB_PATH, STT_MODEL_PATH, TTS_MODEL_PATH,
+    TTS_INTERMISSION_MODEL_PATH,
+    SER_ENABLED,
 )
 
 # ── Memory autopsy helper ───────────────────────────────────────────────
@@ -177,6 +179,31 @@ def _startup_checklist() -> bool:
         critical_failures.append("faster-whisper not importable")
     if not piper_ok:
         critical_failures.append(f"Piper TTS model missing at {TTS_MODEL_PATH}")
+    # Second voice is optional — missing file is a warning, never a
+    # critical failure, since generate() silently falls back to primary.
+    if TTS_INTERMISSION_MODEL_PATH:
+        alt_ok = os.path.isfile(TTS_INTERMISSION_MODEL_PATH)
+        lines.append(
+            f"[{'x' if alt_ok else '~'}] Piper Intermission Voice "
+            f"{'found' if alt_ok else 'NOT FOUND (will fall back to primary)'} "
+            f"({TTS_INTERMISSION_MODEL_PATH})"
+        )
+    # SER status — informational only, never blocks boot.  Disabled
+    # means the stub in src/models/ser.py is active and emotion tags
+    # are hard-coded "neu".  See config.yaml `ser:` block to re-enable.
+    # NOTE: Python 3.10 (Jetson default) disallows backslashes inside
+    # f-string expression parts, so we build the SER descriptor via a
+    # plain conditional rather than embedding escaped quotes in the
+    # f-string. 3.12+ relaxes this rule but the production Jetson
+    # image pins to 3.10.
+    _ser_desc = (
+        'enabled (real backend expected)'
+        if SER_ENABLED
+        else 'disabled (stub — emotion tag is always "neu")'
+    )
+    lines.append(
+        f"[{'x' if SER_ENABLED else '~'}] SER {_ser_desc}"
+    )
 
     # 4. Database (CRITICAL)
     try:
@@ -396,7 +423,14 @@ def main():
             from src.services.speech_service import SpeechInteractionService
 
             speech_service = SpeechInteractionService(INPUT_QUEUE, OUTPUT_QUEUE)
-            _log_process_rss("After SpeechService init (Whisper+SER+TTS loaded)")
+            # SER is disabled by default (src/models/ser.py stub).  Only
+            # Whisper + Piper dual-voice TTS contribute to the post-init
+            # RSS delta; the SER seat loads nothing until a real backend
+            # is dropped in and `ser.ser_enabled=true`.
+            _ser_label = "SER+" if SER_ENABLED else ""
+            _log_process_rss(
+                f"After SpeechService init (Whisper+{_ser_label}TTS loaded)"
+            )
             app.state.speech_loop = speech_service
             speech_thread = threading.Thread(target=speech_service.run, daemon=True)
             speech_thread.start()
@@ -424,7 +458,25 @@ def main():
             # HandlerRL orchestrates the CBT/RL turns and uses the interstitial engine
             handler = HandlerRL()
             handler.run()
-            
+
+            # Bug-1 fix (tail): handler may have queued a final utterance
+            # ("Great work today.", closing reflection, etc.) on OUTPUT_QUEUE
+            # immediately before returning. Give the speech service a bounded
+            # window to speak it before we transition to idle; once
+            # START_SESSION_EVENT clears, the main speech loop drops into
+            # the wake-word listener and stops consuming OUTPUT_QUEUE, so
+            # any remaining item would be orphaned.
+            _DRAIN_TIMEOUT_SEC = 5.0
+            _drain_deadline = time.time() + _DRAIN_TIMEOUT_SEC
+            while time.time() < _drain_deadline:
+                if io_record.OUTPUT_QUEUE.empty():
+                    # Small extra grace so an in-flight say() can finish
+                    # speaking before idle transition silences things.
+                    time.sleep(0.5)
+                    if io_record.OUTPUT_QUEUE.empty():
+                        break
+                time.sleep(0.1)
+
             logger.info("[SESSION] Clinical pipeline finished — returning to idle, awaiting next wake.")
             io_record.START_SESSION_EVENT.clear()
             

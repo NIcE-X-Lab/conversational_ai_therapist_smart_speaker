@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "subject_id": "8080_20260430_175347",
+    "session_id": 2,
+    "started_at": "2026-04-30T17:53:47.883406",
+    "ended_at": "2026-04-30T17:53:50.058476",
+    "total_interactions": 3
+  },
+  "interactions": [
+    {
+      "timestamp": "2026-04-30T17:53:47.899668",
+      "raw_transcription": "",
+      "llm_response": "Hello API",
+      "rl_decision_logic": {},
+      "ser_metrics": {
+        "emotion_tag": "Neutral",
+        "screening_scores": {
+          "anxiety": null,
+          "depression": null,
+          "total": null
+        }
+      },
+      "resource_telemetry": {}
+    },
+    {
+      "timestamp": "2026-04-30T17:53:48.549516",
+      "raw_transcription": "",
+      "llm_response": "Thank you for trusting me with that. What you are going through sounds really heavy, and I want to make sure you are safe right now. If you are in the United States, you can call or text 988 any time to reach the Suicide and Crisis Lifeline. You can also reach the SAMHSA national helpline at 1-800-662-4357 for free, confidential support. If you are in immediate danger, please call 911 or go to your nearest emergency room. I am going to stay with you, and we will focus on this together.",
+      "rl_decision_logic": {},
+      "ser_metrics": {
+        "emotion_tag": "Neutral",
+        "screening_scores": {
+          "anxiety": null,
+          "depression": null,
+          "total": null
+        }
+      },
+      "resource_telemetry": {}
+    },
+    {
+      "timestamp": "2026-04-30T17:53:48.637814",
+      "raw_transcription": "",
+      "llm_response": "Thank you for trusting me with that. What you are going through sounds really heavy, and I want to make sure you are safe right now. If you are in the United States, you can call or text 988 any time to reach the Suicide and Crisis Lifeline. You can also reach the SAMHSA national helpline at 1-800-662-4357 for free, confidential support. If you are in immediate danger, please call 911 or go to your nearest emergency room. I am going to stay with you, and we will focus on this together.",
+      "rl_decision_logic": {},
+      "ser_metrics": {
+        "emotion_tag": "Neutral",
+        "screening_scores": {
+          "anxiety": null,
+          "depression": null,
+          "total": null
+        }
+      },
+      "resource_telemetry": {}
+    }
+  ]
+}

@@ -86,6 +86,15 @@ There are some dimensions that may be confusing, to distinguish them:
 
 If the user input is a general response, such as “Sure”, “Not really”, “I don’t know”, “I don’t understand your question”, “let us stop here”, or anything similar, the DIMENSION will be within [Yes, No, Maybe, Question, Stop], and the SCORE will be 0.
 
+The Stop dimension specifically covers any phrasing that signals the user
+wants to finish the screening questions and move on. Examples that must
+be classified as Stop: "I don't want to answer any more questions",
+"no more questions", "that's enough for today", "I'm done with
+questions", "let's end the session", "I think I'm done with questions
+for today", "enough questions". Classify as Stop even when these phrases
+mention a specific topic, as long as the primary intent is to end the
+question-answer flow.
+
 The score ranges from 0 to 2, where:
 0 indicates that the user performs well in this dimension;
 1 indicates that the user has some problems in this dimension, but no immediate action is needed;
@@ -108,6 +117,12 @@ The example user inputs with their dimensions and scores:
 {"in":"I occasionally miss breakfast.", "res": "eat, 1"}
 {"in":"I don't have a regular schedule for eating.", "res": "eat, 2"}
 {"in":"I don't have a regular schedule for sleeping.", "res": "sleep, 2"}
+{"in":"I don't want to answer any more questions.", "res": "Stop, 0"}
+{"in":"No more questions.", "res": "Stop, 0"}
+{"in":"That's enough for today.", "res": "Stop, 0"}
+{"in":"I think I'm done with questions for today.", "res": "Stop, 0"}
+{"in":"Let's end the session.", "res": "Stop, 0"}
+{"in":"I'm done with questions.", "res": "Stop, 0"}
 '''
 
 # Prompt for summarizing user response in a reflective way

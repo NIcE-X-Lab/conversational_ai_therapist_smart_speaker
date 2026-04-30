@@ -193,10 +193,28 @@ TTS_MODEL_PATH = os.environ.get("TTS_MODEL_PATH", TTS.get("model_path", "./model
 TTS_EXECUTABLE = TTS.get("executable_path", "piper")
 TTS_LENGTH_SCALE = float(os.environ.get("TTS_LENGTH_SCALE", "0.8"))
 TTS_SENTENCE_SILENCE = float(os.environ.get("TTS_SENTENCE_SILENCE", "1.5"))
+# Second voice for intermission-only TTS (lead-in, breathing, music,
+# paired screening).  Blank string disables the second voice so every
+# utterance uses TTS_MODEL_PATH.  Piper is subprocess-invoked per
+# utterance, so there is no resident-memory cost for keeping two
+# voices on disk — only disk space (~63 MB for Alan medium).
+TTS_INTERMISSION_MODEL_PATH = os.environ.get(
+    "TTS_INTERMISSION_MODEL_PATH", TTS.get("intermission_model_path", "")
+).strip()
 
 # Database
 DATABASE = _CFG.get("database", {})
 DB_PATH = DATABASE.get("db_path", "data/therapist.db")
+
+# Speech Emotion Recognition (SER)
+# Disabled by default — see config.yaml `ser:` block for the drop-in
+# contract.  STTGenerator checks SER_ENABLED at init time and only
+# constructs the SERGenerator when the flag is true, so the "off"
+# state truly loads no additional model.
+SER_CFG = _CFG.get("ser", {})
+SER_ENABLED = os.environ.get(
+    "SER_ENABLED", str(SER_CFG.get("ser_enabled", False))
+).strip().lower() in {"1", "true", "yes", "on"}
 
 # Hardware Pins
 PIN_LISTENING_LED = int(os.environ.get("PIN_LISTENING_LED", "18"))

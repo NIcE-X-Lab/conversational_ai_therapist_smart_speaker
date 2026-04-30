@@ -64,13 +64,54 @@ _BRIDGE_PHRASES = [
     "That was a nice moment of stillness. Now, about what you mentioned...",
 ]
 
-# Filler intros for screening questions (avoid abrupt "question" delivery)
+# Intermission framing — spoken as a clear signpost so the user knows the
+# next beat is SEPARATE from the therapy questioning.  A short lead-in
+# plays before ANY intermission activity (screening / breathing / music)
+# and a matching outro (close to, but clearly different from, the bridge)
+# plays on the way back to CaiTI's next reply.  Keep both sides friendly
+# and un-clinical — the goal is "we're stepping aside for a brief pause"
+# rather than "we're starting a new clinical task".
+_INTERMISSION_LEAD_INS = [
+    "Let's take a brief intermission together while I gather my thoughts. "
+    "This is separate from our main conversation — just a short pause.",
+    "I'd like to step aside for a quick intermission. "
+    "This is a little break, not part of the main questions we've been working through.",
+    "Let's pause for a short intermission. "
+    "This is apart from our main session — think of it as a gentle side-beat.",
+    "Before I respond, let's take a brief intermission. "
+    "This part is separate from the questions we've been exploring together.",
+]
+
+# Signposted end-of-intermission phrase. Distinct from `_BRIDGE_PHRASES`
+# so the user can clearly tell the intermission has ended and we're
+# returning to therapy.
+_INTERMISSION_OUTROS = [
+    "That wraps up our little intermission. Coming back to our session now...",
+    "That's the end of this short intermission. Let's return to what we were exploring together.",
+    "And with that, our intermission is complete. Returning to our main conversation now...",
+    "Our brief intermission is over. Let's pick back up with our session.",
+]
+
+# Filler intros for screening questions (avoid abrupt "question" delivery).
+# Used for the FIRST question in a paired screening block; the second
+# question uses `_SCREENING_FOLLOWUPS` below so the transition sounds
+# natural rather than like two unrelated prompts stapled together.
 _SCREENING_INTROS = [
     "While I'm processing that, I'd like to ask you something.",
     "It's taking me a moment to reflect. Let me ask you this in the meantime.",
     "While I work through your response, let me check in with you.",
     "Give me just a moment. In the meantime, I'd like to ask...",
     "Let me ask you this while I gather my thoughts.",
+]
+
+# Softer connector used between the two questions in a paired screening
+# block — keeps the pair feeling like a single gentle check-in rather
+# than two abrupt clinical prompts.
+_SCREENING_FOLLOWUPS = [
+    "And one more quick check-in.",
+    "While we're here, one more short question.",
+    "And just one more along the same lines.",
+    "One more brief question before we move on.",
 ]
 
 # Keywords that trigger opt-out from intermission
@@ -176,7 +217,25 @@ def _is_skip_question_request(text: str) -> bool:
 
 
 class GlobalCommandMatcher:
-    """Regex + fuzzy priority matcher for start/end global voice commands."""
+    """Regex + fuzzy priority matcher for start/end global voice commands.
+
+    Bug-2 fix — end commands are split into two categories:
+
+    * SOFT_END: phrases signalling "I'm done with screening questions"
+      but not necessarily "quit the whole app". Examples:
+      "that's enough for today", "no more questions", "I don't want
+      to answer any more questions", "I'm done with questions".
+      Pre-CBT these route to the Response Analyzer as the paper's
+      `Stop` keyword so the screening loop terminates and CBT still
+      runs (paper §5.1). Once CBT has started, SOFT_END is treated
+      as HARD_END — the user wants to leave therapy.
+
+    * HARD_END: explicit "end/stop/finish/close session", "goodbye",
+      "bye". Always terminates the whole session immediately, skips
+      CBT if not yet started, runs the goodbye/closing-summary path.
+
+    START commands are unchanged.
+    """
 
     FUZZY_THRESHOLD = 0.80
 
@@ -208,12 +267,59 @@ class GlobalCommandMatcher:
         re.compile(r"\b(?:start|begin|hello|hi|let'?s\s+go)\b(?:.*\bsession\b)?", re.IGNORECASE),
         re.compile(r"\bhi\s+katie\b", re.IGNORECASE),
     )
-    _END_PATTERNS = (
-        re.compile(r"\b(?:end\s+session|stop\s+session|finish\s+session|goodbye)\b", re.IGNORECASE),
-        re.compile(r"\b(?:end|and|stop|finish|goodbye)\b(?:\s+(?:the|this|dis|da))?\s+session\b", re.IGNORECASE),
-        re.compile(r"^\s*(?:end|and|stop|finish)\s*(?:the|this|dis|da)?\s*(?:session)?\s*(?:please)?\s*[.!?]*\s*$", re.IGNORECASE),
-        # Aggressive catch-all: any phrase containing an end-word near "session"
-        re.compile(r"(?:end|and|stop|finish|goodbye|close).*session", re.IGNORECASE),
+    # HARD_END: user explicitly wants to end the session (kill switch).
+    # Short-utterance + explicit-session-word bias keeps "I don't want to
+    # answer any more questions. Let's end the session." (long, mixed) OUT
+    # of this category — that sentence carries the softer "finish
+    # screening" intent and should route through SOFT_END instead.
+    _HARD_END_PATTERNS = (
+        # Whole-utterance end command (≤ ~5 words): "end session", "stop
+        # the session please", "finish session".
+        re.compile(
+            r"^\s*(?:end|stop|finish|close)\s+(?:the|this|dis|da)?\s*session\s*(?:please|now)?\s*[.!?]*\s*$",
+            re.IGNORECASE,
+        ),
+        # Whole-utterance goodbye: "goodbye", "bye", "goodbye now"
+        re.compile(r"^\s*(?:good\s?bye|bye)\s*(?:now|please)?\s*[.!?]*\s*$", re.IGNORECASE),
+    )
+    # SOFT_END: "finish screening, move to CBT" intent. Matches any
+    # phrasing that signals the user is done with screening QUESTIONS
+    # specifically, not the whole session. Pre-CBT these become `Stop`
+    # via the Response Analyzer; post-CBT-start they upgrade to HARD_END.
+    #
+    # NOTE: patterns are matched AFTER `_normalize()` strips punctuation
+    # (so "don't" → "don t", "that's" → "that s"). Patterns below use
+    # optional-space forms to match both normalized and raw shapes.
+    _SOFT_END_PATTERNS = (
+        re.compile(r"\bno\s+more\s+questions?\b", re.IGNORECASE),
+        # "I don't/dont/do not want to answer (any) (more) questions"
+        re.compile(
+            r"\b(?:i\s+)?(?:don\s*t|dont|do\s+not)\s+want\s+to\s+answer\s+(?:any\s+)?(?:more\s+)?questions?\b",
+            re.IGNORECASE,
+        ),
+        # "that's / thats / that is / that s enough for today/now"
+        re.compile(
+            r"\b(?:that\s*s|thats|that\s+is)\s+enough\s+(?:for\s+today|for\s+now)\b",
+            re.IGNORECASE,
+        ),
+        # "I'm / I am / im done with (the) questions"
+        re.compile(
+            r"\b(?:i\s*m|im|i\s+am)\s+done\s+(?:with\s+)?(?:the\s+)?questions?\b",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\benough\s+questions?\b", re.IGNORECASE),
+        re.compile(r"\bstop\s+(?:the\s+)?questions?\b", re.IGNORECASE),
+        # Longer "let's end the session" phrasings that mix end-intent
+        # with extra clauses route softly; short "end session" alone
+        # matches _HARD_END_PATTERNS above and is unaffected.
+        re.compile(
+            r"\blet\s*s\s+end\s+(?:the|this)\s+session\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\bi\s+want\s+to\s+end\s+(?:the|this)\s+session\b",
+            re.IGNORECASE,
+        ),
     )
 
     @staticmethod
@@ -231,8 +337,15 @@ class GlobalCommandMatcher:
             for ref in refs
         )
 
-    def _fuzzy_end(self, text: str) -> bool:
-        tokens = set(text.split())
+    def _fuzzy_hard_end(self, text: str) -> bool:
+        """Only short, unambiguous utterances qualify for HARD_END.
+
+        Previous implementation matched ANY utterance containing an end-
+        word near "session", which greedily swallowed mixed-intent lines
+        like "I don't want to answer any more questions. Let's end the
+        session." — that's now handled by SOFT_END instead.
+        """
+        tokens = text.split()
         if not tokens:
             return False
 
@@ -245,23 +358,22 @@ class GlobalCommandMatcher:
         # healthy and have green food" while answering the CHALLENGE
         # prompt and the session terminated).  A strict exact-match is
         # the only safe policy for these 3-letter tokens.
-        if "goodbye" in tokens or "bye" in tokens:
+        tok_set = set(tokens)
+        if len(tokens) <= 3 and ("goodbye" in tok_set or "bye" in tok_set):
             return True
 
-        # Require "session" to be present — this disambiguates the
-        # end-word tokens from normal conversational use of "and" /
-        # "stop" / "finish" etc.  Fuzzy-match on "session" is acceptable
-        # because the word is long enough (7 chars) for SequenceMatcher
-        # ratios to be meaningful.
-        has_session = "session" in tokens or self._token_hit(tokens, ("session",), 0.75)
+        # Short utterance (≤ 4 tokens) containing "session" + an end-word.
+        # Prevents the old catch-all from swallowing long mixed-intent
+        # sentences; short utterances like "end the session please" still
+        # qualify.
+        if len(tokens) > 5:
+            return False
+        has_session = "session" in tok_set or self._token_hit(tok_set, ("session",), 0.75)
         if not has_session:
             return False
 
-        # "end" is commonly mis-heard as "and" — a lower threshold is
-        # fine here because the presence of "session" already blocks
-        # normal conversational false positives.
-        has_end_token = self._token_hit(tokens, ("end", "and", "stop", "finish", "close"), 0.75)
-        has_start_token = self._token_hit(tokens, ("start", "begin", "hello", "hi"), self.FUZZY_THRESHOLD)
+        has_end_token = self._token_hit(tok_set, ("end", "stop", "finish", "close"), 0.80)
+        has_start_token = self._token_hit(tok_set, ("start", "begin", "hello", "hi"), self.FUZZY_THRESHOLD)
         return has_end_token and not has_start_token
 
     def _fuzzy_start(self, text: str) -> bool:
@@ -279,14 +391,38 @@ class GlobalCommandMatcher:
         return has_start_token and has_session_or_name and not has_end_token
 
     def match(self, transcript: str) -> str | None:
+        """Classify utterance as HARD_END / SOFT_END / START / None.
+
+        Returns:
+            "HARD_END" — explicit quit-the-whole-session command.
+            "SOFT_END" — finish-screening-questions intent (pre-CBT
+                         routes to Response Analyzer's Stop keyword;
+                         post-CBT-start upgrades to HARD_END).
+            "START"    — session-start wake command.
+            None       — no global command detected; normal clinical
+                         utterance.
+
+        Matching order: SOFT_END is checked BEFORE HARD_END because
+        SOFT_END phrases are more specific ("let's end the session"
+        with context "screening questions") and should not be swallowed
+        by a broad HARD_END match. Only utterances that fail SOFT_END
+        are considered for HARD_END.
+        """
         text = self._normalize(str(transcript or ""))
         if not text:
             return None
 
-        if any(p.search(text) for p in self._END_PATTERNS):
-            return "END"
-        if self._fuzzy_end(text):
-            return "END"
+        # SOFT_END first: more specific "finish screening" intent.
+        if any(p.search(text) for p in self._SOFT_END_PATTERNS):
+            return "SOFT_END"
+
+        # HARD_END: short, unambiguous kill-switch phrases. We now only
+        # reach this branch if no SOFT_END pattern matched.
+        if any(p.search(text) for p in self._HARD_END_PATTERNS):
+            return "HARD_END"
+        if self._fuzzy_hard_end(text):
+            return "HARD_END"
+
         if any(p.search(text) for p in self._START_PATTERNS):
             return "START"
         if self._fuzzy_start(text):
@@ -372,7 +508,7 @@ class SpeechInteractionService:
     # Core Actions                                                         #
     # ------------------------------------------------------------------ #
 
-    def say(self, text):
+    def say(self, text, voice: str = "primary"):
         """Speak text via TTS or play music.  Blocks until playback finishes.
 
         Every utterance that actually becomes audio is logged as [TTS] so
@@ -381,10 +517,17 @@ class SpeechInteractionService:
         and goodbye lines that never route through log_question's [AGENT]
         tag. Dedup guard below drops the log line when the last [AGENT]
         event already carried the same text (handler-driven clinical turns).
+
+        ``voice="primary"`` (default) uses the CaiTI voice; callers can
+        pass ``voice="intermission"`` to route this utterance through the
+        second Piper voice configured in config.yaml.  When the second
+        voice isn't configured or its files are missing, TTSGenerator
+        silently falls back to the primary voice so the user never
+        experiences a dropout.
         """
         if not text:
             return
-        logger.debug(f"Agent Action: {text[:120]}{'...' if len(text) > 120 else ''}")
+        logger.debug(f"Agent Action [{voice}]: {text[:120]}{'...' if len(text) > 120 else ''}")
 
         if text.startswith("[PLAY_MUSIC]"):
             music_file = text.split(" ", 1)[1] if " " in text else _get_music_path()
@@ -400,12 +543,12 @@ class SpeechInteractionService:
         # by log_question) don't appear twice on the console.
         last_agent = str(getattr(io_record, "_LAST_AGENT_LOGGED", "") or "")
         if text.strip() and text.strip() != last_agent.strip():
-            logger.info(f"[TTS] {text}")
+            logger.info(f"[TTS/{voice}] {text}")
 
         prev_state = self.state
         self.state = "speaking"
         wav_file = "active_ai_response.wav"
-        if self.tts.generate(text, wav_file):
+        if self.tts.generate(text, wav_file, voice=voice):
             self._led_off()
             self.stop_playback_event.clear()
             self.player.play(wav_file, stop_event=self.stop_playback_event)
@@ -415,6 +558,17 @@ class SpeechInteractionService:
             logger.error("[TTS FAILURE] Both engines failed. Raising music to cover silence gap.")
             self.music_service.set_base_volume(_MUSIC_BED_AMBIENT)
         self.state = prev_state
+
+    def say_intermission(self, text):
+        """Convenience wrapper: speak through the intermission voice.
+
+        Routes the utterance through the second Piper voice (Alan by
+        default) so the user hears a clearly different speaker during
+        intermission beats vs. therapy turns.  Falls back silently to
+        the primary voice when the second voice isn't configured —
+        clinical data must still land audibly.
+        """
+        self.say(text, voice="intermission")
 
     def _persist_intermission_status(self, question_id: str, status: str, score=None, response_text="", reason=""):
         if not io_record.DB or not io_record.SESSION_ID:
@@ -432,13 +586,47 @@ class SpeechInteractionService:
             logger.warning(f"Failed to persist intermission status for {question_id}: {e}")
 
     def _apply_global_command_priority(self, transcript: str) -> str | None:
-        """Apply START/END priority matching before queueing input to the NLP stack."""
+        """Apply START/END priority matching before queueing input to the NLP stack.
+
+        Bug-2 fix — routing depends on whether CBT has started:
+
+        * HARD_END → always close session immediately (paper §5.1 is
+          unaffected; this is a kill-switch, not a clinical signal).
+        * SOFT_END → pre-CBT: return None so the transcript flows to the
+          Response Analyzer; the analyzer will classify as `Stop`,
+          which terminates screening and still routes into CBT
+          (handler_rl → run_cbt). Post-CBT-start: upgrade to HARD_END
+          so the user can leave therapy.
+        * START → pass through.
+        """
         command = self.global_command_matcher.match(transcript)
-        if command == "END":
-            logger.info("[SESSION] End command heard — closing session.")
+        if command == "HARD_END":
+            logger.info("[SESSION] Hard end command heard — closing session.")
             self.handle_exit()
             return "END"
-        return command
+        if command == "SOFT_END":
+            if io_record.CBT_STARTED_EVENT.is_set():
+                # Mid/post-CBT: user wants out. Escalate to hard end.
+                logger.info(
+                    "[SESSION] Soft end command heard during CBT — "
+                    "escalating to hard end."
+                )
+                self.handle_exit()
+                return "END"
+            # Pre-CBT: let the transcript reach the Response Analyzer.
+            # It will classify the phrase (e.g. "no more questions",
+            # "that's enough for today") as `Stop`, which the paper's
+            # screening loop treats as "terminate screening, proceed
+            # to CBT" (paper §5.1 / §5.3). Return None so the caller
+            # does NOT substitute a __CMD_END__ sentinel.
+            logger.info(
+                "[SESSION] Soft end command heard pre-CBT — "
+                "routing to screening Stop keyword → CBT."
+            )
+            return None
+        if command == "START":
+            return "START"
+        return None
 
     def _sync_intermission_state_from_db(self):
         if not io_record.DB or not io_record.SESSION_ID:
@@ -904,7 +1092,11 @@ class SpeechInteractionService:
                 "", name, flags=re.IGNORECASE,
             ).strip()
             clean = re.sub(r"[^A-Za-z0-9 _-]", "", stripped or name).strip()
-            uid = clean.replace(" ", "_") or "User"
+            # Canonicalise to lowercase so "Alice" and "alice" resolve to the
+            # same longitudinal Q-table + DB user row across sessions. Without
+            # this, a returning user spoken as "Alice" one day and "alice" the
+            # next would start with a fresh Q-table each time.
+            uid = (clean.replace(" ", "_") or "User").lower()
             logger.info(f"[SESSION] Initializing session for subject: {uid}")
             io_record.reset_session(uid)
             io_record.END_SESSION_EVENT.clear()
@@ -1068,13 +1260,117 @@ class SpeechInteractionService:
     #                   fall through to the declared fallback for this turn.
     #   "completed"   — activity finished; caller continues normal cycling.
 
-    def _run_screening_block(self, question, llm_done, listener_active):
-        """Ask one PHQ/GAD question and record the result."""
+    def _speak_intermission_lead_in(self, stage: IntermissionStage) -> None:
+        """Speak a short "this is an intermission" signpost before an activity.
+
+        Plays before every proactive intermission block so the user can
+        clearly distinguish the intermission from CaiTI's therapy
+        questioning.  Lead-in wording is stage-agnostic by design — the
+        point is to mark the separation, not preview the activity.
+
+        Routed through the intermission voice so the voice change itself
+        is the first sensory signal that the intermission has started.
+        """
+        lead_in = _random.choice(_INTERMISSION_LEAD_INS)
+        logger.debug(f"[INTERMISSION] Lead-in ({stage.value}): {lead_in}")
+        self.say_intermission(lead_in)
+        # Small beat so the lead-in lands before the activity starts.
+        time.sleep(0.4)
+
+    def _run_paired_screening_block(self, llm_done, listener_active):
+        """Ask up to two screening questions together, preferring same-scale pairs.
+
+        Groups GAD-1+GAD-2 (anxiety) and PHQ-1+PHQ-2 (depression) so the
+        user experiences a single gentle check-in rather than one abrupt
+        question at a time.  Falls back to one question when only one
+        remains, or when the next scale-matched question is missing.
+        Outcome propagation:
+          - The first question's outcome dominates (end / declined /
+            completed).  A declined first question falls through without
+            asking the second; the caller will move on to another
+            activity within the same turn per the existing design.
+          - After a successful first answer, the second (if available)
+            is introduced via `_SCREENING_FOLLOWUPS` so the transition
+            reads naturally.
+        """
+        first = self.intermission_ladder.next_screening_question()
+        if first is None:
+            return {"outcome": "completed"}
+
+        # Skip the "while I'm processing that..." intro on the first
+        # question — the lead-in speech that just played already handled
+        # framing, so we go straight into the question text.
+        first_result = self._run_screening_block(
+            first, llm_done, listener_active, skip_intro=True,
+        )
+        first_outcome = first_result.get("outcome", "completed")
+        if first_outcome in ("end", "declined"):
+            # Honour the user's signal — don't push a second question on
+            # top of a decline / end command.
+            return first_result
+
+        # Look for a scale-matched partner; else any remaining question.
+        partner = self._pick_scale_paired_question(first.question_id)
+        if partner is None:
+            return first_result
+
+        # Softer connector so the pair feels like one gentle check-in
+        # instead of two stapled prompts.  Uses its own intros pool so
+        # the wording doesn't collide with the primary intro.  Spoken in
+        # the intermission voice for continuity with the rest of the
+        # screening block.
+        connector = _random.choice(_SCREENING_FOLLOWUPS)
+        logger.debug(f"[PHQ4] Paired follow-up connector: {connector}")
+        self.say_intermission(connector)
+        time.sleep(0.3)
+
+        second_result = self._run_screening_block(
+            partner, llm_done, listener_active,
+            # Skip the random intro on the second question so we don't
+            # double up on "while I'm processing that..." phrasing after
+            # the connector we just spoke.
+            skip_intro=True,
+        )
+        return second_result
+
+    def _pick_scale_paired_question(self, first_question_id: str):
+        """Return the next unanswered question whose scale matches `first_question_id`.
+
+        Falls back to any remaining unanswered question if the matching
+        scale's partner is already resolved.  Returns None when no
+        screening question is available at all.
+        """
+        from src.core.therapy_content import CLINICAL_SCREENING
+        scale_by_id = {q["id"]: q["scale"] for q in CLINICAL_SCREENING}
+        target_scale = scale_by_id.get(first_question_id)
+        next_q = self.intermission_ladder.next_screening_question()
+        if next_q is None:
+            return None
+        if target_scale and scale_by_id.get(next_q.question_id) != target_scale:
+            # The next pending question is a different scale.  Prefer it
+            # only as a fallback — if there's no same-scale partner
+            # pending, we still ask the cross-scale one so the user
+            # gets two check-ins per intermission instead of one.
+            pass
+        return next_q
+
+    def _run_screening_block(self, question, llm_done, listener_active, skip_intro: bool = False):
+        """Ask one PHQ/GAD question and record the result.
+
+        All intermission-domain utterances (intro, question text, silence
+        re-prompt) use the intermission voice so the PHQ/GAD questions
+        don't sound like CaiTI's therapy prompts.  System-level lines
+        like "we're already in session" stay on the primary voice — they
+        are CaiTI speaking a correction, not part of the intermission.
+        """
         self.state = "intermission_screening"
-        intro = _random.choice(_SCREENING_INTROS)
-        full_prompt = f"{intro} {question.text}\n{_SCREENING_OPTIONS_HINT}"
+        if skip_intro:
+            full_prompt = f"{question.text}\n{_SCREENING_OPTIONS_HINT}"
+        else:
+            intro = _random.choice(_SCREENING_INTROS)
+            full_prompt = f"{intro} {question.text}\n{_SCREENING_OPTIONS_HINT}"
         logger.info(f"[PHQ4] Asking screening question: {question.question_id}")
-        self.say(full_prompt)
+        self.say_intermission(full_prompt)
 
         listener_active.set()
         try:
@@ -1103,7 +1399,7 @@ class SpeechInteractionService:
         # Empty / very short transcript — one silent re-prompt before skip.
         if not clean or len(clean) < 2:
             logger.info("[PHQ4] No response heard — re-prompting.")
-            self.say("I didn't catch that. Could you try again?")
+            self.say_intermission("I didn't catch that. Could you try again?")
             listener_active.set()
             try:
                 self.stt.resume_all()
@@ -1203,48 +1499,41 @@ class SpeechInteractionService:
         return {"outcome": "completed"}
 
     def _run_breathing_block(self, llm_done):
-        """Guide one random breathing exercise; no listen step.
+        """Guide one random breathing exercise; no listen step, no mid-cut.
 
-        The meditation / breathing exercise is a passive activity — the
-        user does the breathing, they don't respond to it.  Previously
-        this block ran a 6 s listen for opt-out keywords after the
-        guidance, which left the user confused ("why is the system
-        waiting for me after it said to breathe?") and could also
-        accidentally pick up throat-clears / background noise as an
-        end-session command (observed in Kyle's session — the STT layer
-        is the highest-leverage source of false positives).
-        Speak the guidance and hold for the LLM's remaining latency;
-        that's it.
+        The meditation / breathing exercise is a passive guided activity —
+        the user does the breathing, they don't respond to it.  Cutting
+        the script mid-breath was confusing UX ("it told me to breathe,
+        then disappeared mid-sentence"), so the guidance now plays to
+        completion even if the LLM answer arrives early.  The LLM
+        response simply waits in the output queue until the exercise
+        finishes.  `llm_done` is accepted for signature compatibility
+        with the other blocks but is intentionally NOT polled.
 
-        When `llm_done` is a real (non-dummy) event, the guidance TTS is
-        interruptible — the caller's output-ready watcher trips
-        `self.stop_playback_event` as soon as the next LLM response is
-        ready, which `player.play` already respects.  This gets rid of
-        the ~30 s dead gap that used to happen on GPU turns where the
-        LLM finished long before the full meditation script played out.
-        A minimum-engagement floor keeps very-fast LLM turns from
-        chopping the guidance after a single phrase.
+        Because the caller (`_run_one_intermission_activity`) no longer
+        attaches an output-ready watcher for BREATHING, `stop_playback_event`
+        will not be set mid-script by the watcher.  We still clear it
+        defensively at entry so a prior turn's leftover signal can't
+        truncate the new meditation.
         """
         self.state = "intermission_exercise"
+        # Clear any stale stop signal from a prior turn's watcher so the
+        # full meditation script plays through.  BREATHING runs with no
+        # watcher of its own — this is belt-and-braces for the case where
+        # a prior MUSIC block's watcher raced past its stop_event.set().
+        self.stop_playback_event.clear()
         exercise_text = self.intermission_ladder.next_breathing_exercise()
         logger.info("[INTERMISSION] Guiding a breathing exercise while LLM generates.")
         # Gentle lift so the bed rides *with* the exercise instead of
         # dropping to a whisper between MUSIC blocks.  Ducking kicks in
         # automatically while the guidance TTS plays (set_ai_speaking).
         self.music_service.fade_to(_MUSIC_BED_BREATHING, duration=1.2)
-        block_started = time.monotonic()
-        self.say(exercise_text)
-
-        # Hold the remainder of _EXERCISE_HOLD_SEC but wake immediately if
-        # the LLM becomes ready.  If the LLM is still thinking after the
-        # hold, cycle back to another activity.  The `stop_playback_event`
-        # set by the output-ready watcher will also have cut the
-        # say() above short, so by the time we arrive here the audio is
-        # already fading out or silent.
-        elapsed = time.monotonic() - block_started
-        remaining = max(0.0, _EXERCISE_HOLD_SEC - elapsed)
-        if llm_done.wait(timeout=remaining):
-            return {"outcome": "llm_ready"}
+        # Meditation is spoken in the intermission voice so the guided
+        # script sounds clearly different from CaiTI's therapy prompts.
+        self.say_intermission(exercise_text)
+        # The meditation has played in full at this point.  Return
+        # `completed` so the delivery pipeline can transition back to
+        # the LLM response cleanly via the usual outro + bridge.
         return {"outcome": "completed"}
 
     def _start_output_ready_watcher(self, llm_done: threading.Event) -> threading.Event:
@@ -1322,16 +1611,20 @@ class SpeechInteractionService:
         :meth:`_wait_for_output_with_intermission` call, which by then
         is essentially a no-wait delivery path.
 
-        Early-exit on LLM ready.  Historically this function handed
-        each block a dummy event that never fires, so the block
-        always ran its full ~30 s hold even if the handler had
-        answered in 5 s (observed on GPU turns — user heard 30 s of
-        dead air after the meditation audio itself ended).  Now we
-        start an output-queue watcher that trips a real `llm_done`
-        and cuts in-flight TTS via `stop_playback_event` as soon as
-        the handler enqueues its response.  A short engagement floor
-        prevents cutting the activity mid-first-phrase when the LLM
-        turn was very fast.
+        Framing.  Before the first audible beat of the activity plays
+        we speak a short lead-in that explicitly tells the user "this
+        is an intermission, separate from the main session", so it
+        does not sound like another therapy question.  A matching
+        outro is spoken on the way out of the intermission (in
+        `_wait_for_output_with_intermission`), replacing the older
+        bridge phrase when an intermission was actually active.
+
+        Early-exit on LLM ready (MUSIC only).  MUSIC is interruptible
+        via the output-ready watcher — it's just an ambient bed, the
+        user is not being asked to engage with it.  BREATHING is NOT
+        interruptible any more: the meditation script is a guided
+        experience and cutting it mid-breath was unsettling.  The LLM
+        response simply waits for the full meditation to finish.
         """
         logger.debug("[INTERMISSION] Proactive pre-wait activity starting.")
         self._sync_intermission_state_from_db()
@@ -1345,43 +1638,41 @@ class SpeechInteractionService:
             stage = self.intermission_ladder.next_activity()
         logger.info(f"[INTERMISSION] Pre-wait activity: {stage.value}")  # user-engaging activity while LLM thinks
 
-        # Only BREATHING and MUSIC are safe to interrupt proactively.
-        # SCREENING collects a PHQ/GAD answer from the user — that's
-        # clinical data, and cutting the user mid-answer would lose it.
-        # The downstream `_wait_for_output_with_intermission` already
-        # defers on `listener_active`, so letting SCREENING run its
-        # normal course here costs at most the screening's natural
-        # ~20 s budget (comparable to a full breathing block).
+        # Signpost the intermission so the user hears a clear separation
+        # from the main therapy thread before the activity itself starts.
+        # We do this here, centrally, so every stage benefits without the
+        # individual block functions having to duplicate the wording.
+        self._speak_intermission_lead_in(stage)
+
+        # Only MUSIC is safe to interrupt proactively now. SCREENING
+        # collects a PHQ/GAD answer from the user — that's clinical
+        # data, and cutting the user mid-answer would lose it. BREATHING
+        # is a guided meditation; cutting it mid-script was confusing
+        # UX.  Both now play to completion; the LLM response simply
+        # waits in the output queue until the activity finishes.
         llm_done = threading.Event()
         watcher_stop: threading.Event | None = None
-        if stage in (IntermissionStage.BREATHING_EXERCISE, IntermissionStage.MUSIC):
+        if stage == IntermissionStage.MUSIC:
             watcher_stop = self._start_output_ready_watcher(llm_done)
 
         try:
             listener_active = threading.Event()
             if stage == IntermissionStage.SCREENING:
-                question = self.intermission_ladder.next_screening_question()
-                if question is not None:
-                    result = self._run_screening_block(question, llm_done, listener_active)
-                    self.intermission_ladder.mark_activity(stage)
-                    if result.get("outcome") in ("declined", "completed", "end"):
-                        # Whether answered / skipped / declined, the user
-                        # has had their activity beat; return without
-                        # chaining further.
-                        return
+                result = self._run_paired_screening_block(llm_done, listener_active)
+                self.intermission_ladder.mark_activity(stage)
+                if result.get("outcome") in ("declined", "completed", "end"):
+                    # Whether answered / skipped / declined, the user
+                    # has had their activity beat; return without
+                    # chaining further.
+                    return
                 # Defensive: screening picked but no question available — fall through.
                 stage = IntermissionStage.BREATHING_EXERCISE
-                # Only start the watcher now that we are leaving the
-                # clinical-screening path.
-                watcher_stop = self._start_output_ready_watcher(llm_done)
 
             if stage == IntermissionStage.BREATHING_EXERCISE:
                 # Breathing is passive — user doesn't respond mid-meditation.
-                # The block speaks the guidance and holds silently for the
-                # rest of the exercise window, then returns.  No "declined"
-                # branch is possible any more (opt-out listen was removed
-                # because it was confusing UX and the STT was a false-
-                # positive source for end-session).
+                # The block speaks the full guided script and returns.
+                # No interrupt watcher: the meditation plays through to
+                # completion so the user experiences the whole exercise.
                 self._run_breathing_block(llm_done)
                 self.intermission_ladder.mark_activity(stage)
                 return
@@ -1399,17 +1690,20 @@ class SpeechInteractionService:
     def _run_music_block(self, llm_done):
         """Raise music bed, wait for LLM output or a hold interval.
 
-        Interruptible the same way as `_run_breathing_block`: if the
-        caller's output-ready watcher fires `llm_done`, we return
-        `llm_ready` immediately rather than sitting on the music until
-        the hold-timer expires.  This removes the "~30 s of music after
-        the LLM already answered" tail that used to pad every GPU turn.
-        A short minimum engagement is still respected so the music
-        announcement has time to finish before we hand back.
+        Interruptible — if the caller's output-ready watcher fires
+        `llm_done`, we return `llm_ready` immediately rather than
+        sitting on the music until the hold-timer expires.  This removes
+        the "~30 s of music after the LLM already answered" tail that
+        used to pad every GPU turn.  A short minimum engagement is
+        still respected so the music announcement has time to finish
+        before we hand back.  BREATHING, by contrast, is NOT interrupted
+        mid-script (see `_run_breathing_block`) so the user always
+        experiences the full guided meditation.
         """
         self.state = "music_fallback"
         if not self._music_announced_for_turn:
-            self.say("I'm still thinking, enjoy the music while I continue.")
+            # Music announcement is an intermission utterance.
+            self.say_intermission("I'm still thinking, enjoy the music while I continue.")
             self._music_announced_for_turn = True
         # Fade up so the music bed becomes the foreground while the LLM
         # is thinking — the user should feel like they're being *given*
@@ -1540,14 +1834,16 @@ class SpeechInteractionService:
                 logger.info(f"[INTERMISSION] Selected activity: {stage.value}")
 
             if stage == IntermissionStage.SCREENING:
-                question = self.intermission_ladder.next_screening_question()
-                if question is None:
+                if self.intermission_ladder.next_screening_question() is None:
                     # Defensive: ladder said SCREENING but no question is
                     # available — skip without marking (shouldn't happen
                     # since next_activity() gates on screening_available).
                     turn_exclude.add(IntermissionStage.SCREENING)
                     continue
-                result = self._run_screening_block(question, llm_done, listener_active)
+                # Lead-in so this extra activity is still framed clearly
+                # as a separate intermission, not another therapy question.
+                self._speak_intermission_lead_in(stage)
+                result = self._run_paired_screening_block(llm_done, listener_active)
                 self.intermission_ladder.mark_activity(stage)
                 if result["outcome"] == "end":
                     break
@@ -1563,17 +1859,21 @@ class SpeechInteractionService:
                 continue
 
             if stage == IntermissionStage.BREATHING_EXERCISE:
+                # Lead-in for the additional breathing beat during the
+                # delivery-phase cycle.
+                self._speak_intermission_lead_in(stage)
                 result = self._run_breathing_block(llm_done)
                 self.intermission_ladder.mark_activity(stage)
-                # No "declined" path — breathing is a passive activity,
-                # the block just holds for its natural duration and
-                # returns "llm_ready" or "completed".
-                if result["outcome"] == "llm_ready":
-                    break
+                # Breathing now always plays to completion (see
+                # _run_breathing_block docstring) — no llm_ready mid-cut.
                 turn_exclude.clear()
                 continue
 
             if stage == IntermissionStage.MUSIC:
+                # Lead-in for the music beat only on first entry this
+                # turn (`_music_announced_for_turn` guards repeats).
+                if not self._music_announced_for_turn:
+                    self._speak_intermission_lead_in(stage)
                 result = self._run_music_block(llm_done)
                 self.intermission_ladder.mark_activity(stage)
                 if result["outcome"] == "llm_ready":
@@ -1600,6 +1900,19 @@ class SpeechInteractionService:
             self.music_service.fade_to(_MUSIC_BED_HANDOFF, duration=1.2)
             time.sleep(0.9)
 
+            # Intermission outro — a clearly distinct "that was the
+            # intermission; now back to our session" signpost. Played
+            # before the standard bridge so the user hears: (1) end of
+            # intermission (intermission voice), (2) bridge back into
+            # therapy (CaiTI voice), (3) the LLM reply itself (CaiTI
+            # voice).  The voice flip between outro and bridge is itself
+            # an audible "CaiTI is back" cue.
+            if intermission_was_active and not is_session_start:
+                outro = _random.choice(_INTERMISSION_OUTROS)
+                logger.debug(f"[HANDOFF] Intermission outro: '{outro}'")
+                self.say_intermission(outro)
+                time.sleep(0.3)
+
             # The standard bridge phrases all reference something the user
             # "shared" — on the very first turn they haven't said anything
             # yet, so the bridge would be nonsensical.  Skip it for
@@ -1613,6 +1926,27 @@ class SpeechInteractionService:
             time.sleep(0.3)
             self.say(response_text[0])
 
+            # Defensive drain: after the primary LLM utterance finishes
+            # speaking, give the handler a short window to enqueue any
+            # immediately-adjacent follow-up utterances (e.g. a CBT
+            # Guide example + re-ask pair, or a handler-side closing
+            # message on the last turn). This keeps paper §5.3's
+            # "one user-facing beat" semantics intact even when the
+            # handler emits multiple log_question calls per turn.
+            # 400 ms window per drain, extended whenever something is
+            # actually spoken, so a real trailing utterance from the
+            # handler is never orphaned on the queue.
+            drain_deadline = time.monotonic() + 0.4
+            while time.monotonic() < drain_deadline:
+                try:
+                    more = self.output_queue.get(timeout=0.1)
+                except queue.Empty:
+                    break
+                if more:
+                    logger.debug("[INTERMISSION] Draining trailing agent utterance.")
+                    self.say(more)
+                    drain_deadline = time.monotonic() + 0.4
+
             # Restore the ambient base volume after the reply so the bed
             # sits at a calm level for the next listen.
             self.music_service.fade_to(_MUSIC_BED_AMBIENT, duration=1.5)
@@ -1623,7 +1957,11 @@ class SpeechInteractionService:
             self.music_service.fade_to(_MUSIC_BED_HANDOFF, duration=1.0)
             time.sleep(0.7)
             fallback = self.intermission_ladder.next_breathing_exercise()
-            self.say(fallback)
+            # Meditation fallback rides on the intermission voice; the
+            # apology line (CaiTI explaining the hiccup) stays on the
+            # primary voice so the user hears the therapist acknowledge
+            # the issue directly.
+            self.say_intermission(fallback)
             self.say("I'm having a little trouble with my thoughts right now. Let me try again shortly.")
             self.music_service.fade_to(_MUSIC_BED_AMBIENT, duration=1.5)
 

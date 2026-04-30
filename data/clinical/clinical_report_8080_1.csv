@@ -1,0 +1,13 @@
+# Generated,2026-04-30T18:05:27.729579
+# Subject,8080
+# Session,1
+
+Timestamp,RowType,Dimension,FinalScore,UserEvidence,InterventionDetail,Notes
+,Turn,,,,,system: [REASONER_DECISION]
+,Turn,,,,,system: [RL_DECISION]
+,Turn,,,,,"agent: Hello, welcome to the test session.
+
+How's your eating? Are you eating regularly?"
+,Turn,,,"Yes, I am fine.",,"user: Yes, I am fine."
+,Turn,,,,,system: [SEMANTIC_SCORES]
+,Turn,,,,,agent: Just answer yes or no.

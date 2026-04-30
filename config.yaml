@@ -216,8 +216,36 @@ stt:
   without_timestamps: true
 
 tts:
-  model_path: "en_US-amy-medium.onnx" # piper model path
+  model_path: "en_US-amy-medium.onnx" # piper model path (primary / CaiTI voice)
   executable_path: "piper" # path to piper executable
+  # Second voice used EXCLUSIVELY for intermission segments (lead-in,
+  # breathing meditation, music announcement, outro, paired screening)
+  # so the user hears a clearly different speaker during pauses vs.
+  # during therapy.  Piper is subprocess-invoked (one process per
+  # utterance), so two voices on disk cost only disk space — no
+  # resident-memory overhead; weights are loaded and freed per call.
+  # Leave blank to disable the second voice (intermissions fall back
+  # to the primary CaiTI voice).
+  intermission_model_path: "./models/piper/en_GB-alan-medium.onnx"
 
 database:
   db_path: "data/therapist.db"
+
+# Speech Emotion Recognition (SER)
+# ────────────────────────────────
+# Disabled by default — the legacy `light_mfcc_rf` backend was removed
+# during research alignment (see src/models/stt.py header), but all
+# downstream plumbing is intact:
+#   - STTGenerator.transcribe() emits {"detected_emotion": "neu"}
+#   - io_record.get_answer() / get_resp_log() unpack that tag into
+#     _LAST_USER_EMOTION
+#   - ser_metrics["emotion_tag"] rides the dossier and session analysis
+#
+# To bring SER back online, drop a real detector into
+# src/models/ser.py::SERGenerator.detect() and flip ser_enabled below
+# to true (or set SER_ENABLED=true in .env).  Expected contract:
+# detect(wav_path) -> short string emotion tag ("anxious", "calm",
+# "sad", "neu", ...).  STTGenerator will call it automatically when
+# enabled and replace the hard-coded "neu" in the transcribe() output.
+ser:
+  ser_enabled: false

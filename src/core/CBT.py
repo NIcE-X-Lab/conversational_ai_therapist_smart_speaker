@@ -591,6 +591,12 @@ def run_cbt(question_lib, crisis_callback=None):
     clinical work while a crisis is unaddressed is not safe.
     """
     logger.info("[CBT] Starting CBT flow (3-stage: Recognize / Challenge / Reframe).")
+    # Bug-2 fix: mark CBT as active so the speech service switches end-
+    # commands from the soft "finish screening, go to CBT" routing to the
+    # hard "terminate session now" path. Pre-CBT ambiguous end-intent
+    # goes through the Response Analyzer's Stop keyword; during/post-CBT,
+    # any end-command hard-terminates with the goodbye summary.
+    io_rec.CBT_STARTED_EVENT.set()
 
     def _crisis_intervened() -> bool:
         """Call the handler's scan+deliver hook; True means pause CBT."""
@@ -755,12 +761,15 @@ def run_cbt(question_lib, crisis_callback=None):
     retry = 0
     while dec1 == "1" and retry < 2:
         guide1 = stage1_guide(statement)
-        log_question(_sanitize_guide_text(guide1, "UNHELPFUL_THOUGHTS"))
-        # Legacy prompt was "Please provide your UNHELPFUL_THOUGHTS again,
-        # in one sentence." — the ALL-CAPS label with an underscore sounds
-        # awful through Piper TTS ("UNHELPFUL underscore THOUGHTS").  Same
-        # meaning, natural voice.
-        log_question("Please share those unhelpful thoughts again, in one sentence.")
+        # Paper §5.3 contract: Guide example + re-ask is ONE user-facing beat.
+        # Legacy's CSV slot rendered them as two prints before one input().
+        # On the queue-based TTS pipeline we merge them into a single
+        # `log_question` so the speech service speaks both sentences
+        # before the next listen cycle.
+        log_question(
+            f"{_sanitize_guide_text(guide1, 'UNHELPFUL_THOUGHTS')}\n\n"
+            "Please share those unhelpful thoughts again, in one sentence."
+        )
         unhelpful = get_resp_log()
         if isinstance(unhelpful, str) and "SESSION_END" in unhelpful:
             logger.info("Session End signal received in CBT stage 1 retry.")
@@ -776,9 +785,13 @@ def run_cbt(question_lib, crisis_callback=None):
         # attempts at a CBT stage.
         # G7 — legacy/demo never speaks the 988/SAMHSA hotline on CBT
         # stage failure. Gated off by CBT_ESCALATION_ENABLED.
+        # One-beat emission so the speech service speaks the optional
+        # escalation line and the pause line as a single TTS utterance.
+        pause_msg = "It seems difficult to identify the unhelpful thoughts right now. Let's pause CBT and revisit later."
         if CBT_ESCALATION_ENABLED:
-            log_question(CBT_ESCALATION_MESSAGE)
-        log_question("It seems difficult to identify the unhelpful thoughts right now. Let's pause CBT and revisit later.")
+            log_question(f"{CBT_ESCALATION_MESSAGE}\n\n{pause_msg}")
+        else:
+            log_question(pause_msg)
         # record brief CBT notes
         question_lib[str(i_sel)][str(j_sel)]["notes"].append([
             f"CBT_dimension: {label_sel}",
@@ -819,11 +832,11 @@ def run_cbt(question_lib, crisis_callback=None):
     retry = 0
     while dec2 == "1" and retry < 2:
         guide2 = stage2_guide(statement, unhelpful)
-        log_question(_sanitize_guide_text(guide2, "CHALLENGE"))
-        # Legacy said "Please try to CHALLENGE the unhelpful thoughts
-        # again, in one sentence." — the ALL-CAPS label is awkward spoken
-        # aloud.  Keep the clinical meaning; soften the surface form.
-        log_question("Please try to challenge the unhelpful thoughts again, in one sentence.")
+        # Paper §5.3 contract: Guide example + re-ask is ONE user-facing beat.
+        log_question(
+            f"{_sanitize_guide_text(guide2, 'CHALLENGE')}\n\n"
+            "Please try to challenge the unhelpful thoughts again, in one sentence."
+        )
         challenge = get_resp_log()
         if isinstance(challenge, str) and "SESSION_END" in challenge:
             logger.info("Session End signal received in CBT stage 2 retry.")
@@ -837,9 +850,12 @@ def run_cbt(question_lib, crisis_callback=None):
     if dec2 == "1":
         # G7 — legacy/demo never speaks the 988/SAMHSA hotline on CBT
         # stage failure. Gated off by CBT_ESCALATION_ENABLED.
+        # One-beat emission (paper §5.3 contract on queue pipeline).
+        pause_msg = "Challenging the thought seems difficult now. Let's pause CBT and revisit later."
         if CBT_ESCALATION_ENABLED:
-            log_question(CBT_ESCALATION_MESSAGE)
-        log_question("Challenging the thought seems difficult now. Let's pause CBT and revisit later.")
+            log_question(f"{CBT_ESCALATION_MESSAGE}\n\n{pause_msg}")
+        else:
+            log_question(pause_msg)
         question_lib[str(i_sel)][str(j_sel)]["notes"].append([
             f"CBT_dimension: {label_sel}",
             f"CBT_statement: {statement}",
@@ -881,9 +897,11 @@ def run_cbt(question_lib, crisis_callback=None):
     retry = 0
     while dec3 == "1" and retry < 2:
         guide3 = stage3_guide(statement, unhelpful, challenge)
-        log_question(_sanitize_guide_text(guide3, "REFRAME"))
-        # Legacy said "Please REFRAME again in one or two sentences."
-        log_question("Please try to reframe that again, in one or two sentences.")
+        # Paper §5.3 contract: Guide example + re-ask is ONE user-facing beat.
+        log_question(
+            f"{_sanitize_guide_text(guide3, 'REFRAME')}\n\n"
+            "Please try to reframe that again, in one or two sentences."
+        )
         reframe = get_resp_log()
         if isinstance(reframe, str) and "SESSION_END" in reframe:
             logger.info("Session End signal received in CBT stage 3 retry.")
@@ -897,9 +915,12 @@ def run_cbt(question_lib, crisis_callback=None):
     if dec3 == "1":
         # G7 — legacy/demo never speaks the 988/SAMHSA hotline on CBT
         # stage failure. Gated off by CBT_ESCALATION_ENABLED.
+        # One-beat emission (paper §5.3 contract on queue pipeline).
+        pause_msg = "Reframing seems hard right now. Let's pause CBT and revisit later."
         if CBT_ESCALATION_ENABLED:
-            log_question(CBT_ESCALATION_MESSAGE)
-        log_question("Reframing seems hard right now. Let's pause CBT and revisit later.")
+            log_question(f"{CBT_ESCALATION_MESSAGE}\n\n{pause_msg}")
+        else:
+            log_question(pause_msg)
         question_lib[str(i_sel)][str(j_sel)]["notes"].append([
             f"CBT_dimension: {label_sel}",
             f"CBT_statement: {statement}",

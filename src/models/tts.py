@@ -4,7 +4,13 @@ import os
 import shutil
 import subprocess
 from src.utils.log_util import get_logger
-from src.utils.config_loader import TTS_MODEL_PATH, TTS_EXECUTABLE, TTS_LENGTH_SCALE, TTS_SENTENCE_SILENCE
+from src.utils.config_loader import (
+    TTS_MODEL_PATH,
+    TTS_EXECUTABLE,
+    TTS_LENGTH_SCALE,
+    TTS_SENTENCE_SILENCE,
+    TTS_INTERMISSION_MODEL_PATH,
+)
 
 logger = get_logger("TTSGenerator")
 
@@ -22,11 +28,43 @@ _CACHED_FALLBACK_WAV = os.path.abspath(
 
 
 class TTSGenerator:
+    """Dual-voice Piper wrapper.
+
+    Primary voice (CaiTI) is always loaded and vetted at startup.  A
+    secondary intermission voice is optional — when configured (and
+    present on disk) it is used by callers passing `voice="intermission"`
+    to `generate()`.  Piper is subprocess-invoked per utterance, so
+    neither voice is resident in memory between calls; the only cost of
+    carrying two voices is disk space (~63 MB per Piper medium model).
+
+    Memory contract:
+      - No long-lived model handles inside this Python process.
+      - Each `generate()` spawns one `piper` subprocess with the
+        `--model <path>` argument, which loads the ONNX weights into
+        the subprocess's memory, synthesises the WAV, then exits.
+        Weights are released back to the OS as soon as the subprocess
+        terminates (C-extension memory, not Python-heap).
+      - Two concurrent calls would briefly double the footprint, but
+        our call sites are serial (one `say()` at a time via
+        `self.player.play(..., stop_event=...)` in SpeechService), so
+        only ONE Piper subprocess is ever alive at once.
+    """
+
     def __init__(self):
         self.executable = TTS_EXECUTABLE
+        # Primary voice — always required for the main therapy channel.
         self.model_path = TTS_MODEL_PATH
         self.model_config_path = f"{self.model_path}.json"
-        self._piper_available = self._check_deps()
+        # Secondary voice — optional.  Empty string means "no second
+        # voice configured, fall back to primary for intermission TTS".
+        self.intermission_model_path = TTS_INTERMISSION_MODEL_PATH or ""
+        self.intermission_model_config_path = (
+            f"{self.intermission_model_path}.json"
+            if self.intermission_model_path else ""
+        )
+        self._piper_available = self._check_deps(self.model_path)
+        self._intermission_available = bool(self.intermission_model_path) and \
+            self._check_deps(self.intermission_model_path)
         self._espeak_available = shutil.which(_ESPEAK_FALLBACK) is not None
         if not self._piper_available and self._espeak_available:
             logger.warning(
@@ -36,40 +74,59 @@ class TTSGenerator:
             logger.error(
                 "TTS completely unavailable: neither Piper nor espeak-ng found."
             )
+        if self.intermission_model_path and not self._intermission_available:
+            logger.warning(
+                f"[TTS] Intermission voice configured but unavailable at "
+                f"{self.intermission_model_path}. Intermissions will use the "
+                "primary voice as a fallback."
+            )
+        elif self._intermission_available:
+            logger.info(
+                f"[TTS] Intermission voice ready: {self.intermission_model_path}"
+            )
 
     @property
     def is_ready(self) -> bool:
         return self._piper_available or self._espeak_available
 
-    def _check_deps(self):
-        """Check if Piper executable, model, and model config are valid."""
+    @property
+    def intermission_voice_ready(self) -> bool:
+        """True when the second voice is configured and passed dep checks."""
+        return self._intermission_available
+
+    def _check_deps(self, model_path: str) -> bool:
+        """Validate a Piper voice (executable + model + .onnx.json config)."""
         if not self.executable:
             logger.error("TTS unavailable: Piper executable path is empty.")
             return False
 
-        if not os.path.exists(self.model_path):
-            logger.error(f"TTS unavailable: Piper model not found: {self.model_path}")
+        if not model_path:
             return False
 
-        if os.path.getsize(self.model_path) == 0:
-            logger.error(f"TTS unavailable: Piper model is empty: {self.model_path}")
+        if not os.path.exists(model_path):
+            logger.error(f"TTS unavailable: Piper model not found: {model_path}")
             return False
 
-        if not os.path.exists(self.model_config_path):
-            logger.error(f"TTS unavailable: Piper model config not found: {self.model_config_path}")
+        if os.path.getsize(model_path) == 0:
+            logger.error(f"TTS unavailable: Piper model is empty: {model_path}")
             return False
 
-        if os.path.getsize(self.model_config_path) == 0:
-            logger.error(f"TTS unavailable: Piper model config is empty: {self.model_config_path}")
+        model_config_path = f"{model_path}.json"
+        if not os.path.exists(model_config_path):
+            logger.error(f"TTS unavailable: Piper model config not found: {model_config_path}")
+            return False
+
+        if os.path.getsize(model_config_path) == 0:
+            logger.error(f"TTS unavailable: Piper model config is empty: {model_config_path}")
             return False
 
         try:
-            with open(self.model_config_path, "r", encoding="utf-8") as cfg_file:
+            with open(model_config_path, "r", encoding="utf-8") as cfg_file:
                 json.load(cfg_file)
         except (json.JSONDecodeError, ValueError, OSError) as e:
             logger.error(
                 f"TTS unavailable: Piper model config is invalid JSON: "
-                f"{self.model_config_path} ({e}). "
+                f"{model_config_path} ({e}). "
                 "Session will continue with espeak-ng fallback if available."
             )
             return False
@@ -78,6 +135,17 @@ class TTSGenerator:
             return False
 
         return True
+
+    def _resolve_voice_path(self, voice: str) -> str:
+        """Pick the on-disk model path for the requested voice role.
+
+        voice="intermission" prefers the second voice when available,
+        silently falling back to the primary voice if not configured.
+        Any other value (including None / "primary") returns the primary.
+        """
+        if voice == "intermission" and self._intermission_available:
+            return self.intermission_model_path
+        return self.model_path
 
     def _generate_espeak(self, text: str, output_file: str):
         """Fallback TTS using espeak-ng when Piper is unavailable."""
@@ -107,20 +175,26 @@ class TTSGenerator:
             logger.error(f"espeak-ng error: {e}")
             return None
 
-    def generate(self, text, output_file):
+    def generate(self, text, output_file, voice: str = "primary"):
         """
         Generate audio from text using Piper.  Falls back to espeak-ng if
         Piper is not operational (corrupt config, missing model, etc.).
         Args:
             text: Text to synthesize.
             output_file: Path to save the .wav file.
+            voice: "primary" (default, CaiTI voice) or "intermission"
+                   (second Piper voice, if configured).  Unknown values
+                   are treated as "primary".  When "intermission" is
+                   requested but the second voice is unavailable, we
+                   silently fall back to the primary voice so the user
+                   still hears the message.
         """
         if not text:
             return None
 
         # Re-check Piper deps on each call so a runtime config repair is picked up.
         if not self._piper_available:
-            self._piper_available = self._check_deps()
+            self._piper_available = self._check_deps(self.model_path)
 
         if not self._piper_available:
             logger.warning("[TTS Failure] Piper not available. Attempting espeak-ng fallback.")
@@ -143,9 +217,13 @@ class TTSGenerator:
             logger.error("[TTS Failure] No TTS engine or cached fallback available.")
             return None
 
+        # Resolve which voice to use for this call.  Intermission falls
+        # back to primary silently if the second voice isn't configured.
+        voice_model_path = self._resolve_voice_path(voice)
+
         cmd = [
             self.executable,
-            "--model", self.model_path,
+            "--model", voice_model_path,
             "--length_scale", str(TTS_LENGTH_SCALE),
             "--sentence_silence", str(TTS_SENTENCE_SILENCE),
             "--noise_scale", "0.4",
@@ -153,7 +231,10 @@ class TTSGenerator:
             "--output_file", output_file
         ]
 
-        logger.info(f"Generating TTS for: '{text}' -> {output_file}")
+        logger.info(
+            f"Generating TTS [{voice}={os.path.basename(voice_model_path)}] "
+            f"for: '{text[:60]}{'...' if len(text) > 60 else ''}' -> {output_file}"
+        )
 
         try:
             # Piper accepts text from stdin

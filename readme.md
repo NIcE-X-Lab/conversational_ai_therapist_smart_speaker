@@ -310,7 +310,8 @@ Every LLM call passes through `llm_complete(system, user, role=LLMRole.XYZ)` wit
 │   ├── models/
 │   │   ├── llm_client.py          # LiteRT-LM in-process Gemma engine + LLMRole enum
 │   │   ├── stt.py                 # Faster-Whisper wrapper (with suspend/resume for VRAM handoff)
-│   │   └── tts.py                 # Piper subprocess wrapper with espeak-ng fallback
+│   │   ├── ser.py                 # Speech Emotion Recognition — plug-in stub (always "neu" until a real backend is dropped in)
+│   │   └── tts.py                 # Piper subprocess wrapper (dual voice: Amy primary + Alan intermission) with espeak-ng fallback
 │   │
 │   ├── services/
 │   │   ├── speech_service.py      # Real-time mic/GPIO/turn-taking loop + intermission driver
@@ -335,7 +336,7 @@ Every LLM call passes through `llm_complete(system, user, role=LLMRole.XYZ)` wit
 │
 ├── models/                    # Model weights (git-ignored)
 │   ├── litert/                # Gemma 4 E2B (.litertlm)
-│   └── piper/                 # Piper TTS voice (.onnx + .onnx.json)
+│   └── piper/                 # Piper TTS voices (en_US-amy-medium primary + en_GB-alan-medium intermission; each is an .onnx + .onnx.json pair)
 │
 ├── data/                      # Runtime data (all subdirectories auto-created on first boot)
 │   ├── therapist.db           # SQLite (authoritative relational store; turns + clinical_scores + intervention_logs + ...)
@@ -442,11 +443,16 @@ If any stage exhausts its 3-attempt budget, the `CBT_ESCALATION_MESSAGE` (SAMHSA
 
 - `next_activity(exclude=...)` picks one of `{SCREENING, BREATHING_EXERCISE, MUSIC}` at random on each iteration, deprioritising the last stage played so users don't get the same activity twice in a row when alternatives exist. SCREENING is only eligible while at least one PHQ/GAD question remains unanswered. MUSIC is the guaranteed fallback — if every stage is excluded (e.g. after the user declines all others this turn), MUSIC is returned so the user never hears silence.
 - `mark_activity(stage)` records the last-played activity for the next pick's deprioritisation.
-- **SCREENING** — asks the next unanswered PHQ-4 / GAD-2 question. Tracker guarantees no repeats **for the entire session** and supports checkpoint restore from DB so mid-session restarts don't reset state. Answered / skipped questions never regress. If the user says "no" / "skip" / "pass", the question is marked SKIPPED and the turn falls through to a fresh random pick from `{BREATHING, MUSIC}`.
-- **BREATHING_EXERCISE** — one meditation from the pool with **session-scoped removal**: each played script is added to `_used_breathing_idx` and excluded from subsequent picks, so a user working through a long session hears all 5 scripts before any repeat. When the pool is exhausted the used set clears (wrap-around) and the next pick still avoids the most recent script. Breathing is passive — the block speaks the guidance and holds silently for the LLM's remaining latency; there is **no listen step** (removed so the user isn't left wondering why the device is waiting for them to respond to a meditation, and to eliminate one class of STT false positives on the global command gate).
-- **MUSIC** — ambient fallback via `BackgroundMusicThread` with random-segment playback (see `src/drivers/audio.py` below). The MUSIC block fades the bed up to `_MUSIC_BED_INTERMISSION` (85 %) via `BackgroundMusicThread.fade_to` — at listen-level loudness matching Piper TTS — and triggers a fresh `jump_to_random_segment()` on each invocation so two back-to-back MUSIC beats sound different.
+- **SCREENING (paired)** — asks **two** PHQ-4 / GAD-2 questions per intermission, preferring same-scale pairs (GAD-1 + GAD-2 together, PHQ-1 + PHQ-2 together). `_run_paired_screening_block()` picks the first unanswered question, then looks up its scale and pairs it with the next unanswered question on the same scale; falls back to a cross-scale partner if the same-scale partner is already resolved. A soft `_SCREENING_FOLLOWUPS` connector ("And one more quick check-in") joins the two so the pair reads as a single gentle check-in rather than two stapled prompts. Tracker still guarantees no repeats for the entire session and supports DB checkpoint restore. A decline on the first question skips the second and falls through to `{BREATHING, MUSIC}` (paper-aligned — don't push a second question on a decline).
+- **BREATHING_EXERCISE (plays to completion)** — one meditation from the pool with **session-scoped removal**: each played script is added to `_used_breathing_idx` and excluded from subsequent picks, so a user working through a long session hears all 5 scripts before any repeat. When the pool is exhausted the used set clears (wrap-around) and the next pick still avoids the most recent script. Breathing is passive — the block speaks the guidance and holds silently for the remaining latency; there is **no listen step** (removed so the user isn't left wondering why the device is waiting for them to respond to a meditation, and to eliminate one class of STT false positives on the global command gate). **The meditation is NOT interrupted mid-script** if the LLM answer arrives early — cutting a guided breathing exercise in mid-breath felt broken in UX testing. The LLM response simply waits in the output queue until the full script finishes. Defensive `stop_playback_event.clear()` at entry prevents a prior MUSIC watcher's stop signal from truncating the meditation.
+- **MUSIC (interruptible)** — ambient fallback via `BackgroundMusicThread` with random-segment playback (see `src/drivers/audio.py` below). The MUSIC block fades the bed up to `_MUSIC_BED_INTERMISSION` (85 %) via `BackgroundMusicThread.fade_to` — at listen-level loudness matching Piper TTS — and triggers a fresh `jump_to_random_segment()` on each invocation so two back-to-back MUSIC beats sound different. MUSIC **is** interruptible by the output-ready watcher — it's ambient, the user isn't being asked to engage with it, so cutting when the LLM is ready is fine.
 
-**Handoff back to the LLM reply.** When the LLM output arrives, the intermission loop fades the music down to `_MUSIC_BED_HANDOFF` (5 %) for the bridge phrase, speaks a randomised bridge ("Thank you for reflecting on that with me…"), speaks the LLM response (during which `set_ai_speaking` auto-ducks the bed to 2 %), then fades back up to `_MUSIC_BED_AMBIENT` (85 %) ready for the next turn. Music is never hard-cut — every transition goes through `fade_to`. The bridge phrase is suppressed on the very first turn (`is_session_start=True`) because the user hasn't shared anything yet — the opening dimension question lands clean after the post-greeting intermission.
+**Intermission framing (lead-in + outro).** Every intermission activity is wrapped in explicit signpost wording so the user knows the next beat is SEPARATE from CaiTI's therapy questioning:
+
+- **Lead-in** — `_speak_intermission_lead_in(stage)` speaks one of `_INTERMISSION_LEAD_INS` ("Let's take a brief intermission together while I gather my thoughts. This is separate from our main conversation…") before any activity starts, centrally in `_run_one_intermission_activity` so every stage benefits without duplication.
+- **Outro** — `_INTERMISSION_OUTROS` ("That wraps up our little intermission. Coming back to our session now…") is spoken on the way back to the LLM reply, distinct from `_BRIDGE_PHRASES`. The sequence is: outro (intermission voice) → bridge (CaiTI voice) → LLM reply (CaiTI voice). The voice flip between outro and bridge is itself an audible "CaiTI is back" cue.
+
+**Handoff back to the LLM reply.** When the LLM output arrives, the intermission loop fades the music down to `_MUSIC_BED_HANDOFF` (5 %), speaks the intermission outro in the intermission voice, speaks a randomised bridge ("Thank you for reflecting on that with me…") in the primary CaiTI voice, speaks the LLM response (during which `set_ai_speaking` auto-ducks the bed to 2 %), then fades back up to `_MUSIC_BED_AMBIENT` (85 %) ready for the next turn. Music is never hard-cut — every transition goes through `fade_to`. Both the outro AND bridge are suppressed on the very first turn (`is_session_start=True`) because the user hasn't shared anything yet — the opening dimension question lands clean after the post-greeting intermission.
 
 **Background-music loudness contract.** Two audibly distinct states:
 
@@ -480,13 +486,37 @@ Single public function: `llm_complete(system_content, user_content, role=LLMRole
 
 ### `src/models/stt.py` — Speech-to-Text
 
-`STTGenerator` wraps `faster-whisper` (`base.en`, `int8`, `beam_size=2`). Returns `{"transcript": "...", "detected_emotion": "neu"}` — the `detected_emotion` slot is a legacy compatibility shim; SER has been removed from this deployment (paper doesn't require SER for the clinical pipeline).
+`STTGenerator` wraps `faster-whisper` (`base.en`, `int8`, `beam_size=2`). Returns `{"transcript": "...", "detected_emotion": "<tag>"}` — `detected_emotion` is the output of the companion `SERGenerator` (see `src/models/ser.py`), which is a **stub by default** that always emits `"neu"`. The JSON envelope is preserved end-to-end so every downstream consumer (`io_record.get_answer`, dossier, SOAP) keeps working whether SER is enabled or not.
 
-**VRAM handoff** — `suspend_all()` fully deletes the Whisper model + `gc.collect()` + empties CUDA cache so the 2–3 GB Gemma model has room. `resume_all()` re-loads for the next listen cycle. Orchestrated by `speech_service` around every LLM call.
+**VRAM handoff** — `suspend_all()` fully deletes the Whisper model + `gc.collect()` + empties CUDA cache so the 2–3 GB Gemma model has room, AND walks `SERGenerator.suspend()` so a future real backend releases its weights too. `resume_all()` re-loads both. Orchestrated by `speech_service` around every LLM call.
 
-### `src/models/tts.py` — Text-to-Speech
+### `src/models/ser.py` — Speech Emotion Recognition (plug-in stub)
 
-`TTSGenerator` runs `piper` as a subprocess with `en_US-amy-medium.onnx`, piping text on stdin. Configurable `length_scale` (speech rate) and `sentence_silence` via env. Falls back to `espeak-ng` if Piper or its config is broken, so a session never fails for lack of TTS.
+`SERGenerator` is the **drop-in seat for a future SER backend**. Today it is a stub: `detect(wav_path)` always returns `"neu"`, `suspend()` / `resume()` are no-ops, and `is_ready` stays `False`. The legacy `light_mfcc_rf` backend was removed during research alignment; the plumbing downstream of this class — emotion tag flowing through `io_record._LAST_USER_EMOTION` → dossier `ser_metrics["emotion_tag"]` → session analysis LLM pass — is intact and ready for a real model.
+
+**Drop-in contract** (see docstring in `src/models/ser.py`):
+
+1. Implement `detect(wav_path) -> str` returning a short tag (recommended vocabulary: `"anxious"`, `"sad"`, `"angry"`, `"happy"`, `"calm"`, `"neu"`).
+2. Implement `suspend()` / `resume()` mirroring the STT pattern so the VRAM handoff in `speech_service` keeps working.
+3. Flip `ser.ser_enabled: true` in `config.yaml` (or export `SER_ENABLED=true`). `STTGenerator.transcribe()` will then call `detect()` automatically and substitute the result into the JSON envelope.
+4. Validate under the 8 GB Jetson budget — any SER that needs >400 MB resident AT THE SAME TIME as Gemma will break the existing VRAM handoff contract. See the `CaiTI_emo_module_feasibility_report.pdf` in the repo root for a worked example of why `xxue752-nz/emo_module` cannot be dropped in as-is.
+
+When `SER_ENABLED=True` but no backend is installed, a loud `[SER]` warning fires on init so an operator who flips the flag doesn't get silent `"neu"` outputs and think the new SER is working.
+
+### `src/models/tts.py` — Text-to-Speech (dual voice)
+
+`TTSGenerator` runs `piper` as a subprocess, piping text on stdin. Configurable `length_scale` (speech rate) and `sentence_silence` via env. Falls back to `espeak-ng` if Piper or its config is broken, so a session never fails for lack of TTS.
+
+**Dual-voice architecture.** Two voices live on disk; each `generate()` call loads only the one it needs via subprocess:
+
+| Voice role | Model | Used for |
+|---|---|---|
+| **Primary (CaiTI)** | `en_US-amy-medium.onnx` (`TTS_MODEL_PATH`) | Onboarding handshake, screening questions selected by the RL policy, CBT stages, R-V Validator / Guide outputs, session close, bridge phrase on intermission handoff. |
+| **Intermission** | `en_GB-alan-medium.onnx` (`TTS_INTERMISSION_MODEL_PATH`) | Intermission lead-in, PHQ-4 / GAD-2 questions + re-prompt, paired-screening connector, breathing meditation script, music announcement, intermission outro, LLM-timeout fallback meditation. |
+
+The voice split is how the user audibly distinguishes "CaiTI is talking to me" from "this is a scheduled intermission beat". `say()` takes `voice="primary" | "intermission"` and `say_intermission()` is a thin wrapper. When the second voice isn't configured or its file is missing, `generate()` silently falls back to the primary voice so clinical data always lands audibly.
+
+**Memory contract.** Piper is subprocess-invoked (one process per utterance), so neither voice is resident in the Python process between calls — the ONNX weights live in the subprocess's private heap and are freed back to the OS on exit. Measured RSS stays flat across 6 alternating Amy/Alan synths (18.6 → 18.8 MB Python-heap). Carrying two voices on disk costs only ~63 MB of storage per extra voice; resident RAM overhead is effectively zero.
 
 ### `src/services/speech_service.py` — Real-time orchestrator
 
@@ -496,8 +526,8 @@ The main audio loop. States: `idle`, `onboarding`, `main_listen`, `main_process`
 - **Onboarding** — asks for the user's name, then delivers a **personalised handshake greeting**: `"Hello, {name}. I'm CaiTI, your intelligent therapist. Thank you for joining me today."` (the name is dropped gracefully when the Name Guard fell back to `User`). The earlier "Hello, I'm CaiTI." → music swell → "Who am I speaking with today?" opener still frames the name prompt. A multi-layer Name Guard rejects common filler ("of course", "good morning", "I'm fine", etc.) and strips phrases like "my name is". Bypass keywords (e.g. "start", "hello") fall back to `User`. At the end of onboarding, `_first_output_pending` is armed so the main loop routes the very first LLM utterance through the intermission pipeline.
 - **Active session (parallel turn)** — every clinical turn goes through `_run_parallel_turn()`, which returns one of `"delivered"` / `"silence"` / `"session_end"` / `"start_echo"`. The body is (1) `_record_utterance_to_wav()` — mic-only capture, saves a per-turn unique WAV so a concurrent SCREENING block can't overwrite it; (2) if the captured audio is ≥ `_PARALLEL_MIC_WINDOW_MIN_SEC` (3 s), spawn a daemon `_start_transcription_worker()` on the saved WAV; (3) call `_run_one_intermission_activity()` on this thread immediately, so the user hears "While I'm processing that…" / breathing / music within ~100 ms of the mic closing. The worker pushes the transcript onto `input_queue` the moment decode completes, so the handler's LLM call runs in parallel with the intermission instead of serialising behind it. Short utterances (< 3 s) take a serial fallback path that preserves the fragment-merge retry in `_listen_with_retry`. `_first_output_pending` routes the very first LLM utterance through the intermission pipeline the same way (PHQ-4 / breathing / music fills the pre-first-question gap; bridge phrase suppressed on session start).
 - **VRAM handoff** — moved INSIDE the STT worker: `stt.suspend_all()` runs after decode completes so the main thread can never suspend Whisper mid-decode. STT is resumed at the top of `_run_parallel_turn` and inside SCREENING's listen step, re-suspended by the worker at utterance end. Also resumed at idle-loop entry so the wake-detect transcribe never fails with "Model not loaded".
-- **Intermission early-exit watcher** — BREATHING and MUSIC blocks run behind `_start_output_ready_watcher(llm_done)`, a daemon thread that peeks `output_queue.empty()` every 100 ms. As soon as the handler's response lands, the watcher sets `stop_playback_event` (cuts any playing meditation TTS gracefully, respecting `_INTERMISSION_MIN_ENGAGEMENT_SEC=6.0`) and trips `llm_done` so the block's hold timer returns immediately. SCREENING is deliberately NOT watched — cutting the user mid-PHQ-answer would destroy clinical data.
-- **Intermission pipeline — GIL-safe proactive activity** — LiteRT-LM's Gemma inference holds the Python GIL for the full 2–10 s of each GPU-backed LLM call, which means any `Event.wait(3)` on this thread is effectively paused until the handler releases the GIL. The activity's TTS + listen run in GIL-free pygame / PyAudio C extensions, so they play over the top of the handler's LLM work in parallel. SCREENING is picked first while any PHQ-4 / GAD-2 question remains; once all four are resolved, the ladder cycles BREATHING ↔ MUSIC with last-activity deprioritisation. Breathing is passive (no listen step, just speak + hold). User-decline chains still fire on SCREENING (paper-aligned fallback). When the LLM response arrives the music fades down for the bridge phrase (suppressed on session start), the therapist's reply is spoken, and the music fades back up to the ambient base.
+- **Intermission early-exit watcher** — **Only MUSIC is interruptible.** The watcher (`_start_output_ready_watcher(llm_done)`) is a daemon thread that peeks `output_queue.empty()` every 100 ms; when the handler's response lands it sets `stop_playback_event` (cuts any playing TTS gracefully, respecting `_INTERMISSION_MIN_ENGAGEMENT_SEC=6.0`) and trips `llm_done`. SCREENING is not watched — cutting the user mid-PHQ-answer would destroy clinical data. BREATHING is also not watched any more — the guided meditation plays to completion so the user experiences the full exercise; the LLM response simply waits in `output_queue` until the script finishes.
+- **Intermission pipeline — GIL-safe proactive activity** — LiteRT-LM's Gemma inference holds the Python GIL for the full 2–10 s of each GPU-backed LLM call, which means any `Event.wait(3)` on this thread is effectively paused until the handler releases the GIL. The activity's TTS + listen run in GIL-free pygame / PyAudio C extensions, so they play over the top of the handler's LLM work in parallel. Every activity is wrapped in an intermission lead-in and outro (spoken in the **Alan** intermission voice) so the user audibly distinguishes "this is a pause" from "this is CaiTI talking". SCREENING is picked first while any PHQ-4 / GAD-2 question remains and asks them in **scale-matched pairs** (GAD-1+GAD-2, PHQ-1+PHQ-2) via `_run_paired_screening_block`; once all four are resolved, the ladder cycles BREATHING ↔ MUSIC with last-activity deprioritisation. BREATHING plays its full guided script uninterrupted. User-decline chains still fire on SCREENING (paper-aligned fallback). When the LLM response arrives the music fades down, the intermission outro speaks in Alan, the bridge phrase speaks in Amy (both suppressed on session start), the therapist's reply is spoken in Amy, and the music fades back up to the ambient base.
 - **End session** — via voice (`end session` / `goodbye` via `GlobalCommandMatcher`), GPIO End button, or the FastAPI `/api/end_session`. Triggers: `stop_audio` → `generate_closing_reflection` → speak reflection → save `SessionDossier` → play goodbye music → back to idle. Also clears `_first_output_pending` so a mid-first-turn end doesn't leave the flag armed. The global command matcher uses **exact-token match** for `goodbye`/`bye` (short-token fuzzy matching is unreliable — "be" ↔ "bye" scored 0.80 under the old threshold and ended a session mid-CBT, fixed). The STT worker's command gate is authoritative: on `__CMD_END__` the worker does NOT queue the transcript to `input_queue` (so the handler never sees a sentinel as a clinical answer) and the main thread sets `stop_playback_event` to cut any in-flight intermission.
 
 ### `src/services/response_bridge.py` — Classifier output parser
@@ -773,8 +803,9 @@ All five are coordinated through `src/utils/io_record.py`.
 
 - Written unconditionally at the end of every session.
 - **Keyed by the BASE subject id** (no timestamp), so Alice's session-2 warm-starts from the Q-values saved at the end of session 1. This is a deliberate divergence from the per-session filename scheme used for Report / Notes / dossier artefacts.
+- **Subject id is lowercased at onboarding** (`speech_service.handle_onboarding`) so "Alice" and "alice" always resolve to the same Q-table + DB `users` row. Without this, a returning user spoken as "Alice" one day and "alice" the next would silently start with a fresh Q-table each time.
 - Paper / legacy byte-compatible format (same filename scheme, same shape).
-- Loaded as the baseline Q-table at session start.
+- Loaded as the baseline Q-table at session start, with **shape validation** — if a stale CSV on disk has a different `ITEM_N_STATES` than the current config, the CSV is rejected and the Q-table is re-initialised from `item_importance` priors instead of crashing the action-select path.
 
 **SQLite `persistent_rl_state` row**
 
@@ -959,11 +990,28 @@ stt:
   beam_size: 2
 
 tts:
-  model_path: "en_US-amy-medium.onnx"
+  model_path: "en_US-amy-medium.onnx"                      # primary CaiTI voice
+  intermission_model_path: "./models/piper/en_GB-alan-medium.onnx"
+                               # second voice used EXCLUSIVELY for intermission
+                               # segments (lead-in, breathing, music, screening,
+                               # outro). Leave blank to disable the second voice
+                               # — intermissions will fall back to the primary.
+                               # Piper is subprocess-invoked, so carrying two
+                               # voices on disk costs ~63 MB/voice and ~0 MB
+                               # resident RAM.
   executable_path: "piper"
 
 database:
   db_path: "data/therapist.db"
+
+ser:
+  ser_enabled: false           # Speech Emotion Recognition. Disabled by default
+                               # — legacy light_mfcc_rf backend was removed; a
+                               # stub in src/models/ser.py emits "neu" on every
+                               # call. Flip to true (or export SER_ENABLED=true)
+                               # only after dropping a real backend into ser.py
+                               # AND validating against the Jetson memory
+                               # budget. See "SER plug-in contract" below.
 ```
 
 ### `.env` (runtime / host-specific)
@@ -987,8 +1035,15 @@ STT_MODEL=base.en
 STT_COMPUTE_TYPE=int8
 STT_BEAM_SIZE=2
 TTS_MODEL_PATH=./models/piper/en_US-amy-medium.onnx
+TTS_INTERMISSION_MODEL_PATH=./models/piper/en_GB-alan-medium.onnx   # optional second voice
 TTS_LENGTH_SCALE=0.8
 TTS_SENTENCE_SILENCE=1.5
+
+# Speech Emotion Recognition (SER) — disabled by default.
+# See src/models/ser.py for the drop-in contract. Set to true only after
+# dropping a real backend into SERGenerator.detect() AND validating the
+# Jetson memory budget (any SER >400 MB resident breaks the VRAM handoff).
+# SER_ENABLED=true
 
 # Hardware (Jetson)
 PIN_LISTENING_LED=18
@@ -1035,7 +1090,7 @@ Every gate is an independent toggle: flip one in `config.yaml` (or `src/core/the
 ### Gate index
 
 **Currently ON** (all legacy-parity safe): `MULTI_DIM_BACKFILL_ENABLED` (G8), `SOAP_REPORT_ENABLED` (G13), `REPHRASE_AT_RUNTIME` (D5/D6).
-**Currently OFF** (future / off-demo): G5, G7, G9, G11, G12, G14, G15, D3.
+**Currently OFF** (future / off-demo): G5, G7, G9, G11, G12, G14, G15, D3, S1 (SER).
 
 | # | Gate | Default | Config key | Subsystem | Adds |
 |---|---|---|---|---|---|
@@ -1050,6 +1105,7 @@ Every gate is an independent toggle: flip one in `config.yaml` (or `src/core/the
 | G15 | `SESSION_CAP_ENABLED` | `false` | `rl.session_cap_enabled` | Session lifecycle | 60-minute hard session length cap (tunable via `SESSION_MAX_SECONDS` env) with graceful termination. |
 | D3 | `CRISIS_OVERRIDE_ENABLED` | `False` | `therapy_content.py` | Safety | Score-2 on `CRITICAL_DIMS` (`sib`, `safe`, `risk`, `drug`, `alcohol`) short-circuits the RL loop and speaks `SAFETY_RESOURCES_MESSAGE` (988, SAMHSA, 911). Also runs between every CBT stage. |
 | D5/D6 | `REPHRASE_AT_RUNTIME` | **`true`** | `rl.rephrase_at_runtime` | Questioner | Paper §5.1 / legacy runtime Rephraser — LLM rewrites ~95% of picked question variants before speaking. **ON — matches legacy's `generate_synonymous_sentences()` behaviour.** |
+| S1 | `SER_ENABLED` | `false` | `ser.ser_enabled` | STT / emotion | Speech Emotion Recognition. Disabled by default; legacy `light_mfcc_rf` backend was removed. `src/models/ser.py` is a stub emitting `"neu"` on every call; downstream plumbing (`_LAST_USER_EMOTION` → dossier → session analysis) is intact. Flip on only after implementing `SERGenerator.detect()` with a backend that fits the 8 GB Jetson budget (see feasibility report in repo root). |
 
 ### How each gate is wired
 
@@ -1066,6 +1122,9 @@ grep -n "CRISIS_OVERRIDE_ENABLED\|CBT_ESCALATION_ENABLED" src/core/CBT.py src/co
 
 # Session-lifecycle gates
 grep -n "WARM_START_ENABLED\|SESSION_ANALYSIS_ENABLED\|SOAP_REPORT_ENABLED\|DIMENSION_OPTOUTS_ENABLED\|SESSION_CAP_ENABLED" src/core/handler_rl.py
+
+# SER gate
+grep -n "SER_ENABLED" src/models/stt.py src/models/ser.py main.py
 ```
 
 ### Hyperparameters (values, not flags)
@@ -1128,6 +1187,12 @@ Before flipping a gate on for a live session or trial, follow the checklist for 
 
 **D5/D6 — `rephrase_at_runtime`** — Already ON (legacy parity). Legacy prototype calls `generate_synonymous_sentences()` on ~95% of screening turns, so the demo recording varies wording from session to session. If disabling for a latency-sensitive deploy, validate that the pre-generated `question_synthetic[]` pool covers the turns you'd otherwise rewrite.
 
+**S1 — `ser_enabled`** — Before flipping on:
+1. Implement `SERGenerator.detect(wav_path) -> str` in `src/models/ser.py` with a real backend. Recommended vocabulary: `anxious / sad / angry / happy / calm / neu`.
+2. Implement `suspend()` / `resume()` mirroring the STT pattern — the VRAM handoff in `speech_service` walks the SER alongside Whisper.
+3. Memory-audit: any backend resident >400 MB at the same time as Gemma will break the VRAM contract. The feasibility audit of `xxue752-nz/emo_module` (saved as `CaiTI_emo_module_feasibility_report.pdf`) shows the cost model to validate against.
+4. Verify downstream: with SER live, `_LAST_USER_EMOTION` / dossier `ser_metrics["emotion_tag"]` start carrying real tags instead of `"neu"` — confirm the session-analysis prompt still parses them correctly.
+
 ### Future development — beyond what is gated
 
 Things that would require new code, not just a flag flip:
@@ -1137,6 +1202,8 @@ Things that would require new code, not just a flag flip:
 - **Offline LLM fallback.** When `litert_lm.Engine` throws repeatedly (see `engine_is_healthy()` in `src/models/llm_client.py`), the current behaviour is to raise `LLMError` and mark the turn SKIPPED. A future fallback path would route to a smaller cached model or a scripted decision tree so a hardware hiccup doesn't end the session.
 - **Multi-language.** Every clinical prompt is currently English-only. Translation would change both the STT/TTS models (Whisper supports many; Piper has several voices) and the question/prompt libraries.
 - **Clinician dashboard.** SOAP notes land in `DB.summaries` today but there is no browse UI. A read-only FastAPI endpoint plus a static page would close that loop.
+- **Real SER backend.** `src/models/ser.py::SERGenerator` is a stub today. A real backend feeds `_LAST_USER_EMOTION` / dossier `ser_metrics["emotion_tag"]` / session-analysis prompts with live emotion tags. Any backend must fit under the Jetson VRAM handoff contract (< 400 MB resident at the same time as Gemma). Dropping in `xxue752-nz/emo_module` as-is would exceed the budget (~1.1–1.3 GB RAM + reintroduces torch) — see the repo-root feasibility report for the full audit and lightweight alternatives (SpeechBrain wav2vec2-IEMOCAP ONNX-quantised, MFCC+SVM, etc.).
+- **Emotion-aware LLM prompts.** Once a real SER is live, the handler-driven LLM calls can include the current `_LAST_USER_EMOTION` tag in their context ("User's emotional tone on last utterance: anxious. Respond with appropriate empathy.") — the tag already flows end-to-end through the pipeline; only the prompt-assembly step is missing.
 
 ---
 

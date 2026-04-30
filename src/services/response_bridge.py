@@ -15,6 +15,32 @@ from src.utils.log_util import get_logger
 logger = get_logger("ResponseBridge")
 
 
+# Bug-2 fix: soft-end phrases that must map to the paper's `Stop` keyword
+# regardless of LLM classifier whim. Pre-LLM short-circuit for reliability
+# since Gemma-4-E2B's analyzer sometimes misclassifies these as dimension
+# answers (e.g. "That's enough for today" → care=0 instead of Stop).
+# Matched against the whole lowercased utterance; any match terminates
+# the screening loop via the questioner's Stop path, which still routes
+# into CBT (handler_rl:run() calls run_cbt unless END_SESSION_EVENT fires).
+_SOFT_END_STOP_PATTERNS = (
+    re.compile(r"\bno\s+more\s+questions?\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+)?(?:don'?t|do\s+not)\s+want\s+to\s+answer\s+(?:any\s+)?(?:more\s+)?questions?\b", re.IGNORECASE),
+    re.compile(r"\b(?:that'?s|thats|that\s+is)\s+enough\s+(?:for\s+today|for\s+now|questions?)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i'?m|i\s+am)\s+done\s+(?:with\s+)?(?:the\s+)?questions?\b", re.IGNORECASE),
+    re.compile(r"\benough\s+questions?\b", re.IGNORECASE),
+    re.compile(r"\bstop\s+(?:the\s+)?questions?\b", re.IGNORECASE),
+    re.compile(r"\blet'?s\s+end\s+(?:the|this)\s+session\b", re.IGNORECASE),
+    re.compile(r"\bi\s+want\s+to\s+end\s+(?:the|this)\s+session\b", re.IGNORECASE),
+)
+
+
+def _matches_soft_end_intent(text: str) -> bool:
+    if not text:
+        return False
+    t = str(text).strip()
+    return any(p.search(t) for p in _SOFT_END_STOP_PATTERNS)
+
+
 def _normalize_dim_score(dim: str, score: int):
     """
     If dimension looks like DLA_digits_label or digits_label, strip prefix and keep only the label.
@@ -89,6 +115,22 @@ def get_openai_resp(user_input, original_question, dimension_label: str):
 
     tokens = _clean_input.replace(".", " ").replace(",", " ").replace("?", " ").split()
     lower = [t.lower() for t in tokens[:10]]
+
+    # Bug-2 fix: pre-LLM soft-end intent detection so phrases like
+    # "I don't want to answer any more questions" / "that's enough for
+    # today" / "let's end the session" reliably become the paper's Stop
+    # keyword. The handler's screening loop will then terminate and
+    # still route into CBT (run_cbt) — matching paper §5.1 / §5.3
+    # semantics that Stop is "finish screening, proceed to CBT", not
+    # "quit the whole app". This short-circuit runs BEFORE the ≤3-word
+    # shortcut so multi-word soft-end utterances are still caught, and
+    # BEFORE the LLM classifier so classification is deterministic.
+    if _matches_soft_end_intent(_clean_input):
+        logger.info(
+            f"[SOFT-END] Matched soft-end intent in user utterance; "
+            f"returning ({dimension_label}, Stop)."
+        )
+        return dimension_label, "Stop"
 
     # Short-response shortcuts: only trust these if the user said 3 words or fewer.
     # Longer replies (e.g. "Yes, but I feel terrible") need the LLM classifier.

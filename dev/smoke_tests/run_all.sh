@@ -11,6 +11,8 @@
 #   3. Questioner pipeline (Yes/No/Stop paths, RV, G4 regression)
 #   4. CBT flow (Stage 0 wording, recap, 3 stages, closing, G7 off)
 #   5. End-to-end demo replay (greeting → DLA → RV → CBT → warm close)
+#   6. Bug 1 + Bug 2 regression (CBT retry one-beat, end-command routing)
+#   7. Paper §3-5 full pipeline end-to-end
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -34,6 +36,8 @@ tests=(
     "dev/smoke_tests/test_3_questioner.py"
     "dev/smoke_tests/test_4_cbt.py"
     "dev/smoke_tests/test_5_e2e_replay.py"
+    "dev/smoke_tests/test_6_bug_fixes.py"
+    "dev/smoke_tests/test_7_paper_pipeline.py"
 )
 
 passed=0
