@@ -9,23 +9,76 @@ Q-learning questioner over 37 daily-functioning dimensions → Response Analyzer
 
 ## Table of Contents
 
-1. [Paper Alignment at a Glance](#paper-alignment-at-a-glance)
-2. [Clinical-Trial Hardening](#clinical-trial-hardening)
-3. [Latency & Performance](#latency--performance)
-4. [System Architecture](#system-architecture)
-5. [Repository Layout](#repository-layout)
-6. [Module Reference](#module-reference)
-7. [Session Lifecycle](#session-lifecycle)
-8. [LLM Design (Self-Contained Per Task)](#llm-design-self-contained-per-task)
-9. [Persistence Model](#persistence-model)
-10. [Configuration](#configuration)
-11. [Feature Gates & Future Development](#feature-gates--future-development)
-12. [FastAPI Endpoints](#fastapi-endpoints)
-13. [Running the System](#running-the-system)
-14. [Jetson Deployment](#jetson-deployment)
-15. [Testing](#testing)
-16. [Clinical-Trial Operations Playbook](#clinical-trial-operations-playbook)
-17. [Key Technologies](#key-technologies)
+1. [Recent Bug Fixes (2026-04-30)](#recent-bug-fixes-2026-04-30)
+2. [Paper Alignment at a Glance](#paper-alignment-at-a-glance)
+3. [Clinical-Trial Hardening](#clinical-trial-hardening)
+4. [Latency & Performance](#latency--performance)
+5. [System Architecture](#system-architecture)
+6. [Repository Layout](#repository-layout)
+7. [Module Reference](#module-reference)
+8. [Session Lifecycle](#session-lifecycle)
+9. [LLM Design (Self-Contained Per Task)](#llm-design-self-contained-per-task)
+10. [Persistence Model](#persistence-model)
+11. [Configuration](#configuration)
+12. [Feature Gates & Future Development](#feature-gates--future-development)
+13. [FastAPI Endpoints](#fastapi-endpoints)
+14. [Running the System](#running-the-system)
+15. [Jetson Deployment](#jetson-deployment)
+16. [Testing](#testing)
+17. [Clinical-Trial Operations Playbook](#clinical-trial-operations-playbook)
+18. [Key Technologies](#key-technologies)
+
+---
+
+## Recent Bug Fixes (2026-04-30)
+
+Two bugs surfaced from production transcripts (`pulled_data/latest/data/logs/`, subjects **Alex** and **test**). Both root causes traced back to architectural mismatches between the paper/legacy contract and the queue-based TTS pipeline introduced for the smart-speaker deployment. Fixes are paper-strict (Option 1 from the comparison analysis) and land across five files. Full regression coverage lives in `dev/smoke_tests/test_6_bug_fixes.py` + `dev/smoke_tests/test_7_paper_pipeline.py` (88 new assertions).
+
+### Bug 1 — CBT stage prompts spoken one turn behind; "Great work today" orphaned
+
+**Symptom (Alex session, 2026-04-30 15:18:21–15:29:00).** CBT Stage 2 retry played the Guide's example challenge, but when Stage 3 fired the user heard the Stage 2 retry prompt ("Please try to challenge… again") instead of the Stage 3 REFRAME prompt. After the successful CBT completion, the closing "Great work today. We completed the CBT steps…" was queued but never spoken — the session went silent.
+
+**Root cause.** `CBT.py` retry paths call `log_question` twice in sequence (`log_question(guide_example)` then `log_question("Please try to … again")`) — one paper-aligned beat but **two queue items**. `src/services/speech_service.py::_wait_for_output_with_intermission` consumes exactly one item per user turn, so every retry turn orphaned the second item and drifted the queue by one. Legacy prototype had the same call-shape but `log_question` there was a **blocking CSV slot** (`Question_Lock` semaphore) that naturally serialised the two prints into one console screen before the single `input()` — the new queue-based pipeline lost that back-pressure.
+
+**Fix (paper-strict hybrid, three parts):**
+
+1. **`src/core/CBT.py`** — every Stage 1/2/3 retry and every failure-escalation pair now emits ONE `log_question` call combining the Guide example + re-ask prompt with a `\n\n` separator. Paper §5.3's "Guide + re-ask is one user-facing beat" contract is preserved while fitting the queue's 1-item-per-turn invariant. Call sites affected: Stage 1 retry, Stage 2 retry, Stage 3 retry, plus the three failure-escalation paths (when `CBT_ESCALATION_ENABLED=true` the escalation message is combined with the pause message in the same `log_question`).
+2. **`src/services/speech_service.py`** — added a 400 ms defensive drain loop at the tail of `_wait_for_output_with_intermission`. After the primary LLM utterance is spoken, any immediately-adjacent trailing item on `OUTPUT_QUEUE` is dequeued and spoken as part of the same beat before returning. Future-proofs against any new double-`log_question` site without requiring CBT-style merging.
+3. **`main.py`** — the main handler-loop now waits up to `_DRAIN_TIMEOUT_SEC = 5 s` for `OUTPUT_QUEUE` to empty after `handler.run()` returns, before clearing `START_SESSION_EVENT`. CBT's final "Great work today" (or any handler-side closing line) gets spoken before the main loop transitions back to idle.
+
+### Bug 2 — "Let's end the session" pre-CBT prevented CBT from ever running
+
+**Symptom (test session, 2026-04-30 15:04:29–15:14:58).** The user completed screening with Score-2 dimensions on `mood`, `eat`, `drug` — a CBT session should have triggered. Instead the user's mid-screening phrase *"I don't want to answer any more questions. Let's end the session."* fired the voice kill-switch, set `END_SESSION_EVENT`, and skipped CBT entirely, then delivered the goodbye summary.
+
+**Root cause.** `src/services/speech_service.py::GlobalCommandMatcher._END_PATTERNS` contained the catch-all regex `(?:end|and|stop|finish|goodbye|close).*session` — it greedily swallowed any utterance with an end-word anywhere near "session" and routed it to `handle_exit()`, bypassing the Response Analyzer. Paper §5.1 specifies that the screening `Stop` keyword terminates screening **but still leads into CBT** — the legacy prototype honours this because it has no `END_SESSION_EVENT` concept at all; only the in-band `Stop` classification terminates, and `handler_rl.run()` unconditionally calls `run_cbt()` afterward.
+
+**Fix (end-commands split into two categories, aligned with intent):**
+
+1. **`src/services/speech_service.py::GlobalCommandMatcher`** — end-commands are now classified as `HARD_END` or `SOFT_END`:
+   - **`HARD_END`** matches short, unambiguous kill phrases only: `end session`, `stop session`, `finish session`, `close the session`, `goodbye`, `bye`. Length ≤ 5 tokens, explicit `session` word required (or standalone goodbye). Always terminates session immediately and runs the goodbye/closing path.
+   - **`SOFT_END`** matches longer "finish screening" intent phrasings: `no more questions`, `I don't want to answer any more questions`, `that's enough for today`, `I'm done with questions`, `let's end the session`, `I want to end the session`, `enough questions`, `stop the questions`, etc. — phrases that signal done-with-screening, not quit-the-app.
+2. **`src/utils/io_record.py`** — new `CBT_STARTED_EVENT` (`threading.Event`). Cleared in `init_record`, set by `run_cbt` at entry. Lets the speech service route `SOFT_END` differently depending on which phase of the session is active.
+3. **`src/services/speech_service.py::_apply_global_command_priority`** — routing is now phase-aware:
+   - **Pre-CBT + `SOFT_END`** → returns `None`. The transcript flows into the Response Analyzer, which classifies it as `Stop` (enforced by a new pre-LLM short-circuit in `response_bridge.py` and explicit examples in the Analyzer prompt). The questioner's `Stop` path terminates screening; `handler_rl.run()` still calls `run_cbt()` because `END_SESSION_EVENT` is NOT set. **Paper §5.1 preserved.**
+   - **Mid-/post-CBT + `SOFT_END`** → upgrades to `HARD_END`. Once CBT has started, the user saying "I'm done with questions" means they want to exit therapy — the kill switch fires with the normal goodbye summary.
+   - **`HARD_END` at any phase** → kill switch, same as before.
+4. **`src/services/response_bridge.py::get_openai_resp`** — added `_matches_soft_end_intent()` short-circuit that returns `(dim_label, "Stop")` for SOFT_END phrasings **before** the Gemma classifier runs. Deterministic and LLM-free.
+5. **`src/core/response_analyzer.py`** — extended the Response Analyzer system prompt with an explicit "Stop dimension" block and 6 labelled SOFT_END examples so even utterances that miss the short-circuit get classified as `Stop` reliably.
+
+### Regression coverage
+
+| Test file | Assertions | Coverage |
+|---|---|---|
+| `dev/smoke_tests/test_6_bug_fixes.py` | 69 | CBT retry merges (A/B), matcher classification for 25 phrases (C/D), response_bridge short-circuit (E), `CBT_STARTED_EVENT` lifecycle (F), routing by CBT phase (G/H/I), defensive drain presence (J), main.py drain wiring (K), runtime CBT retry emits 1 queue item per turn |
+| `dev/smoke_tests/test_7_paper_pipeline.py` | 19 | P1 (full E2E happy-path via test_5), P2 (soft-end pre-CBT → Stop → CBT runs, three-link chain), P3 (HARD_END kill path), P4 (mid-CBT SOFT_END upgrades to HARD_END), P5 (CBT retry single-beat), P6 (main.py drain wiring) |
+
+Both test files are wired into `dev/smoke_tests/run_all.sh`. The full smoke suite now carries **7 test files / 197 assertions / ~40 s** runtime on a dev laptop.
+
+### Jetson deployment note (2026-04-30)
+
+The Jetson runs **Python 3.10**; the dev laptop runs **3.12**. Python 3.10 disallows backslashes inside f-string expression parts (a restriction relaxed in 3.12). One pre-existing f-string in `main.py` (SER status descriptor with `\"neu\"` inside the `{...}` expression) triggered a silent boot failure after sync — stderr was routed to a separate `*.stderr.log` file by `start_therapist.sh` clinician mode, so the console showed the banner but no further output. Fixed by extracting the escaped-quote description into a plain variable before the f-string. All modified files now pass `ast.parse(..., feature_version=(3, 10))`.
+
+**Debug recipe for future silent-boot failures:** `ssh arth@$JETSON_IP "cat ~/project/data/logs/therapist_<ts>.stderr.log"` — Python tracebacks and native-library errors land there in clinician mode.
 
 ---
 
