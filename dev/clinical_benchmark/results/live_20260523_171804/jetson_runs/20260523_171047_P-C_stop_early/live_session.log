@@ -1,0 +1,12 @@
+[SYS] Starting live persona run for P-C (stop_early) at 2026-05-23T17:10:47
+[SYS] Profile: User who answers 1-2 dims briefly then says no more questions to test soft-end intercept.
+[SYS] DB session id = 15
+[SYS] Handler thread launched.
+[AGENT #01] I'd like to start with a couple of questions about how you've been feeling lately.
+
+Have you been taking your prescriptions recently?
+[USER #01] Yes, I take everything as prescribed.
+[AGENT #02] Can you describe your current mood and your feelings regarding that mood?
+[USER #02] Honestly, no more questions, I would like to stop.
+[AGENT #03] We do not have a dimension at score 2 to work on today. We will conclude here.
+[SYS] Run complete at 2026-05-23T17:16:32.

@@ -1,0 +1,90 @@
+{
+  "pid": "P10",
+  "name": "adversarial",
+  "profile": "Adversarial: empty replies, unicode, very long inputs, repeated stop.",
+  "duration_sec": 0.27,
+  "agent_turn_count": 11,
+  "user_turn_count": 10,
+  "llm_calls_by_role": {
+    "general": 1,
+    "reflective_summarizer": 2,
+    "rv_reasoner": 2,
+    "rv_validator": 2,
+    "rephraser": 1,
+    "cbt_reasoner": 4,
+    "cbt_guide": 2
+  },
+  "retry_guide_triggers": 0,
+  "brainstorm_triggers": 0,
+  "rv_decision_breakdown": {
+    "on_topic_0": 2,
+    "off_topic_1": 0
+  },
+  "cbt_dimension_picked": "(picked by index)",
+  "cbt_stage_outcomes": [
+    "stage1_entered",
+    "stage1_entered",
+    "stage2_entered",
+    "stage3_entered",
+    "success"
+  ],
+  "cbt_success": true,
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "exceptions": [],
+  "recorded_scores": {
+    "medication": [
+      2,
+      2
+    ],
+    "mood": [
+      2,
+      2
+    ],
+    "nutrition": [
+      0,
+      0
+    ]
+  },
+  "intended_intents": {
+    "weight": "empty",
+    "mood": "unicode",
+    "medication": 2,
+    "care": "empty",
+    "house": "empty",
+    "talk": "empty",
+    "emo": "empty",
+    "safe": "empty",
+    "risk": "empty",
+    "sleep": "long",
+    "eat": "repeat_stop",
+    "work": "empty",
+    "work_dayoff": "empty",
+    "showup": "empty",
+    "finance": "empty",
+    "nutrition": "empty",
+    "problem": "empty",
+    "support": "empty",
+    "family": "empty",
+    "alcohol": "empty",
+    "ciga": "empty",
+    "drug": "empty",
+    "hobbies": "empty",
+    "creativity": "empty",
+    "community": "empty",
+    "social": "empty",
+    "comfortable": "empty",
+    "protection": "empty",
+    "productivity": "empty",
+    "motivation": "empty",
+    "coping": "empty",
+    "sib": "empty",
+    "arrest": "empty",
+    "legal": "empty",
+    "hygiene": "empty",
+    "sports": "empty"
+  },
+  "stop_confirm_invoked": false,
+  "completed_screening": true,
+  "completed_cbt": true
+}

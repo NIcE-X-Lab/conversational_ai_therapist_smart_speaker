@@ -1,0 +1,54 @@
+{
+  "pid": "SMOKE",
+  "name": "smoke_check",
+  "profile": "smoke check, will respond once and quit",
+  "started_at": "2026-05-23T16:02:37",
+  "duration_s": 159.03,
+  "agent_turns_count": 2,
+  "user_turns_count": 1,
+  "agent_turns": [
+    "Let's get started with a couple of questions about your recent daily life.\n\nHave you been taking your prescriptions recently?",
+    "We do not have a dimension at score 2 to work on today. We will conclude here."
+  ],
+  "user_turns": [
+    "stop"
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 2,
+      "total_s": 35.22,
+      "errors": 2,
+      "avg_s": 17.61
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 27.16,
+      "prompt_chars": 1069,
+      "response_chars": 0,
+      "error": "LLMError: LLM engine crash during generate: python/litert_lm/litert_lm.cc:761: operator(): INTERNAL: INTERNAL: [Device] is lost.",
+      "ts": "2026-05-23T16:00:27"
+    },
+    {
+      "role": "general",
+      "latency_s": 8.06,
+      "prompt_chars": 713,
+      "response_chars": 0,
+      "error": "LLMError: LLM engine crash during generate: python/litert_lm/litert_lm.cc:761: operator(): INTERNAL: INTERNAL: [Device] is lost.",
+      "ts": "2026-05-23T16:02:36"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [],
+  "completed": true
+}

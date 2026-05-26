@@ -1,0 +1,213 @@
+{
+  "pid": "P05",
+  "name": "stuck_uncertain",
+  "profile": "Stuck user: replies 'I don't know' to most prompts, drives brainstorm path.",
+  "duration_sec": 0.54,
+  "agent_turn_count": 74,
+  "user_turn_count": 72,
+  "llm_calls_by_role": {
+    "general": 2,
+    "rephraser": 8
+  },
+  "retry_guide_triggers": 36,
+  "brainstorm_triggers": 36,
+  "rv_decision_breakdown": {
+    "on_topic_0": 0,
+    "off_topic_1": 0
+  },
+  "cbt_dimension_picked": null,
+  "cbt_stage_outcomes": [],
+  "cbt_success": false,
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "exceptions": [],
+  "recorded_scores": {
+    "medication": [
+      1,
+      1
+    ],
+    "mood": [
+      1,
+      1
+    ],
+    "eat": [
+      1,
+      1
+    ],
+    "weight": [
+      1,
+      1
+    ],
+    "showup": [
+      1,
+      1
+    ],
+    "work_dayoff": [
+      1,
+      1
+    ],
+    "work": [
+      1,
+      1
+    ],
+    "care": [
+      1,
+      1
+    ],
+    "sleep": [
+      1,
+      1
+    ],
+    "drug": [
+      1,
+      1
+    ],
+    "ciga": [
+      1,
+      1
+    ],
+    "hygiene": [
+      1,
+      1
+    ],
+    "emo": [
+      1,
+      1
+    ],
+    "support": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "alcohol": [
+      1,
+      1
+    ],
+    "sports": [
+      1,
+      1
+    ],
+    "house": [
+      1,
+      1
+    ],
+    "motivation": [
+      1,
+      1
+    ],
+    "talk": [
+      1,
+      1
+    ],
+    "productivity": [
+      1,
+      1
+    ],
+    "coping": [
+      1,
+      1
+    ],
+    "family": [
+      1,
+      1
+    ],
+    "creativity": [
+      1,
+      1
+    ],
+    "hobbies": [
+      1,
+      1
+    ],
+    "finance": [
+      1,
+      1
+    ],
+    "protection": [
+      1,
+      1
+    ],
+    "safe": [
+      1,
+      1
+    ],
+    "social": [
+      1,
+      1
+    ],
+    "comfortable": [
+      1,
+      1
+    ],
+    "risk": [
+      1,
+      1
+    ],
+    "problem": [
+      1,
+      1
+    ],
+    "arrest": [
+      1,
+      1
+    ],
+    "community": [
+      1,
+      1
+    ],
+    "legal": [
+      1,
+      1
+    ],
+    "sib": [
+      1,
+      1
+    ],
+    "nutrition": [
+      0,
+      0
+    ]
+  },
+  "intended_intents": {
+    "weight": "stuck_once",
+    "mood": "stuck_once",
+    "medication": "stuck_once",
+    "care": "stuck_once",
+    "house": "stuck_once",
+    "talk": "stuck_once",
+    "emo": "stuck_once",
+    "safe": "stuck_once",
+    "risk": "stuck_once",
+    "sleep": "stuck_once",
+    "eat": "stuck_once",
+    "work": "stuck_once",
+    "work_dayoff": "stuck_once",
+    "showup": "stuck_once",
+    "finance": "stuck_once",
+    "nutrition": "stuck_once",
+    "problem": "stuck_once",
+    "support": "stuck_once",
+    "family": "stuck_once",
+    "alcohol": "stuck_once",
+    "ciga": "stuck_once",
+    "drug": "stuck_once",
+    "hobbies": "stuck_once",
+    "creativity": "stuck_once",
+    "community": "stuck_once",
+    "social": "stuck_once",
+    "comfortable": "stuck_once",
+    "protection": "stuck_once",
+    "productivity": "stuck_once",
+    "motivation": "stuck_once",
+    "coping": "stuck_once",
+    "sib": "stuck_once",
+    "arrest": "stuck_once",
+    "legal": "stuck_once",
+    "hygiene": "stuck_once",
+    "sports": "stuck_once"
+  },
+  "stop_confirm_invoked": false,
+  "completed_screening": true,
+  "completed_cbt": false
+}

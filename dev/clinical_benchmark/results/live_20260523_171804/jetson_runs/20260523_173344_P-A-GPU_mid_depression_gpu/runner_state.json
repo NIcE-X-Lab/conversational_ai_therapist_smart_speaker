@@ -1,0 +1,10 @@
+{
+  "phase": "complete",
+  "n_agent_turns": 21,
+  "n_user_turns": 20,
+  "completed": true,
+  "exceptions": [
+    "WATCHDOG: handler did not finish within 1800s \u2014 forcing END_SESSION_EVENT."
+  ],
+  "ts": "2026-05-23T18:03:46"
+}

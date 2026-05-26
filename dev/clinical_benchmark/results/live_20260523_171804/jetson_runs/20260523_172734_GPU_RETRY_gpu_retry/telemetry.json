@@ -1,0 +1,73 @@
+{
+  "pid": "GPU_RETRY",
+  "name": "gpu_retry",
+  "profile": "GPU retry after killing Chromium to free VRAM.",
+  "started_at": "2026-05-23T17:32:19",
+  "duration_s": 284.99,
+  "agent_turns_count": 3,
+  "user_turns_count": 2,
+  "agent_turns": [
+    "I'd like to start with a couple of questions about how you've been feeling lately.\n\nHave you been taking medication according to your prescriptions?",
+    "How would you say your general mood has been these past few days?",
+    "We do not have a dimension at score 2 to work on today. We will conclude here."
+  ],
+  "user_turns": [
+    "Yes, I take everything as prescribed.",
+    "stop"
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 2,
+      "total_s": 9.36,
+      "errors": 0,
+      "avg_s": 4.68
+    },
+    "analyzer": {
+      "n": 1,
+      "total_s": 2.27,
+      "errors": 0,
+      "avg_s": 2.27
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 6.98,
+      "prompt_chars": 1067,
+      "response_chars": 82,
+      "error": null,
+      "ts": "2026-05-23T17:27:42"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 2.27,
+      "prompt_chars": 6024,
+      "response_chars": 13,
+      "error": null,
+      "ts": "2026-05-23T17:30:57"
+    },
+    {
+      "role": "general",
+      "latency_s": 2.38,
+      "prompt_chars": 713,
+      "response_chars": 167,
+      "error": null,
+      "ts": "2026-05-23T17:32:19"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "medication": [
+      0
+    ],
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [],
+  "completed": true
+}

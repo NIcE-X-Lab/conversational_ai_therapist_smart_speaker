@@ -292,14 +292,23 @@ def test_GHI_routing_by_cbt_phase():
     import src.utils.io_record as io_rec
 
     # Build a minimal object exposing the two attributes/methods the
-    # function under test actually needs.
+    # function under test actually needs.  HARD_END now runs a yes/no
+    # confirmation dialog before exiting; the stub fakes that with a
+    # toggleable boolean so we can exercise both confirmed and declined
+    # branches without driving real audio.
     class _StubService:
-        def __init__(self):
+        def __init__(self, confirm_yes: bool = True):
             self.global_command_matcher = GlobalCommandMatcher()
             self.handle_exit_called = 0
+            self._confirm_yes = confirm_yes
+            self.confirm_calls = 0
 
         def handle_exit(self):
             self.handle_exit_called += 1
+
+        def _run_end_confirmation(self):
+            self.confirm_calls += 1
+            return self._confirm_yes
 
     # Bind the method from the class to our stub.
     from src.services.speech_service import SpeechInteractionService
@@ -314,6 +323,8 @@ def test_GHI_routing_by_cbt_phase():
           got is None, f"got {got!r}")
     check("[G] Pre-CBT SOFT_END does NOT call handle_exit",
           stub.handle_exit_called == 0)
+    check("[G] Pre-CBT SOFT_END does NOT trigger end-confirmation",
+          stub.confirm_calls == 0)
 
     got = fn(stub, "let's end the session")
     check("[G] Pre-CBT 'let's end the session' → returns None",
@@ -321,28 +332,53 @@ def test_GHI_routing_by_cbt_phase():
     check("[G] Pre-CBT 'let's end the session' does NOT call handle_exit",
           stub.handle_exit_called == 0)
 
-    # ── [H] HARD_END → returns "END" and calls handle_exit.
-    stub = _StubService()
+    # ── [H] HARD_END (confirmed yes) → returns "END" and calls handle_exit.
+    stub = _StubService(confirm_yes=True)
     got = fn(stub, "end the session")
     check("[H] HARD_END 'end the session' → returns 'END'",
           got == "END", f"got {got!r}")
     check("[H] HARD_END 'end the session' calls handle_exit",
           stub.handle_exit_called == 1)
+    check("[H] HARD_END 'end the session' triggered end-confirmation",
+          stub.confirm_calls == 1)
 
-    stub = _StubService()
+    stub = _StubService(confirm_yes=True)
     got = fn(stub, "goodbye")
     check("[H] HARD_END 'goodbye' → returns 'END'", got == "END")
     check("[H] HARD_END 'goodbye' calls handle_exit",
           stub.handle_exit_called == 1)
 
-    # ── [I] SOFT_END + CBT_STARTED → upgrade to HARD_END.
+    # ── [H'] HARD_END (declined) → returns "END_DECLINED" and does NOT
+    #         call handle_exit.  Session continues.
+    stub = _StubService(confirm_yes=False)
+    got = fn(stub, "end the session")
+    check("[H'] HARD_END declined → returns 'END_DECLINED'",
+          got == "END_DECLINED", f"got {got!r}")
+    check("[H'] HARD_END declined does NOT call handle_exit",
+          stub.handle_exit_called == 0)
+    check("[H'] HARD_END declined still ran the confirmation dialog",
+          stub.confirm_calls == 1)
+
+    # ── [I] SOFT_END + CBT_STARTED → upgrade to HARD_END (no confirmation,
+    #       per design: mid-CBT escalation keeps existing immediate-exit
+    #       behaviour because the user already issued one stop command).
     io_rec.CBT_STARTED_EVENT.set()
-    stub = _StubService()
+    stub = _StubService(confirm_yes=True)
     got = fn(stub, "I don't want to answer any more questions")
     check("[I] Mid-CBT SOFT_END → upgrades to 'END'",
           got == "END", f"got {got!r}")
     check("[I] Mid-CBT SOFT_END calls handle_exit",
           stub.handle_exit_called == 1)
+    check("[I] Mid-CBT SOFT_END escalation skips end-confirmation",
+          stub.confirm_calls == 0)
+
+    # ── [I'] HARD_END mid-CBT (confirmed) → still runs confirmation dialog.
+    stub = _StubService(confirm_yes=True)
+    got = fn(stub, "end the session")
+    check("[I'] Mid-CBT HARD_END (confirmed) → returns 'END'",
+          got == "END", f"got {got!r}")
+    check("[I'] Mid-CBT HARD_END triggered end-confirmation",
+          stub.confirm_calls == 1)
 
     # Reset for next tests.
     io_rec.CBT_STARTED_EVENT.clear()

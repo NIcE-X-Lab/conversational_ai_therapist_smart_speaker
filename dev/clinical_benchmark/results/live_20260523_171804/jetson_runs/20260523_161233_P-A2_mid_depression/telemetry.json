@@ -1,0 +1,359 @@
+{
+  "pid": "P-A2",
+  "name": "mid_depression",
+  "profile": "Mid-range depressive episode: 28yo grad student, low mood + early wakings + skipping meals + lapsed therapy. (CPU backend re-run)",
+  "started_at": "2026-05-23T16:42:37",
+  "duration_s": 1803.36,
+  "agent_turns_count": 12,
+  "user_turns_count": 11,
+  "agent_turns": [
+    "I'd like to start with a couple of questions about how you've been feeling lately.\n\nAre you adhering to the medication regimen prescribed by your physician?",
+    "Have your emotional states been something you have been able to handle recently?",
+    "It seems that Here are a few ways to turn that question into a negative declarative sentence, depending on the nuance you want to emphasize:\n\n**Option 1 (Focusing on the inability to manage):**\n\n> You haven't been able to manage your moods.\n\n**Option 2 (More direct negation of the ability):**\n\n> You have not been able to manage your moods.\n\n**Option 3 (Slightly more conversational, mirroring the structure of the original question):**\n\n> You haven't been able to manage your moods. (This is the most natural and common way to phrase it.) Can you tell me more about it?",
+    "It sounds like you are carrying a really heavy weight right now, and the feeling that it doesn't lift is incredibly draining, especially when it leads to sleep disturbances and a loss of appetite. It makes perfect sense that when you feel this way, finding the energy to eat properly becomes almost impossible. You might try focusing on very small, easy-to-manage food choices, like sipping on broth or eating a few small, nutrient-dense bites throughout the day instead of aiming for full meals. You could also try to gently shift your focus away from the weight of the feeling by engaging in very low-effort activities, like listening to calming music or a short, gentle stretch. Sometimes just acknowledging the weight without trying to immediately lift it can create a tiny bit of space.\n\nHow's your eating? Are you eating regularly?",
+    "You mentioned that you really haven't been eating regularly. Can you tell me more?",
+    "It sounds incredibly difficult when you feel like food has lost its appeal and you are going from morning until evening without eating, only grabbing small things like crackers or granola bars. It makes sense that when appetite disappears, the desire for food diminishes, and that feeling of loss is very real. You might try focusing on very small, non-food-related activities to shift your focus, like gentle stretching or a short walk, to see if that shifts your mental state. You could try introducing very small, nutrient-dense items that don't feel like a full meal, perhaps focusing on hydration first. Consider talking to a professional about appetite changes, as they can offer specific strategies for gently rebuilding a connection to food when the desire isn't there.\n\nHow has your sleep been? Do you have a regular sleeping schedule?",
+    "You mentioned that you have a mess sleep. Can you tell me more?",
+    "It sounds incredibly exhausting to wake up around three a.m. with your mind racing and only getting four or five hours of broken sleep, which must feel really draining. It makes sense that when your mind is racing, it makes it hard to settle down and get restful sleep. You might try establishing a very strict, calming routine for the hour before bed, like turning off screens completely, reading a physical book, or practicing deep breathing exercises. You could also try a 'worry time' earlier in the evening, where you write down all those racing thoughts so your mind has permission to let them go until the next day. Consider using a white noise machine or a specific sleep story to help signal to your body that it is time to rest.\n\nHave you been attending your appointments with your medical or mental-health providers?",
+    "It seems that Answer: You haven't been seeing your doctor, therapist, or case manager consistently. Can you tell me more about it?",
+    "It sounds incredibly difficult to feel stuck in a cycle where you know you should call but freezing up makes you miss appointments, which then leads to guilt and makes the next call even harder. That feeling of guilt when you miss something you know you should do is a very heavy burden to carry. It is completely understandable that the pressure of calling feels overwhelming when you are already feeling anxious about the situation. You might try breaking the task down into the smallest possible step, like just writing down the number you need to call. You could also prepare a script beforehand with just a few sentences about why you need to call, so you have something concrete to focus on when you pick up the phone. Finally, consider setting a very short, non-negotiable reminder on your phone to make that first contact feel less spontaneous and more manageable.\n\nHave you lost or gained a significant amount of weight recently?",
+    "Have you been giving yourself room to rest away from work?",
+    "Have you been meeting your obligations as they come up?"
+  ],
+  "user_turns": [
+    "I'm not on any medication right now. I stopped seeing my therapist about three months ago.",
+    "Honestly, no. My mood has been really low most days for the past two months. It feels heavy and I can't shake it.",
+    "It feels like a heavy weight that doesn't lift. I sleep a few hours then wake up at three in the morning and just lie there. Most days I can't bring myself to eat properly either.",
+    "No, I really haven't been eating regularly. I skip breakfast most days and dinner is whatever I can grab \u2014 sometimes I just don't bother.",
+    "I just don't have an appetite anymore. I'll go from morning until evening without eating and then maybe grab some crackers or a granola bar. It feels like food has lost its appeal.",
+    "No, my sleep is a mess. I wake up at three in the morning almost every night and can't get back to sleep. By the time I get up I feel exhausted before the day starts.",
+    "Yeah, I wake up around three a.m. and just lie there with my mind racing. I get maybe four or five hours of broken sleep on a good night.",
+    "No. I haven't seen my therapist in about three months. I keep meaning to call but I don't.",
+    "I keep telling myself I should call but every time I pick up the phone I freeze. I miss the appointments and feel guilty and then it gets harder to call.",
+    "A little \u2014 maybe five pounds in a month or so. My pants fit looser.",
+    "Not really. I've been working most weekends because I cant focus during the week."
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 1,
+      "total_s": 44.09,
+      "errors": 0,
+      "avg_s": 44.09
+    },
+    "rephraser": {
+      "n": 4,
+      "total_s": 43.45,
+      "errors": 0,
+      "avg_s": 10.86
+    },
+    "analyzer": {
+      "n": 16,
+      "total_s": 253.29,
+      "errors": 0,
+      "avg_s": 15.83
+    },
+    "rv_reasoner": {
+      "n": 4,
+      "total_s": 32.93,
+      "errors": 0,
+      "avg_s": 8.23
+    },
+    "rv_validator": {
+      "n": 4,
+      "total_s": 112.0,
+      "errors": 0,
+      "avg_s": 28.0
+    },
+    "reflective_summarizer": {
+      "n": 2,
+      "total_s": 4.79,
+      "errors": 0,
+      "avg_s": 2.4
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 44.09,
+      "prompt_chars": 1072,
+      "response_chars": 82,
+      "error": null,
+      "ts": "2026-05-23T16:13:19"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 14.17,
+      "prompt_chars": 1495,
+      "response_chars": 83,
+      "error": null,
+      "ts": "2026-05-23T16:13:33"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 17.43,
+      "prompt_chars": 6031,
+      "response_chars": 13,
+      "error": null,
+      "ts": "2026-05-23T16:16:33"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.66,
+      "prompt_chars": 6048,
+      "response_chars": 7,
+      "error": null,
+      "ts": "2026-05-23T16:16:49"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 9.18,
+      "prompt_chars": 1479,
+      "response_chars": 91,
+      "error": null,
+      "ts": "2026-05-23T16:16:58"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.76,
+      "prompt_chars": 6065,
+      "response_chars": 7,
+      "error": null,
+      "ts": "2026-05-23T16:18:15"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.7,
+      "prompt_chars": 6039,
+      "response_chars": 6,
+      "error": null,
+      "ts": "2026-05-23T16:18:30"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 17.81,
+      "prompt_chars": 500,
+      "response_chars": 526,
+      "error": null,
+      "ts": "2026-05-23T16:18:48"
+    },
+    {
+      "role": "rv_reasoner",
+      "latency_s": 8.4,
+      "prompt_chars": 2716,
+      "response_chars": 11,
+      "error": null,
+      "ts": "2026-05-23T16:21:12"
+    },
+    {
+      "role": "rv_validator",
+      "latency_s": 28.69,
+      "prompt_chars": 6307,
+      "response_chars": 803,
+      "error": null,
+      "ts": "2026-05-23T16:21:41"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.74,
+      "prompt_chars": 6010,
+      "response_chars": 6,
+      "error": null,
+      "ts": "2026-05-23T16:23:46"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.63,
+      "prompt_chars": 6060,
+      "response_chars": 6,
+      "error": null,
+      "ts": "2026-05-23T16:24:02"
+    },
+    {
+      "role": "reflective_summarizer",
+      "latency_s": 3.41,
+      "prompt_chars": 384,
+      "response_chars": 41,
+      "error": null,
+      "ts": "2026-05-23T16:24:05"
+    },
+    {
+      "role": "rv_reasoner",
+      "latency_s": 8.16,
+      "prompt_chars": 2710,
+      "response_chars": 11,
+      "error": null,
+      "ts": "2026-05-23T16:25:57"
+    },
+    {
+      "role": "rv_validator",
+      "latency_s": 27.08,
+      "prompt_chars": 6301,
+      "response_chars": 789,
+      "error": null,
+      "ts": "2026-05-23T16:26:24"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.68,
+      "prompt_chars": 6011,
+      "response_chars": 8,
+      "error": null,
+      "ts": "2026-05-23T16:28:21"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.67,
+      "prompt_chars": 6069,
+      "response_chars": 8,
+      "error": null,
+      "ts": "2026-05-23T16:28:36"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.66,
+      "prompt_chars": 6048,
+      "response_chars": 8,
+      "error": null,
+      "ts": "2026-05-23T16:28:52"
+    },
+    {
+      "role": "reflective_summarizer",
+      "latency_s": 1.38,
+      "prompt_chars": 364,
+      "response_chars": 22,
+      "error": null,
+      "ts": "2026-05-23T16:28:54"
+    },
+    {
+      "role": "rv_reasoner",
+      "latency_s": 8.18,
+      "prompt_chars": 2670,
+      "response_chars": 11,
+      "error": null,
+      "ts": "2026-05-23T16:30:38"
+    },
+    {
+      "role": "rv_validator",
+      "latency_s": 28.02,
+      "prompt_chars": 6261,
+      "response_chars": 750,
+      "error": null,
+      "ts": "2026-05-23T16:31:06"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.7,
+      "prompt_chars": 6060,
+      "response_chars": 7,
+      "error": null,
+      "ts": "2026-05-23T16:33:34"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.66,
+      "prompt_chars": 6033,
+      "response_chars": 7,
+      "error": null,
+      "ts": "2026-05-23T16:33:50"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.66,
+      "prompt_chars": 6018,
+      "response_chars": 7,
+      "error": null,
+      "ts": "2026-05-23T16:34:05"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 2.29,
+      "prompt_chars": 511,
+      "response_chars": 85,
+      "error": null,
+      "ts": "2026-05-23T16:34:08"
+    },
+    {
+      "role": "rv_reasoner",
+      "latency_s": 8.19,
+      "prompt_chars": 2687,
+      "response_chars": 11,
+      "error": null,
+      "ts": "2026-05-23T16:35:45"
+    },
+    {
+      "role": "rv_validator",
+      "latency_s": 28.21,
+      "prompt_chars": 6278,
+      "response_chars": 884,
+      "error": null,
+      "ts": "2026-05-23T16:36:13"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.72,
+      "prompt_chars": 6033,
+      "response_chars": 9,
+      "error": null,
+      "ts": "2026-05-23T16:38:17"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.8,
+      "prompt_chars": 6007,
+      "response_chars": 9,
+      "error": null,
+      "ts": "2026-05-23T16:38:33"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.94,
+      "prompt_chars": 5992,
+      "response_chars": 14,
+      "error": null,
+      "ts": "2026-05-23T16:40:33"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.88,
+      "prompt_chars": 6050,
+      "response_chars": 14,
+      "error": null,
+      "ts": "2026-05-23T16:40:48"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "medication": [
+      0
+    ],
+    "mood": [
+      2
+    ],
+    "eat": [
+      2
+    ],
+    "sleep": [
+      2
+    ],
+    "care": [
+      2
+    ],
+    "weight": [
+      1
+    ],
+    "work_dayoff": [
+      1
+    ],
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [
+    "WATCHDOG: handler did not finish within 1800s \u2014 forcing END_SESSION_EVENT."
+  ],
+  "completed": true
+}

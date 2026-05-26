@@ -1,0 +1,87 @@
+{
+  "pid": "P-C",
+  "name": "stop_early",
+  "profile": "User who answers 1-2 dims briefly then says no more questions to test soft-end intercept.",
+  "started_at": "2026-05-23T17:16:32",
+  "duration_s": 344.92,
+  "agent_turns_count": 3,
+  "user_turns_count": 2,
+  "agent_turns": [
+    "I'd like to start with a couple of questions about how you've been feeling lately.\n\nHave you been taking your prescriptions recently?",
+    "Can you describe your current mood and your feelings regarding that mood?",
+    "We do not have a dimension at score 2 to work on today. We will conclude here."
+  ],
+  "user_turns": [
+    "Yes, I take everything as prescribed.",
+    "Honestly, no more questions, I would like to stop."
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 2,
+      "total_s": 40.31,
+      "errors": 0,
+      "avg_s": 20.16
+    },
+    "analyzer": {
+      "n": 1,
+      "total_s": 15.81,
+      "errors": 0,
+      "avg_s": 15.81
+    },
+    "rephraser": {
+      "n": 1,
+      "total_s": 9.14,
+      "errors": 0,
+      "avg_s": 9.14
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 30.2,
+      "prompt_chars": 1068,
+      "response_chars": 82,
+      "error": null,
+      "ts": "2026-05-23T17:11:18"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.81,
+      "prompt_chars": 6009,
+      "response_chars": 13,
+      "error": null,
+      "ts": "2026-05-23T17:14:54"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 9.14,
+      "prompt_chars": 1483,
+      "response_chars": 84,
+      "error": null,
+      "ts": "2026-05-23T17:15:04"
+    },
+    {
+      "role": "general",
+      "latency_s": 10.11,
+      "prompt_chars": 713,
+      "response_chars": 139,
+      "error": null,
+      "ts": "2026-05-23T17:16:32"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "medication": [
+      0
+    ],
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [],
+  "completed": true
+}

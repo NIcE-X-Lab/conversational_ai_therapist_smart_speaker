@@ -1,0 +1,73 @@
+{
+  "pid": "P-C-GPU",
+  "name": "stop_early_gpu",
+  "profile": "GPU re-run: stop early via no more questions soft-end intercept.",
+  "started_at": "2026-05-23T18:13:20",
+  "duration_s": 220.18,
+  "agent_turns_count": 3,
+  "user_turns_count": 2,
+  "agent_turns": [
+    "I'd like to start with a couple of questions about how you've been feeling lately.\n\nHave you been following the medication plan your provider set up?",
+    "How's your mood recently?",
+    "We do not have a dimension at score 2 to work on today. We will conclude here."
+  ],
+  "user_turns": [
+    "Yes I take everything.",
+    "Honestly, no more questions, I would like to stop."
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 2,
+      "total_s": 8.06,
+      "errors": 0,
+      "avg_s": 4.03
+    },
+    "analyzer": {
+      "n": 1,
+      "total_s": 2.28,
+      "errors": 0,
+      "avg_s": 2.28
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 5.7,
+      "prompt_chars": 1072,
+      "response_chars": 82,
+      "error": null,
+      "ts": "2026-05-23T18:09:46"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 2.28,
+      "prompt_chars": 6010,
+      "response_chars": 13,
+      "error": null,
+      "ts": "2026-05-23T18:12:43"
+    },
+    {
+      "role": "general",
+      "latency_s": 2.36,
+      "prompt_chars": 713,
+      "response_chars": 167,
+      "error": null,
+      "ts": "2026-05-23T18:13:20"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "medication": [
+      0
+    ],
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [],
+  "completed": true
+}

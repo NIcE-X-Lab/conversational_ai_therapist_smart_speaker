@@ -1,0 +1,86 @@
+{
+  "pid": "P-A",
+  "name": "mid_depression",
+  "profile": "Mid-range depressive episode: 28yo grad student, low mood + early wakings + skipping meals + lapsed therapy.",
+  "started_at": "2026-05-23T16:19:30",
+  "duration_s": 809.7,
+  "agent_turns_count": 3,
+  "user_turns_count": 2,
+  "agent_turns": [
+    "Let's get started with a couple of questions about your recent daily life.\n\nHave you been taking medication according to doctor's recommendation?",
+    "Have your moods been something you can manage lately?",
+    "Are you eating at fairly steady times each day?"
+  ],
+  "user_turns": [
+    "I'm not taking any medication right now. I stopped seeing my therapist a few months ago.",
+    "Honestly, no. My mood has been really low most days for the last couple of months. It feels heavy and I can't shake it."
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 1,
+      "total_s": 14.36,
+      "errors": 1,
+      "avg_s": 14.36
+    },
+    "analyzer": {
+      "n": 2,
+      "total_s": 11.68,
+      "errors": 2,
+      "avg_s": 5.84
+    },
+    "rephraser": {
+      "n": 1,
+      "total_s": 0.0,
+      "errors": 1,
+      "avg_s": 0.0
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 14.36,
+      "prompt_chars": 1072,
+      "response_chars": 0,
+      "error": "LLMError: LLM engine crash during generate: python/litert_lm/litert_lm.cc:761: operator(): INTERNAL: INTERNAL: [Device] is lost.",
+      "ts": "2026-05-23T16:06:16"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 9.51,
+      "prompt_chars": 6032,
+      "response_chars": 0,
+      "error": "LLMError: LLM engine crash during generate: python/litert_lm/litert_lm.cc:761: operator(): INTERNAL: INTERNAL: [Device] is lost.",
+      "ts": "2026-05-23T16:08:54"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 2.17,
+      "prompt_chars": 6044,
+      "response_chars": 0,
+      "error": "LLMError: LLM engine crash during generate: python/litert_lm/litert_lm.cc:761: operator(): INTERNAL: INTERNAL: [Device] is lost.",
+      "ts": "2026-05-23T16:09:29"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 0.0,
+      "prompt_chars": 1473,
+      "response_chars": 0,
+      "error": "LLMError: LiteRT engine has failed 3 times this session; refusing further attempts.",
+      "ts": "2026-05-23T16:09:29"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [
+    "User reply timeout at agent turn #3"
+  ],
+  "completed": true
+}

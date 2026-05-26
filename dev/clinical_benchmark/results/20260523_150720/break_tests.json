@@ -1,0 +1,417 @@
+[
+  {
+    "check": "GlobalCommandMatcher: 'end the session' -> HARD_END",
+    "passed": true,
+    "detail": "got 'HARD_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'End the session.' -> HARD_END",
+    "passed": true,
+    "detail": "got 'HARD_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'goodbye' -> HARD_END",
+    "passed": true,
+    "detail": "got 'HARD_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'bye' -> HARD_END",
+    "passed": true,
+    "detail": "got 'HARD_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'stop the session' -> HARD_END",
+    "passed": true,
+    "detail": "got 'HARD_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'no more questions' -> SOFT_END",
+    "passed": true,
+    "detail": "got 'SOFT_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: \"I don't want to answer any more questions\" -> SOFT_END",
+    "passed": true,
+    "detail": "got 'SOFT_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: \"that's enough for today\" -> SOFT_END",
+    "passed": true,
+    "detail": "got 'SOFT_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: \"I'm done with questions\" -> SOFT_END",
+    "passed": true,
+    "detail": "got 'SOFT_END'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'start session' -> START",
+    "passed": true,
+    "detail": "got 'START'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'hi katie' -> START",
+    "passed": true,
+    "detail": "got 'START'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'hello' -> None",
+    "passed": false,
+    "detail": "got 'START'"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'how are you' -> None",
+    "passed": true,
+    "detail": "got None"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'I feel sad' -> None",
+    "passed": true,
+    "detail": "got None"
+  },
+  {
+    "check": "GlobalCommandMatcher: '' -> None",
+    "passed": true,
+    "detail": "got None"
+  },
+  {
+    "check": "GlobalCommandMatcher: '    ' -> None",
+    "passed": true,
+    "detail": "got None"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'I need to be healthy and have green food' -> None",
+    "passed": true,
+    "detail": "got None"
+  },
+  {
+    "check": "GlobalCommandMatcher: 'Is the session almost over?' -> None",
+    "passed": true,
+    "detail": "got None"
+  },
+  {
+    "check": "GlobalCommandMatcher: '\u2014\u2014 emdash flood \u2014\u2014' -> None",
+    "passed": true,
+    "detail": "got None"
+  },
+  {
+    "check": "_classify_confirm: 'yes' -> yes",
+    "passed": true,
+    "detail": "got 'yes'"
+  },
+  {
+    "check": "_classify_confirm: 'YES PLEASE' -> yes",
+    "passed": true,
+    "detail": "got 'yes'"
+  },
+  {
+    "check": "_classify_confirm: 'Yes go ahead.' -> yes",
+    "passed": true,
+    "detail": "got 'yes'"
+  },
+  {
+    "check": "_classify_confirm: 'sure' -> yes",
+    "passed": true,
+    "detail": "got 'yes'"
+  },
+  {
+    "check": "_classify_confirm: 'no' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'NO' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'never mind' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'not yet' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'keep going' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'wait' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'no, I think we should keep going' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'yes wait actually no' -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: 'mmm' -> unclear",
+    "passed": true,
+    "detail": "got 'unclear'"
+  },
+  {
+    "check": "_classify_confirm: \"hmmm I don't know\" -> no",
+    "passed": true,
+    "detail": "got 'no'"
+  },
+  {
+    "check": "_classify_confirm: '' -> unclear",
+    "passed": true,
+    "detail": "got 'unclear'"
+  },
+  {
+    "check": "_classify_confirm: '   ' -> unclear",
+    "passed": true,
+    "detail": "got 'unclear'"
+  },
+  {
+    "check": "_is_dont_know: \"I don't know\" -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_is_dont_know: 'i dont know' -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_is_dont_know: \"I DON'T KNOW\" -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_is_dont_know: 'No idea' -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_is_dont_know: \"I don't want to answer\" -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_is_dont_know: 'I have nothing to say' -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_is_dont_know: 'Not sure what to say' -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_is_dont_know: \"I don't have a therapist\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: \"I haven't visited my prescriber for a while\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: \"I often don't eat regularly\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: \"I don't smoke cigarettes\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: \"I don't get it\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: \"I'm not sure\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: 'maybe' -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: '' -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_is_dont_know: '\u2014 unicode dash \u2014' -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "Brainstorm 'mood' contains 'low days'",
+    "passed": true,
+    "detail": "That's okay, we can think about it together. Maybe just consider low days, irritable patches, or moments where you felt unusually flat \u2014 anything that comes to mind, even briefly, is useful."
+  },
+  {
+    "check": "Brainstorm fallback for unknown dim contains 'past week'",
+    "passed": true,
+    "detail": "That's okay, we can take it slow. Try thinking about the past week \u2014 even one small moment that touches on this topic is enough to share."
+  },
+  {
+    "check": "_matches_soft_end_intent: 'no more questions' -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_matches_soft_end_intent: \"I don't want to answer any more questions\" -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_matches_soft_end_intent: \"that's enough for today\" -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_matches_soft_end_intent: \"I'm done with questions\" -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_matches_soft_end_intent: \"let's end the session\" -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_matches_soft_end_intent: 'I want to end the session' -> True",
+    "passed": true,
+    "detail": "got True"
+  },
+  {
+    "check": "_matches_soft_end_intent: \"I don't have a therapist\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_matches_soft_end_intent: \"I don't want pizza\" -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_matches_soft_end_intent: 'the questions help me a lot' -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "_matches_soft_end_intent: '' -> False",
+    "passed": true,
+    "detail": "got False"
+  },
+  {
+    "check": "HARD_END returns END_PENDING and does NOT call handle_exit",
+    "passed": true,
+    "detail": "got=END_PENDING latch=True exit_calls=0"
+  },
+  {
+    "check": "Mid-CBT SOFT_END returns END_PENDING (deferred confirm)",
+    "passed": true,
+    "detail": "got=END_PENDING latch=True exit_calls=0"
+  },
+  {
+    "check": "Pre-CBT SOFT_END returns None (let analyzer Stop the loop) and no latch",
+    "passed": true,
+    "detail": "got=None latch=False"
+  },
+  {
+    "check": "speech_service forces MUSIC stage in _run_one_intermission_activity when CBT active",
+    "passed": true,
+    "detail": "missing the music-only branch"
+  },
+  {
+    "check": "speech_service suppresses music announcement during CBT in _run_music_block",
+    "passed": true,
+    "detail": "missing CBT-active guard"
+  },
+  {
+    "check": "speech_service skips outro/bridge during CBT",
+    "passed": true,
+    "detail": "missing cbt_active_now guard"
+  },
+  {
+    "check": "_INTERMISSION_LEAD_INS_BY_STAGE has SCREENING entry mentioning 'survey'",
+    "passed": true,
+    "detail": "missing stage-specific screening lead-in"
+  },
+  {
+    "check": "retry_guide brainstorm path bypasses LLM when flag ON",
+    "passed": true,
+    "detail": "calls=0 out=\"That's okay, we can think about it together. Maybe just consider low days, irritable patches, or moments where you felt unusually flat \u2014 anything that comes to mind, even briefly, is useful.\""
+  },
+  {
+    "check": "retry_guide LLM path used when flag OFF",
+    "passed": true,
+    "detail": "calls=1 out='legacy LLM'"
+  },
+  {
+    "check": "_is_dont_know on 'I don\\u2019t know' (smart quote)",
+    "passed": true,
+    "detail": "DOCUMENTED: smart-quote apostrophes are NOT matched (legacy regex uses straight quote). STT layer should normalise to straight quote upstream."
+  },
+  {
+    "check": "Persona P01 healthy_student covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P02 mid_depression covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P03 anxious_perfectionist covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P04 substance_use covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P05 stuck_uncertain covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P06 confused_questioning covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P07 stop_early covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P08 self_harm_signal covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P09 mixed_edge_case covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  },
+  {
+    "check": "Persona P10 adversarial covers all 37 dims",
+    "passed": true,
+    "detail": "missing: []"
+  }
+]

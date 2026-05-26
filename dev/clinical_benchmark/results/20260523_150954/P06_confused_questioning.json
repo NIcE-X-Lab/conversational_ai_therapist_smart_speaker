@@ -1,0 +1,217 @@
+{
+  "pid": "P06",
+  "name": "confused_questioning",
+  "profile": "Confused user: asks Question tokens / 'I don't get it' often.",
+  "duration_sec": 0.54,
+  "agent_turn_count": 78,
+  "user_turn_count": 77,
+  "llm_calls_by_role": {
+    "general": 1,
+    "rephraser": 10,
+    "rv_guide": 34,
+    "reflective_summarizer": 2,
+    "rv_reasoner": 2,
+    "rv_validator": 2,
+    "cbt_reasoner": 4,
+    "cbt_guide": 2
+  },
+  "retry_guide_triggers": 34,
+  "brainstorm_triggers": 0,
+  "rv_decision_breakdown": {
+    "on_topic_0": 2,
+    "off_topic_1": 0
+  },
+  "cbt_dimension_picked": "(picked by index)",
+  "cbt_stage_outcomes": [
+    "stage1_entered",
+    "stage1_entered",
+    "stage2_entered",
+    "stage3_entered",
+    "success"
+  ],
+  "cbt_success": true,
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "exceptions": [],
+  "recorded_scores": {
+    "medication": [
+      1,
+      1
+    ],
+    "mood": [
+      2,
+      2
+    ],
+    "eat": [
+      1,
+      1
+    ],
+    "sleep": [
+      2,
+      2
+    ],
+    "care": [
+      1,
+      1
+    ],
+    "work_dayoff": [
+      1,
+      1
+    ],
+    "weight": [
+      1,
+      1
+    ],
+    "showup": [
+      1,
+      1
+    ],
+    "alcohol": [
+      1,
+      1
+    ],
+    "talk": [
+      1,
+      1
+    ],
+    "house": [
+      1,
+      1
+    ],
+    "support": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "ciga": [
+      1,
+      1
+    ],
+    "productivity": [
+      0,
+      0
+    ],
+    "drug": [
+      1,
+      1
+    ],
+    "sports": [
+      1,
+      1
+    ],
+    "hygiene": [
+      1,
+      1
+    ],
+    "motivation": [
+      1,
+      1
+    ],
+    "creativity": [
+      1,
+      1
+    ],
+    "coping": [
+      1,
+      1
+    ],
+    "family": [
+      1,
+      1
+    ],
+    "hobbies": [
+      1,
+      1
+    ],
+    "risk": [
+      1,
+      1
+    ],
+    "social": [
+      1,
+      1
+    ],
+    "comfortable": [
+      1,
+      1
+    ],
+    "safe": [
+      1,
+      1
+    ],
+    "protection": [
+      1,
+      1
+    ],
+    "finance": [
+      1,
+      1
+    ],
+    "problem": [
+      1,
+      1
+    ],
+    "community": [
+      1,
+      1
+    ],
+    "legal": [
+      1,
+      1
+    ],
+    "sib": [
+      1,
+      1
+    ],
+    "arrest": [
+      1,
+      1
+    ],
+    "nutrition": [
+      0,
+      0
+    ]
+  },
+  "intended_intents": {
+    "weight": "unsure",
+    "mood": 2,
+    "medication": "unsure",
+    "care": "unsure",
+    "house": "unsure",
+    "talk": "unsure",
+    "emo": "unsure",
+    "safe": "unsure",
+    "risk": "unsure",
+    "sleep": 2,
+    "eat": "unsure",
+    "work": "unsure",
+    "work_dayoff": "unsure",
+    "showup": "unsure",
+    "finance": "unsure",
+    "nutrition": "unsure",
+    "problem": "unsure",
+    "support": "unsure",
+    "family": "unsure",
+    "alcohol": "unsure",
+    "ciga": "unsure",
+    "drug": "unsure",
+    "hobbies": "unsure",
+    "creativity": "unsure",
+    "community": "unsure",
+    "social": "unsure",
+    "comfortable": "unsure",
+    "protection": "unsure",
+    "productivity": "unsure",
+    "motivation": "unsure",
+    "coping": "unsure",
+    "sib": "unsure",
+    "arrest": "unsure",
+    "legal": "unsure",
+    "hygiene": "unsure",
+    "sports": "unsure"
+  },
+  "stop_confirm_invoked": false,
+  "completed_screening": true,
+  "completed_cbt": true
+}

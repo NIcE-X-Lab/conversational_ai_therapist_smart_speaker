@@ -1,0 +1,73 @@
+{
+  "pid": "P06",
+  "name": "confused_questioning",
+  "profile": "Confused user: asks Question tokens / 'I don't get it' often.",
+  "duration_sec": 60.11,
+  "agent_turn_count": 2,
+  "user_turn_count": 1,
+  "llm_calls_by_role": {
+    "general": 1,
+    "rv_guide": 1
+  },
+  "retry_guide_triggers": 0,
+  "brainstorm_triggers": 0,
+  "rv_decision_breakdown": {
+    "on_topic_0": 0,
+    "off_topic_1": 0
+  },
+  "cbt_dimension_picked": null,
+  "cbt_stage_outcomes": [],
+  "cbt_success": false,
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "exceptions": [
+    "WATCHDOG: handler did not finish within 60s \u2014 setting END_SESSION_EVENT and force-draining."
+  ],
+  "recorded_scores": {
+    "nutrition": [
+      0,
+      0
+    ]
+  },
+  "intended_intents": {
+    "weight": "unsure",
+    "mood": 2,
+    "medication": "unsure",
+    "care": "unsure",
+    "house": "unsure",
+    "talk": "unsure",
+    "emo": "unsure",
+    "safe": "unsure",
+    "risk": "unsure",
+    "sleep": 2,
+    "eat": "unsure",
+    "work": "unsure",
+    "work_dayoff": "unsure",
+    "showup": "unsure",
+    "finance": "unsure",
+    "nutrition": "unsure",
+    "problem": "unsure",
+    "support": "unsure",
+    "family": "unsure",
+    "alcohol": "unsure",
+    "ciga": "unsure",
+    "drug": "unsure",
+    "hobbies": "unsure",
+    "creativity": "unsure",
+    "community": "unsure",
+    "social": "unsure",
+    "comfortable": "unsure",
+    "protection": "unsure",
+    "productivity": "unsure",
+    "motivation": "unsure",
+    "coping": "unsure",
+    "sib": "unsure",
+    "arrest": "unsure",
+    "legal": "unsure",
+    "hygiene": "unsure",
+    "sports": "unsure"
+  },
+  "stop_confirm_invoked": false,
+  "completed_screening": true,
+  "completed_cbt": false
+}

@@ -1,0 +1,13 @@
+[SYS] Starting live persona run for P-A (mid_depression) at 2026-05-23T16:06:00
+[SYS] Profile: Mid-range depressive episode: 28yo grad student, low mood + early wakings + skipping meals + lapsed therapy.
+[SYS] DB session id = 11
+[SYS] Handler thread launched.
+[AGENT #01] Let's get started with a couple of questions about your recent daily life.
+
+Have you been taking medication according to doctor's recommendation?
+[USER #01] I'm not taking any medication right now. I stopped seeing my therapist a few months ago.
+[AGENT #02] Have your moods been something you can manage lately?
+[USER #02] Honestly, no. My mood has been really low most days for the last couple of months. It feels heavy and I can't shake it.
+[AGENT #03] Are you eating at fairly steady times each day?
+[SYS] User reply timeout (600s) — sending SESSION_END.
+[SYS] Run complete at 2026-05-23T16:19:30.

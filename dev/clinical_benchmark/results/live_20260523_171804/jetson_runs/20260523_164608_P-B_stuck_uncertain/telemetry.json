@@ -1,0 +1,87 @@
+{
+  "pid": "P-B",
+  "name": "stuck_uncertain",
+  "profile": "Stuck user: replies I dont know early; needs scaffolding to engage. Stop after a few brainstorm-driven scores.",
+  "started_at": "2026-05-23T17:00:17",
+  "duration_s": 848.99,
+  "agent_turns_count": 2,
+  "user_turns_count": 1,
+  "agent_turns": [
+    "I'd like to start with a couple of questions about how you've been feeling lately.\n\nAre you adhering to the prescribed schedule and dosage for your medications?",
+    "How would you characterize your overall mood during this recent period?"
+  ],
+  "user_turns": [
+    "I don't know."
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 1,
+      "total_s": 37.72,
+      "errors": 0,
+      "avg_s": 37.72
+    },
+    "rephraser": {
+      "n": 2,
+      "total_s": 20.63,
+      "errors": 0,
+      "avg_s": 10.32
+    },
+    "analyzer": {
+      "n": 1,
+      "total_s": 16.69,
+      "errors": 0,
+      "avg_s": 16.69
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 37.72,
+      "prompt_chars": 1073,
+      "response_chars": 82,
+      "error": null,
+      "ts": "2026-05-23T16:46:47"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 11.64,
+      "prompt_chars": 1495,
+      "response_chars": 87,
+      "error": null,
+      "ts": "2026-05-23T16:46:59"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 16.69,
+      "prompt_chars": 6012,
+      "response_chars": 13,
+      "error": null,
+      "ts": "2026-05-23T16:50:08"
+    },
+    {
+      "role": "rephraser",
+      "latency_s": 8.99,
+      "prompt_chars": 1488,
+      "response_chars": 82,
+      "error": null,
+      "ts": "2026-05-23T16:50:17"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "medication": [
+      1
+    ],
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [
+    "User reply timeout at agent turn #2"
+  ],
+  "completed": true
+}

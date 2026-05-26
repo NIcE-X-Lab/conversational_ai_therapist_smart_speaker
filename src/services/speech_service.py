@@ -118,6 +118,32 @@ _SCREENING_FOLLOWUPS = [
 _OPT_OUT_KEYWORDS = ("skip", "don't want", "opt out", "no thanks",
                      "just music", "play music", "i'd rather not")
 
+# End-session confirmation patterns. Used by `_run_end_confirmation`
+# to parse the user's reply to "Are you sure you want to end the
+# session? Please say yes or no." We accept a generous set of yes/no
+# phrasings; anything that matches neither falls through to a re-prompt
+# and ultimately defaults to "no" (continue session) on ambiguity.
+_END_CONFIRM_YES_PATTERNS = (
+    re.compile(r"\byes\b", re.IGNORECASE),
+    re.compile(r"\byeah\b", re.IGNORECASE),
+    re.compile(r"\byep\b", re.IGNORECASE),
+    re.compile(r"\bsure\b", re.IGNORECASE),
+    re.compile(r"\bokay\b|\bok\b", re.IGNORECASE),
+    re.compile(r"\bend\s+(?:it|the\s+session|now)\b", re.IGNORECASE),
+    re.compile(r"\bi\s+(?:do|am)\b", re.IGNORECASE),
+    re.compile(r"\bconfirm\b", re.IGNORECASE),
+)
+_END_CONFIRM_NO_PATTERNS = (
+    re.compile(r"\bno\b", re.IGNORECASE),
+    re.compile(r"\bnope\b", re.IGNORECASE),
+    re.compile(r"\bnot\s+(?:yet|now|really)\b", re.IGNORECASE),
+    re.compile(r"\bcancel\b", re.IGNORECASE),
+    re.compile(r"\b(?:i\s+)?(?:want\s+to\s+)?continue\b", re.IGNORECASE),
+    re.compile(r"\bkeep\s+going\b", re.IGNORECASE),
+    re.compile(r"\bstay\b", re.IGNORECASE),
+    re.compile(r"\bnever\s*mind\b", re.IGNORECASE),
+)
+
 # Keywords that trigger a "repeat" request
 _REPEAT_KEYWORDS = ("repeat", "again", "say that again", "what was that",
                     "pardon", "sorry what", "one more time", "can you repeat")
@@ -590,20 +616,36 @@ class SpeechInteractionService:
 
         Bug-2 fix — routing depends on whether CBT has started:
 
-        * HARD_END → always close session immediately (paper §5.1 is
-          unaffected; this is a kill-switch, not a clinical signal).
+        * HARD_END → run a yes/no confirmation dialog before closing.
+          On confirmed "yes", call handle_exit() and return "END".
+          On "no" (or ambiguous after re-prompt), return None and the
+          session continues. Applies whether pre-CBT or mid-CBT.
         * SOFT_END → pre-CBT: return None so the transcript flows to the
           Response Analyzer; the analyzer will classify as `Stop`,
           which terminates screening and still routes into CBT
           (handler_rl → run_cbt). Post-CBT-start: upgrade to HARD_END
-          so the user can leave therapy.
+          (without confirmation — mid-CBT escalation keeps the existing
+          immediate-exit behaviour, since the user already issued one
+          stop command and the soft-end phrase is unambiguous in that
+          context).
         * START → pass through.
         """
         command = self.global_command_matcher.match(transcript)
         if command == "HARD_END":
-            logger.info("[SESSION] Hard end command heard — closing session.")
-            self.handle_exit()
-            return "END"
+            logger.info(
+                "[SESSION] Hard end command heard — running end-session "
+                "confirmation."
+            )
+            if self._run_end_confirmation():
+                logger.info("[SESSION] End confirmed — closing session.")
+                self.handle_exit()
+                return "END"
+            logger.info("[SESSION] End declined — continuing session.")
+            # Distinct from None so callers can treat the turn as
+            # consumed by the confirmation dialog (don't queue the
+            # original "goodbye" / "end the session" phrase as a user
+            # response — the confirmation dialog has already used it).
+            return "END_DECLINED"
         if command == "SOFT_END":
             if io_record.CBT_STARTED_EVENT.is_set():
                 # Mid/post-CBT: user wants out. Escalate to hard end.
@@ -627,6 +669,49 @@ class SpeechInteractionService:
         if command == "START":
             return "START"
         return None
+
+    def _classify_end_confirm_reply(self, text: str) -> str:
+        """Return 'yes', 'no', or 'unclear' for an end-confirmation reply."""
+        if not text:
+            return "unclear"
+        t = str(text).strip()
+        if not t:
+            return "unclear"
+        # Check NO patterns first so phrasings like "no, keep going" don't
+        # accidentally hit the "going" → continue match before "no" wins.
+        if any(p.search(t) for p in _END_CONFIRM_NO_PATTERNS):
+            return "no"
+        if any(p.search(t) for p in _END_CONFIRM_YES_PATTERNS):
+            return "yes"
+        return "unclear"
+
+    def _run_end_confirmation(self) -> bool:
+        """Speak a yes/no confirmation prompt and return True only on a
+        clear "yes" reply. On unclear or timed-out replies, re-prompt
+        once; if the second reply is also unclear, default to False
+        (continue session) — safer than ending therapy on ambiguity.
+        """
+        prompts = (
+            "Are you sure you want to end the session? Please say yes or no.",
+            "I didn't catch that. Yes or no — do you want to end the session?",
+        )
+        for attempt, prompt in enumerate(prompts):
+            self.say(prompt)
+            # Listen WITHOUT the priority gate so a second "stop"-flavour
+            # utterance doesn't recurse back into this same confirmation
+            # dialog.  We want a literal yes/no here.
+            reply = self.listen(timeout=10.0, apply_priority_gate=False)
+            classification = self._classify_end_confirm_reply(reply)
+            logger.info(
+                f"[SESSION] End-confirmation reply ({attempt + 1}/{len(prompts)}): "
+                f"{reply!r} → {classification}"
+            )
+            if classification == "yes":
+                return True
+            if classification == "no":
+                return False
+        # Both attempts ambiguous — default to continuing the session.
+        return False
 
     def _sync_intermission_state_from_db(self):
         if not io_record.DB or not io_record.SESSION_ID:
@@ -652,6 +737,13 @@ class SpeechInteractionService:
                 return "__CMD_END__"
             if command == "START":
                 return "__CMD_START__"
+            if command == "END_DECLINED":
+                # User triggered HARD_END but declined the confirmation.
+                # The confirmation dialog already consumed this turn's
+                # mic window; treat as silence so the original phrase
+                # ("goodbye" / "end the session") is not queued as a
+                # user response.
+                return "__CMD_END_DECLINED__"
         return text
 
     def _listen_for_intermission_answer(self, timeout: float, min_window: float = _SCREENING_MIN_LISTEN_WINDOW_SEC) -> str:
@@ -790,7 +882,7 @@ class SpeechInteractionService:
                 logger.error(f"[PARALLEL_STT] Transcription raised: {e}")
                 text = ""
 
-            is_sentinel = text in {"__CMD_END__", "__CMD_START__"} or not text
+            is_sentinel = text in {"__CMD_END__", "__CMD_START__", "__CMD_END_DECLINED__"} or not text
             if is_sentinel:
                 abort_event.set()
             else:
@@ -836,7 +928,7 @@ class SpeechInteractionService:
         if not text:
             return ""
 
-        if text in {"__CMD_END__", "__CMD_START__"}:
+        if text in {"__CMD_END__", "__CMD_START__", "__CMD_END_DECLINED__"}:
             return text
 
         words = text.split()
@@ -845,7 +937,7 @@ class SpeechInteractionService:
             logger.debug(f"[STT] Short transcript ({len(words)} words). Checking for continuation...")
             extra = self.listen(timeout=4.0, apply_priority_gate=apply_priority_gate)
             if extra:
-                if extra in {"__CMD_END__", "__CMD_START__"}:
+                if extra in {"__CMD_END__", "__CMD_START__", "__CMD_END_DECLINED__"}:
                     return extra
                 merged = f"{text} {extra}"
                 logger.debug(f"[STT] Merged fragments: '{merged}'")
@@ -907,14 +999,15 @@ class SpeechInteractionService:
             if duration < self._PARALLEL_MIC_WINDOW_MIN_SEC:
                 user_response = self.transcribe(wav_path, apply_priority_gate=True)
                 # Fragment merge if short + no punctuation.
-                if user_response not in ("", "__CMD_END__", "__CMD_START__"):
+                _SENTINELS = ("", "__CMD_END__", "__CMD_START__", "__CMD_END_DECLINED__")
+                if user_response not in _SENTINELS:
                     words = user_response.split()
                     if len(words) <= 2 and not user_response.rstrip().endswith((".", "!", "?")):
                         extra = self.listen(timeout=4.0, apply_priority_gate=True)
-                        if extra and extra not in ("__CMD_END__", "__CMD_START__"):
+                        if extra and extra not in _SENTINELS:
                             user_response = f"{user_response} {extra}"
                             logger.debug(f"[STT] Serial-path merged fragments: '{user_response}'")
-                        elif extra in ("__CMD_END__", "__CMD_START__"):
+                        elif extra in _SENTINELS and extra:
                             user_response = extra
                 try:
                     self.stt.suspend_all()
@@ -927,9 +1020,15 @@ class SpeechInteractionService:
                     return "session_end"
                 if user_response == "__CMD_START__":
                     return "start_echo"
+                if user_response == "__CMD_END_DECLINED__":
+                    # End-confirmation already consumed this turn; treat
+                    # as silence so the next loop iteration listens fresh.
+                    return "silence"
                 command = self._apply_global_command_priority(user_response)
                 if command == "END":
                     return "session_end"
+                if command == "END_DECLINED":
+                    return "silence"
                 if command == "START":
                     return "start_echo"
                 self.input_queue.put(user_response)
@@ -985,6 +1084,10 @@ class SpeechInteractionService:
                 # Cut any still-playing intermission audio.
                 self.stop_playback_event.set()
                 return "session_end"
+            if user_response == "__CMD_END_DECLINED__":
+                logger.info("[TURN] Parallel STT — END confirmation declined; staying in session.")
+                self.stop_playback_event.set()
+                return "silence"
             if user_response == "__CMD_START__":
                 logger.info("[TURN] Parallel STT detected START command.")
                 self.stop_playback_event.set()
@@ -1630,19 +1733,29 @@ class SpeechInteractionService:
         self._sync_intermission_state_from_db()
         self._music_announced_for_turn = False
 
-        # Pick SCREENING when a PHQ/GAD question is still pending,
-        # else let the ladder pick between BREATHING and MUSIC.
-        if self.intermission_ladder.screening_available():
-            stage = IntermissionStage.SCREENING
+        # During CBT we collapse the intermission to silent MUSIC only —
+        # no SCREENING (the user is mid-CBT, not in a check-in beat),
+        # no BREATHING (a guided script breaks the CBT thread), and no
+        # spoken lead-in or music announcement. Music plays as ambient
+        # cover while the LLM thinks; the CBT response delivers on top.
+        cbt_active = io_record.CBT_STARTED_EVENT.is_set()
+        if cbt_active:
+            stage = IntermissionStage.MUSIC
+            logger.info("[INTERMISSION] CBT active — forcing silent MUSIC intermission.")
         else:
-            stage = self.intermission_ladder.next_activity()
-        logger.info(f"[INTERMISSION] Pre-wait activity: {stage.value}")  # user-engaging activity while LLM thinks
+            # Pick SCREENING when a PHQ/GAD question is still pending,
+            # else let the ladder pick between BREATHING and MUSIC.
+            if self.intermission_ladder.screening_available():
+                stage = IntermissionStage.SCREENING
+            else:
+                stage = self.intermission_ladder.next_activity()
+            logger.info(f"[INTERMISSION] Pre-wait activity: {stage.value}")  # user-engaging activity while LLM thinks
 
-        # Signpost the intermission so the user hears a clear separation
-        # from the main therapy thread before the activity itself starts.
-        # We do this here, centrally, so every stage benefits without the
-        # individual block functions having to duplicate the wording.
-        self._speak_intermission_lead_in(stage)
+            # Signpost the intermission so the user hears a clear separation
+            # from the main therapy thread before the activity itself starts.
+            # We do this here, centrally, so every stage benefits without the
+            # individual block functions having to duplicate the wording.
+            self._speak_intermission_lead_in(stage)
 
         # Only MUSIC is safe to interrupt proactively now. SCREENING
         # collects a PHQ/GAD answer from the user — that's clinical
@@ -1701,7 +1814,10 @@ class SpeechInteractionService:
         experiences the full guided meditation.
         """
         self.state = "music_fallback"
-        if not self._music_announced_for_turn:
+        # During CBT the music plays silently (no spoken announcement)
+        # so the CBT thread isn't broken by an intermission framing line.
+        cbt_active = io_record.CBT_STARTED_EVENT.is_set()
+        if not self._music_announced_for_turn and not cbt_active:
             # Music announcement is an intermission utterance.
             self.say_intermission("I'm still thinking, enjoy the music while I continue.")
             self._music_announced_for_turn = True
@@ -1900,6 +2016,10 @@ class SpeechInteractionService:
             self.music_service.fade_to(_MUSIC_BED_HANDOFF, duration=1.2)
             time.sleep(0.9)
 
+            # During CBT the intermission is silent music only — no outro
+            # and no bridge phrase, so the CBT reply lands directly.
+            cbt_active = io_record.CBT_STARTED_EVENT.is_set()
+
             # Intermission outro — a clearly distinct "that was the
             # intermission; now back to our session" signpost. Played
             # before the standard bridge so the user hears: (1) end of
@@ -1907,7 +2027,7 @@ class SpeechInteractionService:
             # therapy (CaiTI voice), (3) the LLM reply itself (CaiTI
             # voice).  The voice flip between outro and bridge is itself
             # an audible "CaiTI is back" cue.
-            if intermission_was_active and not is_session_start:
+            if intermission_was_active and not is_session_start and not cbt_active:
                 outro = _random.choice(_INTERMISSION_OUTROS)
                 logger.debug(f"[HANDOFF] Intermission outro: '{outro}'")
                 self.say_intermission(outro)
@@ -1918,7 +2038,7 @@ class SpeechInteractionService:
             # yet, so the bridge would be nonsensical.  Skip it for
             # session start; the LLM's opening dimension question is a
             # clean lead-in on its own.
-            if intermission_was_active and not is_session_start:
+            if intermission_was_active and not is_session_start and not cbt_active:
                 bridge = _random.choice(_BRIDGE_PHRASES)
                 logger.debug(f"[HANDOFF] Bridge phrase: '{bridge}'")
                 self.say(bridge)

@@ -342,24 +342,42 @@ def scenario_P3_hard_end_during_screening():
     check("[P3] 'goodbye' classified HARD_END",
           m.match("goodbye") == "HARD_END")
 
-    # Route-through with a stub service.
+    # Route-through with a stub service.  HARD_END now runs a yes/no
+    # confirmation; the stub fakes that with a configurable boolean so
+    # the existing assertions still hold while we also cover decline.
     class _Stub:
-        def __init__(self):
+        def __init__(self, confirm_yes: bool = True):
             self.global_command_matcher = GlobalCommandMatcher()
             self.exit_calls = 0
+            self._confirm_yes = confirm_yes
+            self.confirm_calls = 0
 
         def handle_exit(self):
             self.exit_calls += 1
 
+        def _run_end_confirmation(self):
+            self.confirm_calls += 1
+            return self._confirm_yes
+
     import src.utils.io_record as io_rec
     io_rec.CBT_STARTED_EVENT.clear()
-    stub = _Stub()
+    stub = _Stub(confirm_yes=True)
     fn = SpeechInteractionService._apply_global_command_priority
     got = fn(stub, "end the session")
     check("[P3] HARD_END returns 'END' from _apply_global_command_priority",
           got == "END")
     check("[P3] HARD_END calls handle_exit once",
           stub.exit_calls == 1)
+    check("[P3] HARD_END triggered the end-confirmation dialog",
+          stub.confirm_calls == 1)
+
+    # Declined HARD_END keeps the session alive.
+    stub = _Stub(confirm_yes=False)
+    got = fn(stub, "end the session")
+    check("[P3] HARD_END declined → 'END_DECLINED'",
+          got == "END_DECLINED", f"got {got!r}")
+    check("[P3] HARD_END declined does NOT call handle_exit",
+          stub.exit_calls == 0)
 
 
 # ════════════════════════════════════════════════════════════════════════

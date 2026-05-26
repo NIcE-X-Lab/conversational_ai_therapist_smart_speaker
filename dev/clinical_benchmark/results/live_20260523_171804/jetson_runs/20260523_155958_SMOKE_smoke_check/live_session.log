@@ -1,0 +1,10 @@
+[SYS] Starting live persona run for SMOKE (smoke_check) at 2026-05-23T15:59:58
+[SYS] Profile: smoke check, will respond once and quit
+[SYS] DB session id = 10
+[SYS] Handler thread launched.
+[AGENT #01] Let's get started with a couple of questions about your recent daily life.
+
+Have you been taking your prescriptions recently?
+[USER #01] stop
+[AGENT #02] We do not have a dimension at score 2 to work on today. We will conclude here.
+[SYS] Run complete at 2026-05-23T16:02:37.

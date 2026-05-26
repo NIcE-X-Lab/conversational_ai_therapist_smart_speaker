@@ -1,0 +1,224 @@
+{
+  "pid": "P04",
+  "name": "substance_use",
+  "profile": "Polysubstance use: heavy alcohol, daily drugs, pack-a-day smoker.",
+  "duration_sec": 0.48,
+  "agent_turn_count": 45,
+  "user_turn_count": 44,
+  "llm_calls_by_role": {
+    "general": 1,
+    "rephraser": 5,
+    "reflective_summarizer": 3,
+    "rv_reasoner": 3,
+    "rv_validator": 3,
+    "cbt_reasoner": 4,
+    "cbt_guide": 2
+  },
+  "retry_guide_triggers": 0,
+  "brainstorm_triggers": 0,
+  "rv_decision_breakdown": {
+    "on_topic_0": 3,
+    "off_topic_1": 0
+  },
+  "cbt_dimension_picked": "(picked by index)",
+  "cbt_stage_outcomes": [
+    "stage1_entered",
+    "stage1_entered",
+    "stage2_entered",
+    "stage3_entered",
+    "success"
+  ],
+  "cbt_success": true,
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "exceptions": [],
+  "recorded_scores": {
+    "medication": [
+      0,
+      0
+    ],
+    "mood": [
+      0,
+      0
+    ],
+    "eat": [
+      1,
+      1
+    ],
+    "sleep": [
+      1,
+      1
+    ],
+    "care": [
+      0,
+      0
+    ],
+    "showup": [
+      0,
+      0
+    ],
+    "work_dayoff": [
+      0,
+      0
+    ],
+    "work": [
+      0,
+      0
+    ],
+    "weight": [
+      0,
+      0
+    ],
+    "hygiene": [
+      0,
+      0
+    ],
+    "talk": [
+      0,
+      0
+    ],
+    "drug": [
+      2,
+      2
+    ],
+    "sports": [
+      0,
+      0
+    ],
+    "house": [
+      0,
+      0
+    ],
+    "emo": [
+      0,
+      0
+    ],
+    "productivity": [
+      0,
+      0
+    ],
+    "motivation": [
+      1,
+      1
+    ],
+    "support": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "ciga": [
+      2,
+      2
+    ],
+    "alcohol": [
+      2,
+      2
+    ],
+    "family": [
+      0,
+      0
+    ],
+    "hobbies": [
+      0,
+      0
+    ],
+    "coping": [
+      0,
+      0
+    ],
+    "creativity": [
+      0,
+      0
+    ],
+    "finance": [
+      1,
+      1
+    ],
+    "protection": [
+      0,
+      0
+    ],
+    "comfortable": [
+      0,
+      0
+    ],
+    "social": [
+      0,
+      0
+    ],
+    "risk": [
+      0,
+      0
+    ],
+    "safe": [
+      0,
+      0
+    ],
+    "sib": [
+      0,
+      0
+    ],
+    "legal": [
+      0,
+      0
+    ],
+    "arrest": [
+      0,
+      0
+    ],
+    "problem": [
+      0,
+      0
+    ],
+    "community": [
+      0,
+      0
+    ],
+    "nutrition": [
+      0,
+      0
+    ]
+  },
+  "intended_intents": {
+    "weight": 0,
+    "mood": 0,
+    "medication": 0,
+    "care": 0,
+    "house": 0,
+    "talk": 0,
+    "emo": 0,
+    "safe": 0,
+    "risk": 0,
+    "sleep": 1,
+    "eat": 1,
+    "work": 0,
+    "work_dayoff": 0,
+    "showup": 0,
+    "finance": 1,
+    "nutrition": 0,
+    "problem": 0,
+    "support": 0,
+    "family": 0,
+    "alcohol": 2,
+    "ciga": 2,
+    "drug": 2,
+    "hobbies": 0,
+    "creativity": 0,
+    "community": 0,
+    "social": 0,
+    "comfortable": 0,
+    "protection": 0,
+    "productivity": 0,
+    "motivation": 1,
+    "coping": 0,
+    "sib": 0,
+    "arrest": 0,
+    "legal": 0,
+    "hygiene": 0,
+    "sports": 0
+  },
+  "stop_confirm_invoked": false,
+  "completed_screening": true,
+  "completed_cbt": true
+}

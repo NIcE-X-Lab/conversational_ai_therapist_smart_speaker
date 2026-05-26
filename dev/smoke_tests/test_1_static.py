@@ -43,10 +43,10 @@ def main():
     check("G2 importance[11]=97 (eat pinned)", cfg.ITEM_IMPORTANCE[11] == 97, f"got {cfg.ITEM_IMPORTANCE[11]}")
     check("G5 REASK_DIMENSION_N == False", cfg.REASK_DIMENSION_N is False)
     check("G7 CBT_ESCALATION_ENABLED == False", tc.CBT_ESCALATION_ENABLED is False)
-    # G8 — ON (flipped by operator after session-11 John bug on 2026-04-25
-    # where a score-2 signal on 'emo' was lost because primary was 'mood').
-    check("G8 MULTI_DIM_BACKFILL_ENABLED == True (session-11 fix)",
-          cfg.MULTI_DIM_BACKFILL_ENABLED is True)
+    # G8 — OFF (legacy-parity: paper §4.1 back-fill kept disabled so a
+    # turn's score lands only on the asked dimension, matching demo flow).
+    check("G8 MULTI_DIM_BACKFILL_ENABLED == False (legacy-parity)",
+          cfg.MULTI_DIM_BACKFILL_ENABLED is False)
     check("G9 REFLECTIVE_SUMMARIZER_ENABLED == False", cfg.REFLECTIVE_SUMMARIZER_ENABLED is False)
     check("D3 CRISIS_OVERRIDE_ENABLED == False", tc.CRISIS_OVERRIDE_ENABLED is False)
     # D5/D6 — legacy-parity: legacy prototype DOES rephrase via

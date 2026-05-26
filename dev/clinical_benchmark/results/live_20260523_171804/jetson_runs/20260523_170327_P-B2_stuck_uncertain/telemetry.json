@@ -1,0 +1,86 @@
+{
+  "pid": "P-B2",
+  "name": "stuck_uncertain",
+  "profile": "Stuck user re-run: brief replies, Idontknow until brainstorm fires, then short answers.",
+  "started_at": "2026-05-23T17:10:14",
+  "duration_s": 406.91,
+  "agent_turns_count": 4,
+  "user_turns_count": 3,
+  "agent_turns": [
+    "I'd like to start with a couple of questions about how you've been feeling lately.\n\nHow has your mood been? Have you been able to manage your moods?",
+    "Have you been taking medication according to your prescriptions?",
+    "Over the past week, have you been eating at predictable times?",
+    "We do not have a dimension at score 2 to work on today. We will conclude here."
+  ],
+  "user_turns": [
+    "I don't know.",
+    "I don't know what to say to that question.",
+    "stop"
+  ],
+  "llm_call_summary": {
+    "general": {
+      "n": 2,
+      "total_s": 41.0,
+      "errors": 0,
+      "avg_s": 20.5
+    },
+    "analyzer": {
+      "n": 2,
+      "total_s": 31.63,
+      "errors": 0,
+      "avg_s": 15.81
+    }
+  },
+  "llm_calls": [
+    {
+      "role": "general",
+      "latency_s": 30.39,
+      "prompt_chars": 1073,
+      "response_chars": 82,
+      "error": null,
+      "ts": "2026-05-23T17:03:59"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.79,
+      "prompt_chars": 6000,
+      "response_chars": 7,
+      "error": null,
+      "ts": "2026-05-23T17:07:27"
+    },
+    {
+      "role": "analyzer",
+      "latency_s": 15.84,
+      "prompt_chars": 6029,
+      "response_chars": 13,
+      "error": null,
+      "ts": "2026-05-23T17:09:02"
+    },
+    {
+      "role": "general",
+      "latency_s": 10.61,
+      "prompt_chars": 713,
+      "response_chars": 139,
+      "error": null,
+      "ts": "2026-05-23T17:10:13"
+    }
+  ],
+  "rv_decisions": [],
+  "cbt_dim": null,
+  "cbt_outcomes": [],
+  "crisis_triggered": false,
+  "crisis_dim": null,
+  "recorded_scores": {
+    "mood": [
+      0
+    ],
+    "medication": [
+      0
+    ],
+    "nutrition": [
+      0
+    ]
+  },
+  "exceptions": [],
+  "completed": true
+}
